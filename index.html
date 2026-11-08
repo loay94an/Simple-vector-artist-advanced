@@ -75,7 +75,7 @@
       display: none !important;
     }
   </style>
-  <script type="module" src="./js/app.js?v=20261105-04"></script>
+  <script type="module" src="./js/app.js?v=20261108-03"></script>
 </head>
 
 <body class="light">
@@ -1114,15 +1114,7 @@
   <!-- PWA REGISTRATION & CACHE PURGE -->
   <script>
   if ("serviceWorker" in navigator) {
-    if ("caches" in window) {
-      caches.keys().then(keys => {
-        keys.forEach(k => {
-          if (k !== "rasem-pwa-v10-flex-centered-overlay") {
-            caches.delete(k);
-          }
-        });
-      });
-    }
+    // The active service worker owns cache versioning and removes old caches on activation.
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./service-worker.js")
         .then(reg => {
