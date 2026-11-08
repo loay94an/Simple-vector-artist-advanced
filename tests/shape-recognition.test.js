@@ -112,3 +112,22 @@ test("detects a deliberate corner in an open polyline", () => {
   assert.ok(result.corners.length >= 1);
   assert.ok(result.angles.some(angle => Math.abs(angle - 90) < 20));
 });
+
+test("recognizes a rotated ellipse and preserves its orientation", () => {
+  const angle = Math.PI / 5;
+  const points = Array.from({ length: 121 }, (_, i) => {
+    const theta = Math.PI * 2 * i / 120;
+    const x = Math.cos(theta) * 82;
+    const y = Math.sin(theta) * 34;
+    return {
+      x: 140 + x * Math.cos(angle) - y * Math.sin(angle),
+      y: 110 + x * Math.sin(angle) + y * Math.cos(angle),
+      pressure: 0.5,
+      time: i * 8
+    };
+  });
+  const result = recognizeShape(points);
+  assert.equal(result?.type, "ellipse");
+  assert.ok(Math.abs(result.rotation - angle) < 0.08);
+  assert.ok(result.points.length >= 90);
+});
