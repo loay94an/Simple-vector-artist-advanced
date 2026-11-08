@@ -434,18 +434,16 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
-    const isCalligraphy = this.tool === "calligraphy";
+    // قلم الخط العربي يستعمل العينات الأصلية كما وصلت من القلم/اللمس
+    // دائماً؛ لا تنعيم، لا تبسيط، ولا معالجة مؤجلة عند أي مستوى تصحيح.
+    if (this.tool === "calligraphy") {
+      return this.points.map(point => ({ ...point }));
+    }
 
-    // استخدم قوة التصحيح نفسها لقلم الخط العربي وبقية الأقلام؛
-    // خفضها سابقاً كان يترك اهتزازات المنحنيات ظاهرة.
     this.smoothing.strength = this.baseSmoothingStrength;
+    this.smoothing.minDistance = this.baseSmoothingMinDistance;
 
-    this.smoothing.minDistance = isCalligraphy
-      ? Math.min(this.baseSmoothingMinDistance, 0.02)
-      : this.baseSmoothingMinDistance;
-
-    // لا تطبق أي تنعيم أو تبسيط أثناء تحريك الإصبع.
-    // يعاد تفعيل المعالجة فقط بعد اكتمال مؤقت السكون مع بقاء الضغط.
+    // بقية الأقلام فقط تخضع للتصحيح المؤجل بعد السكون.
     if (this.deferSmoothing) {
       return this.points.map(point => ({ ...point }));
     }
@@ -1625,6 +1623,7 @@ export class DrawingEngine {
     if (
       !this.drawing ||
       this.settings.tool === "eraser" ||
+      this.builder.tool === "calligraphy" ||
       this.settings.lineCorrection <= 0 ||
       this.builder.points.length < 2
     ) return;
@@ -1633,8 +1632,8 @@ export class DrawingEngine {
       this.shapeRecognitionTimer = null;
       if (!this.drawing || this.destroyed) return;
 
-      // لا نفعّل التنعيم إلا بعد 1.3 ثانية من السكون مع استمرار الضغط.
-      // هذا هو الموضع الوحيد الذي يسمح بتنعيم مسار الضربة الحالية.
+      // لا يعمل هذا المؤقت إلا مع الأقلام التي تدعم التصحيح؛
+      // قلم الخط العربي مستثنى بالكامل من مسار التنعيم.
       this.idleCorrectionApplied = true;
       this.builder.deferSmoothing = false;
       this.renderCurrent();
