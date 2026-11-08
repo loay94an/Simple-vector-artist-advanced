@@ -1282,6 +1282,7 @@ export class DrawingEngine {
     this.destroyed = false;
     this.shapeRecognitionTimer = null;
     this.shapeRecognitionApplied = false;
+    this.idleCorrectionApplied = false;
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
       this.renderer,
@@ -1465,6 +1466,7 @@ export class DrawingEngine {
 
     this.clearShapeRecognitionTimer();
     this.shapeRecognitionApplied = false;
+    this.idleCorrectionApplied = false;
     this.drawing = true;
     this.activePointer = event.pointerId ?? null;
 
@@ -1574,8 +1576,9 @@ export class DrawingEngine {
 
     // إذا استأنف المستخدم الرسم بعد توقف قصير والتصحيح التلقائي،
     // نسمح بمتابعة الضربة من آخر نقطة مصححة.
-    if (this.shapeRecognitionApplied) {
+    if (this.shapeRecognitionApplied || this.idleCorrectionApplied) {
       this.shapeRecognitionApplied = false;
+      this.idleCorrectionApplied = false;
       this.clearShapeRecognitionTimer();
     }
 
@@ -1615,6 +1618,8 @@ export class DrawingEngine {
       if (!this.drawing || this.destroyed) return;
 
       // بعد ثبات الإصبع فقط، أعد معالجة المسار مرة واحدة.
+      // نعلّم الضربة كي لا نضيف pointerup كنقطة جديدة بعد التصحيح.
+      this.idleCorrectionApplied = true;
       this.renderCurrent();
 
       // لا نحوّل ضربات الخط العربي إلى أشكال هندسية؛
@@ -1693,6 +1698,8 @@ export class DrawingEngine {
       const lastPoint = this.builder.points.at(-1);
 
       if (
+        !this.idleCorrectionApplied &&
+        !this.shapeRecognitionApplied &&
         finalPoint &&
         EngineUtils.validPoint(finalPoint) &&
         (!lastPoint || EngineUtils.distance(finalPoint, lastPoint) > 0.02)
@@ -2504,6 +2511,7 @@ export class DrawingEngine {
   reset() {
     this.clearShapeRecognitionTimer();
     this.shapeRecognitionApplied = false;
+    this.idleCorrectionApplied = false;
     this.drawing = false;
     this.activePointer = null;
 
