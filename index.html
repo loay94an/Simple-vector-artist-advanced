@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
-  <link rel="stylesheet" href="./css/app.css?v=20261108-03">
+  <link rel="stylesheet" href="./css/app.css?v=20261108-04">
   <style>
     /* Bulletproof Flexbox Centering Overlay for All Dialogs & Modals */
     .modal-overlay-wrapper {
@@ -387,22 +387,20 @@
         <!-- Brush presets section -->
         <section id="brushPresetsSection" style="margin-top:12px;">
           <strong style="font-size:12px; display:block; margin-bottom:6px;">شكل ورأس الفرشاة:</strong>
-          <div class="tool-brush-presets brush-presets-general" style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px;">
-            <button type="button" data-brush="round" title="دائرية">● دائرية ناعمة</button>
-
-            <button type="button" data-brush="chisel" title="عريضة">■ عريضة هندسية</button>
-            <button type="button" data-brush="spray" title="رش / بخاخ">░ رش / بخاخ</button>
-            <button type="button" data-brush="watercolor" title="تلوين مائي">◉ ألوان مائية</button>
-            <button type="button" data-brush="chalk" title="طباشيري / جاف">▧ طباشيري / جاف</button>
-            <button type="button" data-brush="ink" title="حبر هندي">✒ حبر هندي G-Pen</button>
-            <button type="button" data-brush="highlighter" title="تظليل">▮ قلم تظليل</button>
+          <div class="tool-brush-presets brush-presets-general">
+<button type="button" class="brush-preset" data-brush="round" title="رأس دائري ناعم" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><circle cx="22" cy="17" r="8" /></svg><span>رأس دائري</span></button>
+<button type="button" class="brush-preset" data-brush="chisel" title="رأس عريض مشطوف" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M11 22 L17 8 L33 8 L27 22 Z" /></svg><span>رأس مشطوف</span></button>
+<button type="button" class="brush-preset" data-brush="spray" title="رذاذ متناثر" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><g class="brush-dots"><circle cx="13" cy="11" r="2"/><circle cx="23" cy="8" r="1.5"/><circle cx="31" cy="14" r="2"/><circle cx="17" cy="22" r="1.5"/><circle cx="27" cy="25" r="2"/><circle cx="9" cy="17" r="1"/></g></svg><span>بخاخ</span></button>
+<button type="button" class="brush-preset" data-brush="watercolor" title="رأس فرشاة مائية" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M22 5 C16 13 11 18 13 24 C15 31 29 31 31 24 C33 18 28 12 22 5 Z" /></svg><span>فرشاة مائية</span></button>
+<button type="button" class="brush-preset" data-brush="chalk" title="رأس طباشيري عريض" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M12 9 L31 9 L34 23 L15 25 Z" /></svg><span>طباشير</span></button>
+<button type="button" class="brush-preset" data-brush="ink" title="سن قلم حبر مدبب" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M22 4 L31 22 L22 18 L13 22 Z M22 18 L22 29" /></svg><span>سن مدبب</span></button>
+<button type="button" class="brush-preset" data-brush="highlighter" title="رأس قلم تظليل عريض" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M10 12 L34 12 L34 23 L10 23 Z" /></svg><span>قلم تظليل</span></button>
           </div>
-
-          <div class="brush-presets-calligraphy" style="display:none; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:6px;">
-            <button type="button" data-brush="cal-thuluth" title="رأس عريض للثلث">✒ رأس الثلث</button>
-            <button type="button" data-brush="cal-naskh" title="رأس متوسط للنسخ">✒ رأس النسخ</button>
-            <button type="button" data-brush="cal-ruqah" title="رأس متوازن للرقعة">✒ رأس الرقعة</button>
-            <button type="button" data-brush="cal-fine" title="رأس دقيق للتفاصيل">✎ رأس دقيق</button>
+          <div class="brush-presets-calligraphy">
+<button type="button" class="brush-preset" data-brush="cal-thuluth" title="سن عريض للثلث" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M10 22 L18 7 L35 7 L27 22 Z" /></svg><span>رأس الثلث</span></button>
+<button type="button" class="brush-preset" data-brush="cal-naskh" title="سن متوسط للنسخ" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M13 21 L19 8 L31 8 L25 21 Z" /></svg><span>رأس النسخ</span></button>
+<button type="button" class="brush-preset" data-brush="cal-ruqah" title="سن مشطوف للرقعة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M12 19 L20 8 L32 8 L24 19 Z" /></svg><span>رأس الرقعة</span></button>
+<button type="button" class="brush-preset" data-brush="cal-fine" title="سن رفيع للتفاصيل" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M22 5 L27 23 L22 20 L17 23 Z" /></svg><span>رأس دقيق</span></button>
           </div>
           <!-- Custom PNG Brush Section -->
           <div style="margin-top:12px; padding:10px; border-radius:10px; background:var(--surface-2); border:1px dashed var(--border);">
