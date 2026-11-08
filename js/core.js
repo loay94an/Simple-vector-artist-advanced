@@ -1080,6 +1080,9 @@ export class Scene {
       this.canvasPreviewCount = 0;
     }
 
+    // Image-based custom brushes need their original SVG renderer.
+    if (style.customBrush) return false;
+
     const color = style.color || "#111111";
     const size = Math.max(0.5, Number(style.size) || 3);
     const opacity = Math.max(0, Math.min(1, Number(style.opacity ?? 1)));
@@ -1093,8 +1096,10 @@ export class Scene {
     context.globalAlpha = opacity;
     context.fillStyle = color;
     context.strokeStyle = color;
-    context.lineCap = "round";
-    context.lineJoin = "round";
+    context.lineCap = style.lineCap || "round";
+    context.lineJoin = style.lineJoin || "round";
+    const dash = String(style.dashArray || "").trim();
+    context.setLineDash(dash ? dash.split(/[ ,]+/).map(Number).filter(value => Number.isFinite(value) && value >= 0) : []);
 
     const drawNib = (a, b) => {
       const ra = Math.max(0.3, radiusFor(a));
