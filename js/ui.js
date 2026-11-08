@@ -427,6 +427,7 @@ export class LayerPanel {
       getElement(options.rootId || "layerList");
 
     this.destroyed = false;
+    this.onChange = options.onChange || null;
 
     this.onClick = this.onClick.bind(this);
 
@@ -436,6 +437,11 @@ export class LayerPanel {
     );
 
     this.refresh();
+  }
+
+  commitChange() {
+    this.history?.commit?.();
+    this.onChange?.();
   }
 
   get layers() {
@@ -475,6 +481,7 @@ export class LayerPanel {
         const newName = prompt("أدخل اسم الطبقة الجديد:", layer.name);
         if (newName && newName.trim()) {
           this.document.updateLayer(layer.id, { name: newName.trim() });
+          this.commitChange();
           this.refresh();
         }
       });
@@ -539,6 +546,7 @@ export class LayerPanel {
         if (label) label.textContent = `الشفافية: ${Math.round(val * 100)}%`;
         this.renderer?.render(this.document);
       });
+      opInput?.addEventListener("change", () => this.commitChange());
 
       item.append(infoRow, opRow);
       fragment.appendChild(item);
@@ -593,6 +601,7 @@ export class LayerPanel {
 
     this.renderer?.render(this.document);
     this.refresh();
+    this.commitChange();
 
     emit(this.root, "rasem:layerchange", {
       layerId: layer.id,
@@ -607,6 +616,7 @@ export class LayerPanel {
     this.document.setActiveLayer(layer.id);
     this.renderer?.render(this.document);
     this.refresh();
+    this.commitChange();
     return layer;
   }
 
@@ -617,6 +627,7 @@ export class LayerPanel {
 
     this.renderer?.render(this.document);
     this.refresh();
+    this.commitChange();
     return true;
   }
 
@@ -630,6 +641,7 @@ export class LayerPanel {
 
     this.document = null;
     this.renderer = null;
+    this.onChange = null;
 
     this.destroyed = true;
   }
@@ -846,6 +858,7 @@ export class UIManager {
     this.history = options.history || null;
     this.renderer = options.renderer || null;
     this.storage = options.storage || null;
+    this.onChange = options.onChange || null;
 
     this.components = {};
 
@@ -875,7 +888,8 @@ export class UIManager {
       ? new LayerPanel(
           this.document,
           this.history,
-          this.renderer
+          this.renderer,
+          { onChange: this.onChange }
         )
       : null;
 
@@ -912,6 +926,7 @@ export class UIManager {
     this.history = null;
     this.renderer = null;
     this.storage = null;
+    this.onChange = null;
 
     this.destroyed = true;
   }
