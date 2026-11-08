@@ -565,6 +565,7 @@ export class StrokeBuilder {
     if (preset.startsWith("feather-")) {
       const density = EngineUtils.clamp(Math.round(EngineUtils.number(this.brushStyle?.featherDensity, 10)), 3, 32);
       const spread = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpread, 0.45), 0, 1);
+      const spacing = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpacing, 1), 0.25, 2.5);
       const softness = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSoftness, 0.35), 0, 1);
       const taper = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTaper, 0.7), 0, 1);
       const lanes = preset === "feather-fan" ? density : preset === "feather-dry" ? Math.max(3, Math.round(density * 0.65)) : preset === "feather-flat" ? Math.max(3, Math.round(density * 0.45)) : preset === "feather-soft" ? Math.max(3, Math.round(density * 0.7)) : 1;
@@ -579,7 +580,7 @@ export class StrokeBuilder {
           const progress = points.length <= 1 ? 0.5 : i / (points.length - 1);
           const endTaper = Math.max(0.08, 1 - taper * (1 - Math.min(1, Math.min(progress, 1 - progress) * 5)));
           const r = radiusAt(p, i) * endTaper;
-          const laneOffset = ratio * spread * r * 1.65;
+          const laneOffset = ratio * spread * spacing * r * 1.65;
           const laneRadius = Math.max(0.22, r * (preset === "feather-fan" ? 0.12 : preset === "feather-flat" ? 0.30 : preset === "feather-dry" ? 0.10 : 0.42));
           const cx = p.x + nx * laneOffset, cy = p.y + ny * laneOffset;
           leftSide.push({x:cx + nx * laneRadius, y:cy + ny * laneRadius});
@@ -851,6 +852,8 @@ export class StrokeBuilder {
         brushAngle: this.calligraphyAngle,
         brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity,
         featherDensity: this.brushStyle?.featherDensity ?? 10,
+        featherGlow: this.brushStyle?.featherGlow ?? 0,
+        featherSpacing: this.brushStyle?.featherSpacing ?? 1,
         featherSpread: this.brushStyle?.featherSpread ?? 0.45,
         featherSoftness: this.brushStyle?.featherSoftness ?? 0.35,
         featherTaper: this.brushStyle?.featherTaper ?? 0.7
@@ -1607,6 +1610,8 @@ export class DrawingEngine {
         brushPreset: brushStyle.preset || "round",
         brushAngle: this.builder.calligraphyAngle,
         featherDensity: brushStyle.featherDensity ?? 10,
+        featherGlow: brushStyle.featherGlow ?? 0,
+        featherSpacing: brushStyle.featherSpacing ?? 1,
         featherSpread: brushStyle.featherSpread ?? 0.45,
         featherSoftness: brushStyle.featherSoftness ?? 0.35,
         featherTaper: brushStyle.featherTaper ?? 0.7
@@ -1622,6 +1627,8 @@ export class DrawingEngine {
           calligraphyAngle: this.builder.calligraphyAngle,
           brushPreset: brushStyle.preset || "round",
           featherDensity: brushStyle.featherDensity,
+          featherGlow: brushStyle.featherGlow,
+          featherSpacing: brushStyle.featherSpacing,
           featherSpread: brushStyle.featherSpread,
           featherSoftness: brushStyle.featherSoftness,
           featherTaper: brushStyle.featherTaper,
