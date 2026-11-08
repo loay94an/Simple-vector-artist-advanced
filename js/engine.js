@@ -128,15 +128,11 @@ export class Smoothing {
     const averageStep = totalLength / Math.max(1, points.length - 1);
     // عند 100% نرفع تدخل التصحيح إلى 50 تمريرة لمعالجة الاهتزازات
     // بقوة أكبر، مع إبقاء الضربات القصيرة قليلة العينات محمية من الإفراط.
-    const passes = points.length < 3
+    // Keep correction bounded: large strokes must not trigger dozens of
+    // full-array passes on the UI thread.
+    const passes = points.length < 5
       ? 1
-      : (strength >= 0.95
-        ? (points.length < 5 ? 1 : 50)
-        : (strength >= 0.85
-          ? (points.length < 5 ? 1 : 5)
-          : (strength >= 0.72
-            ? (points.length < 5 ? 1 : 4)
-            : (strength >= 0.22 ? 2 : 1))));
+      : (strength >= 0.85 ? 4 : strength >= 0.72 ? 3 : strength >= 0.22 ? 2 : 1);
 
     // الضربات الكثيفة تستفيد من تنعيم إضافي خفيف، أما النقاط المتباعدة
     // فلا نبالغ في تحريكها حتى لا نفقد شكل المسار الأصلي.
@@ -1343,6 +1339,8 @@ export class DrawingEngine {
     this.erasedIds = new Set();
     this.destroyed = false;
     this.shapeRecognitionTimer = null;
+    this.renderFrameId = null;
+    this.renderFrameUsesTimeout = false;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.arabicWriting = new ArabicWritingAssistant(
@@ -1653,7 +1651,9 @@ export class DrawingEngine {
     const added = this.addPoint(point, input);
 
     if (added) {
-      this.renderCurrent();
+      // Coalesced pointer samples are all retained immediately, while
+      // expensive SVG outline construction is performed at most once/frame.
+      this.scheduleRenderCurrent();
     }
 
     // أعد تشغيل مؤقت السكون عند كل حدث حركة، حتى لو كانت الحركة
@@ -1728,11 +1728,41 @@ export class DrawingEngine {
     );
   }
 
+  scheduleRenderCurrent() {
+    if (!this.currentElement || this.renderFrameId !== null) return false;
+
+    const render = () => {
+      this.renderFrameId = null;
+      this.renderFrameUsesTimeout = false;
+      if (this.drawing && !this.destroyed) this.renderCurrent();
+    };
+
+    if (typeof requestAnimationFrame === "function") {
+      this.renderFrameId = requestAnimationFrame(render);
+    } else {
+      this.renderFrameUsesTimeout = true;
+      this.renderFrameId = setTimeout(render, 16);
+    }
+    return true;
+  }
+
+  cancelScheduledRender() {
+    if (this.renderFrameId === null) return;
+    if (this.renderFrameUsesTimeout) clearTimeout(this.renderFrameId);
+    else if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(this.renderFrameId);
+    this.renderFrameId = null;
+    this.renderFrameUsesTimeout = false;
+  }
+
+  flushScheduledRender() {
+    this.cancelScheduledRender();
+    return this.renderCurrent();
+  }
+
   renderCurrent() {
     if (!this.currentElement) return false;
 
     const built = this.builder.build();
-
     if (!built) return false;
 
     this.currentElement = {
@@ -1740,10 +1770,7 @@ export class DrawingEngine {
       ...built,
       points: this.builder.points
     };
-
-    return this.renderer.updateElement(
-      this.currentElement
-    );
+    return this.renderer.updateElement(this.currentElement);
   }
 
   end(event = {}) {
@@ -1758,6 +1785,10 @@ export class DrawingEngine {
     ) {
       return false;
     }
+
+    // Flush the last queued frame before finalizing so pointerup geometry
+    // and the committed SVG can never lag behind the collected samples.
+    this.cancelScheduledRender();
 
     // رفع القلم هو الحدث الحاسم لنهاية الضربة:
     // نلتقط إحداثيات pointerup نفسها قبل بناء المسار النهائي،
@@ -1884,6 +1915,7 @@ export class DrawingEngine {
   }
 
   cancel() {
+    this.cancelScheduledRender();
     this.clearShapeRecognitionTimer();
     if (!this.drawing) return false;
 
@@ -2567,6 +2599,7 @@ export class DrawingEngine {
   }
 
   reset() {
+    this.cancelScheduledRender();
     this.clearShapeRecognitionTimer();
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
