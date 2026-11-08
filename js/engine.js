@@ -388,6 +388,11 @@ export class StrokeBuilder {
 
     this.tool = settings.tool || "pen";
     this.calligraphyAngle = settings.calligraphyAngle ?? 45;
+    this.lineCorrectionStrength = EngineUtils.clamp(
+      EngineUtils.number(settings.lineCorrection, 0.35),
+      0,
+      1
+    );
     this.brushStyle = settings.brushStyle || null;
 
     this.sensitivity = EngineUtils.clamp(
@@ -434,10 +439,16 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
-    // قلم الخط العربي يستعمل العينات الأصلية كما وصلت من القلم/اللمس
-    // دائماً؛ لا تنعيم، لا تبسيط، ولا معالجة مؤجلة عند أي مستوى تصحيح.
+    // أثناء الكتابة تبقى ضربات الخط العربي خاماً. بعد السكون فقط،
+    // نطبق تنعيماً محافظاً على العينات دون حذفها أو تغيير نقاط البداية والنهاية.
     if (this.tool === "calligraphy") {
-      return this.points.map(point => ({ ...point }));
+      if (this.deferSmoothing) {
+        return this.points.map(point => ({ ...point }));
+      }
+
+      this.smoothing.strength = this.lineCorrectionStrength;
+      this.smoothing.minDistance = 0;
+      return this.smoothing.filter(this.points);
     }
 
     this.smoothing.strength = this.baseSmoothingStrength;
@@ -1500,6 +1511,7 @@ export class DrawingEngine {
       sensitivity: this.settings.sensitivity,
       pressureEnabled: this.settings.pressureEnabled,
       calligraphyAngle: this.settings.calligraphyAngle,
+      lineCorrection: this.settings.lineCorrection,
       brushStyle: { ...this.brushStyle }
     });
 
@@ -1623,7 +1635,6 @@ export class DrawingEngine {
     if (
       !this.drawing ||
       this.settings.tool === "eraser" ||
-      this.builder.tool === "calligraphy" ||
       this.settings.lineCorrection <= 0 ||
       this.builder.points.length < 2
     ) return;
@@ -1632,8 +1643,8 @@ export class DrawingEngine {
       this.shapeRecognitionTimer = null;
       if (!this.drawing || this.destroyed) return;
 
-      // لا يعمل هذا المؤقت إلا مع الأقلام التي تدعم التصحيح؛
-      // قلم الخط العربي مستثنى بالكامل من مسار التنعيم.
+      // بعد ثبات الإصبع مع استمرار الضغط، نعرض المسار المنعّم.
+      // هذا التنعيم محافظ ويخص الانحناءات؛ لا يشغّل التعرف الهندسي.
       this.idleCorrectionApplied = true;
       this.builder.deferSmoothing = false;
       this.renderCurrent();

@@ -252,8 +252,8 @@
     const correctionRow = document.getElementById("lineCorrectionRow");
     if (calRow) calRow.style.display = isCal ? "flex" : "none";
     if (calScale) calScale.style.display = isCal ? "block" : "none";
-    // التصحيح التلقائي غير مدعوم لقلم الخط العربي؛ أخفِ إعداد التنعيم له.
-    if (correctionRow) correctionRow.style.display = isCal ? "none" : "flex";
+    // إظهار شدة تنعيم الانحناءات لقلم الخط العربي أيضاً.
+    if (correctionRow) correctionRow.style.display = isCal ? "flex" : "flex";
 
     // Eraser mode row visibility
     const eraserRow = document.getElementById("eraserModeRow");
