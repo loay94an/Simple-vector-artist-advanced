@@ -620,6 +620,10 @@ export class StrokeBuilder {
       if (kind === "oval") r *= 0.72;
       if (kind === "soft" || kind === "watercolor") r *= 1.12;
       if (kind === "highlighter") r *= 0.92;
+      const prev=points[Math.max(0,i-1)], next=points[Math.min(points.length-1,i+1)];
+      const elapsed=Math.max(1,EngineUtils.number(next.time,p.time)-EngineUtils.number(prev.time,p.time));
+      const speed=EngineUtils.distance(prev,next)/elapsed;
+      r *= EngineUtils.clamp(1.12-speed*0.22,0.78,1.12);
       if (kind === "flat") {
         const a=points[Math.max(0,i-1)], b=points[Math.min(points.length-1,i+1)];
         r *= 0.12 + Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
@@ -863,7 +867,7 @@ export class StrokeBuilder {
       style: {
         color: this.color,
         size: this.baseSize,
-        opacity: this.opacity,
+        opacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity,
         fill: (variableWidth || isCalligraphy) ? this.color : "none",
         lineCap: brushStyle.lineCap || "round",
         lineJoin: brushStyle.lineJoin || "round",
@@ -1671,7 +1675,7 @@ export class DrawingEngine {
         ...(this.currentElement.style || {}),
         color: this.builder.color,
         size: this.builder.baseSize,
-        opacity: this.builder.opacity,
+        opacity: preset === "watercolor" ? this.builder.opacity * 0.72 : preset === "soft" ? this.builder.opacity * 0.82 : this.builder.opacity,
         fill: isCalligraphy ? this.builder.color : "none",
         lineCap: brushStyle.lineCap || "round",
         lineJoin: brushStyle.lineJoin || "round",
