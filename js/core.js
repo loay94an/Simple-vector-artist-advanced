@@ -1148,7 +1148,7 @@ export class Scene {
       if(calligraphy||["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)){context.beginPath();context.moveTo(a.x+nx*ra,a.y+ny*ra);context.lineTo(b.x+nx*rb,b.y+ny*rb);context.lineTo(b.x-nx*rb,b.y-ny*rb);context.lineTo(a.x-nx*ra,a.y-ny*ra);context.closePath();context.fill();return;}
       if(preset==="oval"){context.save();context.translate((a.x+b.x)/2,(a.y+b.y)/2);context.rotate(Math.atan2(dy,dx));context.scale(1,0.72);context.lineWidth=ra+rb;context.beginPath();context.moveTo(-len/2,0);context.lineTo(len/2,0);context.stroke();context.restore();return;}
       context.lineWidth=Math.max(0.5,ra+rb);context.beginPath();context.moveTo(a.x,a.y);context.lineTo(b.x,b.y);context.stroke();};
-    if(points.length===1){const p=points[0],r=radius(p,p,p);if(calligraphy){const tx=-ny,ty=nx,h=Math.max(0.6,r*0.5);draw({x:p.x-tx*h,y:p.y-ty*h,pressure:p.pressure},{x:p.x+tx*h,y:p.y+ty*h,pressure:p.pressure});}else{context.beginPath();context.arc(p.x,p.y,r,0,Math.PI*2);context.fill();}}
+    if(points.length===1){if(!calligraphy){const p=points[0],r=radius(p,p,p);context.beginPath();context.arc(p.x,p.y,r,0,Math.PI*2);context.fill();}}
     else for(let i=1;i<points.length;i++)draw(points[i-1],points[i]);
     context.restore();this.canvasPreviewCount+=points.length;return true;
   }
