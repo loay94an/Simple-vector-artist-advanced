@@ -925,13 +925,24 @@ export class RasemApplication {
     const canvasGridCheckbox = getElement("canvasGridCheckbox");
     const gridLayer = getElement("gridLayer");
     if (canvasGridCheckbox && gridLayer) {
-      let gridEnabled = false;
-      try { gridEnabled = localStorage.getItem("rasem_canvas_grid") === "true"; } catch {}
+      // Grid is enabled by default. Persisted user choice takes precedence.
+      let gridEnabled = true;
+      try {
+        const savedGrid = localStorage.getItem("rasem_canvas_grid");
+        if (savedGrid !== null) gridEnabled = savedGrid === "true";
+      } catch {}
       canvasGridCheckbox.checked = gridEnabled;
-      gridLayer.style.display = gridEnabled ? "" : "none";
+      const applyGridVisibility = (visible) => {
+        // SVG presentation attributes are more reliable across mobile browsers
+        // than clearing an inline display:none declaration.
+        gridLayer.setAttribute("visibility", visible ? "visible" : "hidden");
+        gridLayer.style.setProperty("display", visible ? "inline" : "none", "important");
+      };
+      applyGridVisibility(gridEnabled);
       const gridToggleHandler = () => {
-        gridLayer.style.display = canvasGridCheckbox.checked ? "" : "none";
-        try { localStorage.setItem("rasem_canvas_grid", String(canvasGridCheckbox.checked)); } catch {}
+        const visible = canvasGridCheckbox.checked;
+        applyGridVisibility(visible);
+        try { localStorage.setItem("rasem_canvas_grid", String(visible)); } catch {}
       };
       canvasGridCheckbox.addEventListener("change", gridToggleHandler);
       this.cleanupCallbacks.push(() => canvasGridCheckbox.removeEventListener("change", gridToggleHandler));
