@@ -775,25 +775,49 @@ export class StrokeBuilder {
       );
     }
 
-    // غطاء نهاية مستقل: يمنع القص الحاد عند رفع القلم ويُبقي شكل السن
-    // متصلاً بالمسار. تتغير سماكته مع الضغط ونوع سن الخط المختار.
+    // نهاية مستقلة قابلة للاختيار، تتبع اتجاه آخر مقطع حقيقي.
     if (points.length > 1) {
       const lastIndex = points.length - 1;
       const lastPoint = points[lastIndex];
+      const previousPoint = points[lastIndex - 1];
+      const dx = lastPoint.x - previousPoint.x;
+      const dy = lastPoint.y - previousPoint.y;
+      const length = Math.hypot(dx, dy) || 1;
+      const tangentX = dx / length;
+      const tangentY = dy / length;
+      const normalX = -tangentY;
+      const normalY = tangentX;
       const lastRadius = getRadius(lastPoint, lastIndex);
+      const endStyle = ["thin", "wide", "pointed", "crescent"].includes(this.brushStyle?.calligraphyEndStyle)
+        ? this.brushStyle.calligraphyEndStyle
+        : "thin";
       const endCapLength = Math.max(0.6, lastRadius * 0.5);
-      const endCapStart = {
-        x: lastPoint.x - tangentX * endCapLength,
-        y: lastPoint.y - tangentY * endCapLength
-      };
-      const endCapEnd = {
-        x: lastPoint.x + tangentX * endCapLength,
-        y: lastPoint.y + tangentY * endCapLength
-      };
-      const endTaper = ["cal-fine", "cal-needle"].includes(preset) ? 0.18
-        : preset === "cal-brush" ? 0.42
-        : ["cal-diwani", "cal-taliq"].includes(preset) ? 0.78 : 1;
-      segments.push(makeSegment(endCapStart, endCapEnd, lastRadius, lastRadius * endTaper));
+      if (endStyle === "crescent") {
+        const r = lastRadius;
+        const bx = lastPoint.x - tangentX * r * 0.22;
+        const by = lastPoint.y - tangentY * r * 0.22;
+        const leftX = bx + normalX * r;
+        const leftY = by + normalY * r;
+        const rightX = bx - normalX * r;
+        const rightY = by - normalY * r;
+        const tipX = lastPoint.x + tangentX * r * 0.72;
+        const tipY = lastPoint.y + tangentY * r * 0.72;
+        const hollowX = lastPoint.x + tangentX * r * 0.08;
+        const hollowY = lastPoint.y + tangentY * r * 0.08;
+        segments.push(
+          `M ${leftX.toFixed(2)} ${leftY.toFixed(2)} Q ${tipX.toFixed(2)} ${tipY.toFixed(2)} ${rightX.toFixed(2)} ${rightY.toFixed(2)} Q ${hollowX.toFixed(2)} ${hollowY.toFixed(2)} ${leftX.toFixed(2)} ${leftY.toFixed(2)} Z`
+        );
+      } else {
+        const endTaper = endStyle === "pointed" ? 0.025 : endStyle === "wide" ? 1.22 : 0.22;
+        const start = {
+          x: lastPoint.x - tangentX * endCapLength,
+          y: lastPoint.y - tangentY * endCapLength
+        };
+        const end = endStyle === "pointed"
+          ? lastPoint
+          : { x: lastPoint.x + tangentX * endCapLength, y: lastPoint.y + tangentY * endCapLength };
+        segments.push(makeSegment(start, end, lastRadius, lastRadius * endTaper));
+      }
     }
 
     return segments.join(" ");
@@ -850,6 +874,7 @@ export class StrokeBuilder {
         calligraphyClean: isCalligraphy,
         brushPreset: preset,
         brushAngle: this.calligraphyAngle,
+        calligraphyEndStyle: brushStyle.calligraphyEndStyle || "thin",
         brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity,
         featherDensity: this.brushStyle?.featherDensity ?? 10,
         featherGlow: this.brushStyle?.featherGlow ?? 0,
