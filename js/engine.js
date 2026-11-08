@@ -1,5 +1,6 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
+import { recognizeShape } from "./shape-recognition.js";
 
 /* =========================================================
    RASEM 2.0
@@ -1014,357 +1015,6 @@ export class HitTesting {
 }
 
 /* =========================================================
-   AUTO SHAPE RECOGNITION
-   Converts a held, completed hand-drawn shape into clean geometry.
-========================================================= */
-
-function shapePointDistance(a, b) {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function simplifyShapePath(points, tolerance) {
-  if (points.length <= 2) return points.slice();
-
-  let farthestIndex = 0;
-  let farthestDistance = 0;
-  const first = points[0];
-  const last = points[points.length - 1];
-  const dx = last.x - first.x;
-  const dy = last.y - first.y;
-  const lengthSquared = dx * dx + dy * dy;
-
-  for (let i = 1; i < points.length - 1; i++) {
-    let distance;
-    if (lengthSquared < 0.0001) {
-      distance = shapePointDistance(first, points[i]);
-    } else {
-      const t = EngineUtils.clamp(
-        ((points[i].x - first.x) * dx + (points[i].y - first.y) * dy) /
-          lengthSquared,
-        0,
-        1
-      );
-      distance = Math.hypot(
-        points[i].x - (first.x + t * dx),
-        points[i].y - (first.y + t * dy)
-      );
-    }
-    if (distance > farthestDistance) {
-      farthestDistance = distance;
-      farthestIndex = i;
-    }
-  }
-
-  if (farthestDistance <= tolerance) return [first, last];
-
-  const left = simplifyShapePath(points.slice(0, farthestIndex + 1), tolerance);
-  const right = simplifyShapePath(points.slice(farthestIndex), tolerance);
-  return [...left.slice(0, -1), ...right];
-}
-
-function interpolateShapeEdges(vertices, pressure, stepsPerEdge = 5) {
-  const result = [];
-  for (let i = 0; i < vertices.length; i++) {
-    const a = vertices[i];
-    const b = vertices[(i + 1) % vertices.length];
-    for (let step = 0; step < stepsPerEdge; step++) {
-      const t = step / stepsPerEdge;
-      result.push({
-        x: a.x + (b.x - a.x) * t,
-        y: a.y + (b.y - a.y) * t,
-        pressure,
-        time: Date.now()
-      });
-    }
-  }
-  return result;
-}
-
-function recognizeHeldShape(sourcePoints, strength = 0.35) {
-  if (!Array.isArray(sourcePoints) || sourcePoints.length < 8) return null;
-
-  const points = sourcePoints.filter(EngineUtils.validPoint);
-  if (points.length < 8) return null;
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let pressureTotal = 0;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-    pressureTotal += EngineUtils.number(point.pressure, 1);
-  }
-
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const diagonal = Math.hypot(width, height);
-  if (diagonal < 24 || (width < 8 && height < 8)) return null;
-
-  const averagePressure = pressureTotal / points.length;
-  const first = points[0];
-  const last = points[points.length - 1];
-  const endGap = shapePointDistance(first, last);
-  const isClosed = endGap <= Math.max(12, diagonal * 0.22);
-  const tolerance = Math.max(2, diagonal * (0.025 + strength * 0.025));
-
-  if (isClosed) {
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const rx = width / 2;
-    const ry = height / 2;
-    const aspect = width / height;
-
-    // دائرة أو بيضاوي: نقيس انتظام نصف القطر بعد تطبيع حدود الرسم.
-    if (aspect >= 0.55 && aspect <= 1.8) {
-      let radialError = 0;
-      for (const point of points) {
-        const nx = (point.x - centerX) / rx;
-        const ny = (point.y - centerY) / ry;
-        radialError += Math.abs(Math.hypot(nx, ny) - 1);
-      }
-      radialError /= points.length;
-
-      if (radialError < 0.24 + strength * 0.12) {
-        const makeCircle = aspect >= 0.82 && aspect <= 1.22;
-        const radiusX = makeCircle ? (rx + ry) / 2 : rx;
-        const radiusY = makeCircle ? radiusX : ry;
-        const circlePoints = [];
-        for (let i = 0; i < 64; i++) {
-          const angle = (Math.PI * 2 * i) / 64;
-          circlePoints.push({
-            x: centerX + Math.cos(angle) * radiusX,
-            y: centerY + Math.sin(angle) * radiusY,
-            pressure: averagePressure,
-            time: Date.now()
-          });
-        }
-        circlePoints.push({ ...circlePoints[0], time: Date.now() });
-        return { type: makeCircle ? "circle" : "ellipse", points: circlePoints };
-      }
-    }
-
-    // تبسيط المسار المغلق إلى زواياه الرئيسية لاكتشاف المثلث والمستطيل.
-    const ring = points.slice();
-    if (endGap < diagonal * 0.18) ring.pop();
-    if (ring.length >= 6) {
-      let splitIndex = 1;
-      let splitDistance = 0;
-      for (let i = 1; i < ring.length; i++) {
-        const distance = shapePointDistance(ring[0], ring[i]);
-        if (distance > splitDistance) {
-          splitDistance = distance;
-          splitIndex = i;
-        }
-      }
-
-      const firstArc = simplifyShapePath(ring.slice(0, splitIndex + 1), tolerance);
-      const secondArc = simplifyShapePath(
-        [...ring.slice(splitIndex), ring[0]],
-        tolerance
-      );
-      let vertices = [...firstArc.slice(0, -1), ...secondArc.slice(0, -1)];
-
-      // إزالة الرؤوس المتقاربة الناتجة عن الاهتزاز حول الزاوية نفسها.
-      const compact = [];
-      for (const vertex of vertices) {
-        if (!compact.length || shapePointDistance(compact[compact.length - 1], vertex) > diagonal * 0.12) {
-          compact.push(vertex);
-        }
-      }
-      if (compact.length > 2 && shapePointDistance(compact[0], compact.at(-1)) < diagonal * 0.12) compact.pop();
-      vertices = compact;
-
-      if (vertices.length >= 3 && vertices.length <= 12) {
-        let rightAngles = 0;
-        for (let i = 0; i < vertices.length; i++) {
-          const previous = vertices[(i + vertices.length - 1) % vertices.length];
-          const current = vertices[i];
-          const next = vertices[(i + 1) % vertices.length];
-          const ax = previous.x - current.x;
-          const ay = previous.y - current.y;
-          const bx = next.x - current.x;
-          const by = next.y - current.y;
-          const denominator = Math.hypot(ax, ay) * Math.hypot(bx, by);
-          if (denominator > 0 && Math.abs((ax * bx + ay * by) / denominator) < 0.38) {
-            rightAngles++;
-          }
-        }
-
-        if (vertices.length === 3) {
-          return {
-            type: "triangle",
-            points: interpolateShapeEdges(vertices, averagePressure, 8)
-          };
-        }
-
-        if (rightAngles >= 3) {
-          return {
-            type: Math.abs(width - height) / Math.max(width, height) < 0.16
-              ? "square"
-              : "rectangle",
-            points: interpolateShapeEdges(vertices, averagePressure, 8)
-          };
-        }
-
-        if (vertices.length === 4) {
-          const sides = vertices.map((p, i) =>
-            shapePointDistance(p, vertices[(i + 1) % 4]));
-          const oppositeParallel = (a, b) => {
-            const cross = a.x * b.y - a.y * b.x;
-            return Math.abs(cross) / Math.max(1, Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y));
-          };
-          const edgeA = { x: vertices[1].x - vertices[0].x, y: vertices[1].y - vertices[0].y };
-          const edgeB = { x: vertices[3].x - vertices[2].x, y: vertices[3].y - vertices[2].y };
-          const edgeC = { x: vertices[2].x - vertices[1].x, y: vertices[2].y - vertices[1].y };
-          const edgeD = { x: vertices[0].x - vertices[3].x, y: vertices[0].y - vertices[3].y };
-          const parallelA = oppositeParallel(edgeA, edgeB) < 0.16;
-          const parallelB = oppositeParallel(edgeC, edgeD) < 0.16;
-          const equalSides = sides.every(side =>
-            Math.abs(side - sides[0]) / Math.max(1, sides[0]) < 0.18);
-          const type = parallelA && parallelB
-            ? (equalSides ? "rhombus" : "parallelogram")
-            : (parallelA || parallelB ? "trapezoid" : "quadrilateral");
-          return { type, points: interpolateShapeEdges(vertices, averagePressure, 8) };
-        }
-
-        if (vertices.length >= 5) {
-          const center = {
-            x: vertices.reduce((sum, p) => sum + p.x, 0) / vertices.length,
-            y: vertices.reduce((sum, p) => sum + p.y, 0) / vertices.length
-          };
-          const radii = vertices.map(p => shapePointDistance(center, p));
-          const high = Math.max(...radii);
-          const low = Math.min(...radii);
-          const alternating = vertices.length >= 8 &&
-            radii.every((r, i) =>
-              i % 2 === 0 ? r >= (high + low) / 2 : r <= (high + low) / 2);
-          if (alternating && low / Math.max(1, high) < 0.78) {
-            return { type: "star", points: interpolateShapeEdges(vertices, averagePressure, 8) };
-          }
-          const names = {
-            5: "pentagon", 6: "hexagon", 7: "heptagon", 8: "octagon",
-            9: "nonagon", 10: "decagon", 11: "hendecagon", 12: "dodecagon"
-          };
-          return {
-            type: names[vertices.length] || "polygon",
-            points: interpolateShapeEdges(vertices, averagePressure, 8)
-          };
-        }
-      }
-    }
-  }
-
-  // الخط المستقيم: يجب أن يكون طويلاً ومنخفض الانحراف عن المحور بين طرفيه.
-  const lineLength = shapePointDistance(first, last);
-  if (lineLength >= 30 && !isClosed) {
-    let maximumDeviation = 0;
-    for (const point of points) {
-      const deviation = Math.abs(
-        (last.x - first.x) * (first.y - point.y) -
-        (first.x - point.x) * (last.y - first.y)
-      ) / lineLength;
-      maximumDeviation = Math.max(maximumDeviation, deviation);
-    }
-    if (maximumDeviation / lineLength < 0.035 + strength * 0.025) {
-      return {
-        type: "line",
-        points: [
-          { ...first, pressure: averagePressure },
-          { ...last, pressure: averagePressure }
-        ]
-      };
-    }
-  }
-
-  // المنحنيات المفتوحة: قوس دائري أو منحنى حر ناعم.
-  if (!isClosed && points.length >= 8) {
-    const start = points[0];
-    const middle = points[Math.floor(points.length / 2)];
-    const finish = points[points.length - 1];
-    const determinant = 2 * (
-      start.x * (middle.y - finish.y) +
-      middle.x * (finish.y - start.y) +
-      finish.x * (start.y - middle.y)
-    );
-
-    if (Math.abs(determinant) > 0.001) {
-      const a2 = start.x * start.x + start.y * start.y;
-      const b2 = middle.x * middle.x + middle.y * middle.y;
-      const c2 = finish.x * finish.x + finish.y * finish.y;
-      const cx = (a2 * (middle.y - finish.y) +
-        b2 * (finish.y - start.y) + c2 * (start.y - middle.y)) / determinant;
-      const cy = (a2 * (finish.x - middle.x) +
-        b2 * (start.x - finish.x) + c2 * (middle.x - start.x)) / determinant;
-      const radius = shapePointDistance({ x: cx, y: cy }, start);
-      if (Number.isFinite(radius) && radius >= 8) {
-        const angles = points.map(p => Math.atan2(p.y - cy, p.x - cx));
-        let sweep = 0;
-        for (let i = 1; i < angles.length; i++) {
-          let delta = angles[i] - angles[i - 1];
-          while (delta > Math.PI) delta -= Math.PI * 2;
-          while (delta < -Math.PI) delta += Math.PI * 2;
-          sweep += delta;
-        }
-        let radialError = 0;
-        for (const p of points) {
-          radialError += Math.abs(shapePointDistance({ x: cx, y: cy }, p) - radius);
-        }
-        radialError /= points.length * radius;
-        if (Math.abs(sweep) > 0.25 && Math.abs(sweep) < Math.PI * 2.1 && radialError < 0.075) {
-          const arcPoints = [];
-          const steps = Math.max(24, Math.ceil(Math.abs(sweep) * 20));
-          for (let i = 0; i <= steps; i++) {
-            const angle = angles[0] + sweep * i / steps;
-            arcPoints.push({
-              x: cx + Math.cos(angle) * radius,
-              y: cy + Math.sin(angle) * radius,
-              pressure: averagePressure,
-              time: Date.now()
-            });
-          }
-          return { type: "arc", points: arcPoints };
-        }
-      }
-    }
-
-    // منحنى حر: نعيد أخذ العينات على المسار لتقليل الاهتزاز دون تغيير اتجاهه.
-    let pathLength = 0;
-    for (let i = 1; i < points.length; i++) {
-      pathLength += shapePointDistance(points[i - 1], points[i]);
-    }
-    const chordLength = shapePointDistance(start, finish);
-    if (pathLength > chordLength * 1.08 && pathLength < chordLength * 3.8) {
-      const sampled = [];
-      const count = Math.max(48, Math.min(120, points.length * 3));
-      const cumulative = [0];
-      for (let i = 1; i < points.length; i++) {
-        cumulative.push(cumulative[i - 1] + shapePointDistance(points[i - 1], points[i]));
-      }
-      const total = cumulative[cumulative.length - 1];
-      let segment = 1;
-      for (let i = 0; i < count; i++) {
-        const target = total * i / (count - 1);
-        while (segment < cumulative.length - 1 && cumulative[segment] < target) segment++;
-        const a = points[segment - 1];
-        const b = points[segment];
-        const span = cumulative[segment] - cumulative[segment - 1];
-        const t = span > 0 ? (target - cumulative[segment - 1]) / span : 0;
-        sampled.push({
-          x: a.x + (b.x - a.x) * t,
-          y: a.y + (b.y - a.y) * t,
-          pressure: averagePressure,
-          time: Date.now()
-        });
-      }
-      return { type: "freeform-curve", points: sampled };
-    }
-  }
-
-  return null;
-}
-
-/* =========================================================
    5. DRAWING ENGINE
 ========================================================= */
 
@@ -1820,18 +1470,26 @@ export class DrawingEngine {
         this.builder.points.length < 8
       ) return;
 
-      const confirmed = recognizeHeldShape(
-        this.builder.points,
-        this.settings.lineCorrection
-      );
-      if (!confirmed?.points?.length) return;
+      const confirmed = recognizeShape(this.builder.points, {
+        strength: this.settings.lineCorrection
+      });
+      // لا نعتمد أي تحويل هندسي إلا عندما تتجاوز الثقة الحد المحافظ.
+      if (!confirmed?.points?.length || confirmed.confidence < 0.72) return;
 
+      // إبطال نتيجة التنعيم السابقة لأن هندسة الضربة تغيرت بالتعرف.
       this.workerRequestId++;
       this.builder.workerFilteredPoints = null;
       this.builder.points = confirmed.points.map(point => ({ ...point }));
       this.points = this.builder.points;
       this.lastPoint = this.builder.points.at(-1) || null;
       this.shapeRecognitionApplied = true;
+      this.currentElement.recognition = {
+        type: confirmed.type,
+        confidence: confirmed.confidence,
+        corners: Array.isArray(confirmed.corners) ? confirmed.corners.length : 0,
+        angles: confirmed.angles || [],
+        angleTypes: confirmed.angleTypes || []
+      };
       this.renderCurrent();
     }, 1300);
   }
