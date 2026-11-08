@@ -1046,7 +1046,7 @@ export class DrawingEngine {
       calligraphyAngle: 45
     };
 
-    this.bucketSettings = { gap: 1, edgeThreshold: 12, maxPixels: 1300000, resolution: 1 };
+    this.bucketSettings = { gap: 1, edgeThreshold: 12, opacity: 1, maxPixels: 1300000, resolution: 1 };
 
     this.builder = new StrokeBuilder({
       smoothing: this.settings.lineCorrection,
@@ -1855,6 +1855,7 @@ export class DrawingEngine {
     if (!options || typeof options !== "object") return false;
     if (Number.isFinite(options.gap)) this.bucketSettings.gap = EngineUtils.clamp(Math.round(options.gap), 0, 3);
     if (Number.isFinite(options.edgeThreshold)) this.bucketSettings.edgeThreshold = EngineUtils.clamp(Math.round(options.edgeThreshold), 1, 96);
+    if (Number.isFinite(options.opacity)) this.bucketSettings.opacity = EngineUtils.clamp(options.opacity, 0.05, 1);
     if (Number.isFinite(options.maxPixels)) this.bucketSettings.maxPixels = EngineUtils.clamp(Math.round(options.maxPixels), 10000, 2000000);
     if (Number.isFinite(options.resolution)) this.bucketSettings.resolution = EngineUtils.clamp(options.resolution, 0.5, 2);
     return true;
@@ -1984,7 +1985,7 @@ export class DrawingEngine {
         path,
         tool: "bucket",
         bucketFill: true,
-        style: { fill: color, color, size: 0, opacity: this.settings.opacity, lineCap: "round", lineJoin: "round" }
+        style: { fill: color, color, size: 0, opacity: this.bucketSettings.opacity, lineCap: "round", lineJoin: "round" }
       };
 
       // Insert below ordinary strokes to keep the original boundaries crisp.
