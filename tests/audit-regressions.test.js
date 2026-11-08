@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { DrawingDocument } from "../js/core.js";
 import { Selector } from "../js/tools.js";
@@ -107,4 +108,13 @@ test("layer panel add and remove changes are committed and autosaved", () => {
   assert.equal(document.layers.length, 1);
   assert.equal(commits, 2);
   assert.equal(saves, 2);
+});
+
+
+test("blank SVG canvas background remains a touch hit target", () => {
+  const css = readFileSync(new URL("../css/app.css", import.meta.url), "utf8");
+  const backgroundRule = css.match(/#canvasBackground\s*\{([^}]*)\}/g) || [];
+  const finalRule = backgroundRule.at(-1) || "";
+  assert.match(finalRule, /pointer-events:\s*all\s*!important/);
+  assert.match(finalRule, /touch-action:\s*none\s*!important/);
 });
