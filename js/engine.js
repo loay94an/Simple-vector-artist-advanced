@@ -1,7 +1,6 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
 import { recognizeShape } from "./shape-recognition.js";
-import { closeBoundaryMask, floodRegion, traceRegionContours, contoursToPath } from "./bucket-fill.js";
 
 /* =========================================================
    RASEM 2.0
@@ -1046,7 +1045,6 @@ export class DrawingEngine {
       calligraphyAngle: 45
     };
 
-    this.bucketSettings = { gap: 1, edgeThreshold: 12, opacity: 1, maxPixels: 1300000, resolution: 1 };
 
     this.builder = new StrokeBuilder({
       smoothing: this.settings.lineCorrection,
@@ -1850,159 +1848,6 @@ export class DrawingEngine {
       Math.max(0.01, zoom);
   }
 
-
-  setBucketSettings(options = {}) {
-    if (!options || typeof options !== "object") return false;
-    if (Number.isFinite(options.gap)) this.bucketSettings.gap = EngineUtils.clamp(Math.round(options.gap), 0, 3);
-    if (Number.isFinite(options.edgeThreshold)) this.bucketSettings.edgeThreshold = EngineUtils.clamp(Math.round(options.edgeThreshold), 1, 96);
-    if (Number.isFinite(options.opacity)) this.bucketSettings.opacity = EngineUtils.clamp(options.opacity, 0.05, 1);
-    if (Number.isFinite(options.maxPixels)) this.bucketSettings.maxPixels = EngineUtils.clamp(Math.round(options.maxPixels), 10000, 2000000);
-    if (Number.isFinite(options.resolution)) this.bucketSettings.resolution = EngineUtils.clamp(options.resolution, 0.5, 2);
-    return true;
-  }
-
-  async fillAt(event) {
-    const layer = this.activeLayer;
-    if (!this.canDraw() || !event) return false;
-    const color = this.settings.color;
-    if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return false;
-    const svg = this.renderer?.svg;
-    if (!svg || typeof XMLSerializer === "undefined") return false;
-    const rect = svg.getBoundingClientRect();
-    if (!(rect.width > 0 && rect.height > 0)) return false;
-
-    const requestedScale = this.bucketSettings.resolution || 1;
-    const scale = Math.min(requestedScale, 1200 / rect.width, 1200 / rect.height);
-    const width = Math.max(1, Math.round(rect.width * scale));
-    const height = Math.max(1, Math.round(rect.height * scale));
-    const total = width * height;
-    if (total > this.bucketSettings.maxPixels) return false;
-    const svgMatrix = svg.getScreenCTM();
-    if (!svgMatrix) return false;
-    let viewBox = svg.viewBox?.baseVal;
-    if (!viewBox || !(viewBox.width > 0 && viewBox.height > 0)) viewBox = { x: 0, y: 0, width: rect.width, height: rect.height };
-
-    const pointer = svg.createSVGPoint();
-    pointer.x = event.clientX;
-    pointer.y = event.clientY;
-    let svgPointer;
-    try { svgPointer = pointer.matrixTransform(svgMatrix.inverse()); } catch { return false; }
-    const seedX = Math.floor((svgPointer.x - viewBox.x) * width / viewBox.width);
-    const seedY = Math.floor((svgPointer.y - viewBox.y) * height / viewBox.height);
-    if (seedX < 0 || seedY < 0 || seedX >= width || seedY >= height) return false;
-
-    const clone = svg.cloneNode(true);
-    clone.setAttribute("width", String(width));
-    clone.setAttribute("height", String(height));
-    clone.setAttribute("preserveAspectRatio", "none");
-    // The page background and editor guides are not drawing boundaries.
-    for (const selector of ["#canvasBackground", "#gridLayer", "#guideLayer", "#selectionLayer", "#previewLayer"]) {
-      clone.querySelector(selector)?.setAttribute("display", "none");
-    }
-    try {
-      const originals = [svg, ...svg.querySelectorAll("*")];
-      const copies = [clone, ...clone.querySelectorAll("*")];
-      const properties = ["stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "fill", "fill-opacity", "stroke-opacity", "opacity", "display", "visibility", "font-family", "font-size", "font-weight"];
-      for (let i = 0; i < Math.min(originals.length, copies.length); i++) {
-        const computed = getComputedStyle(originals[i]);
-        const inline = properties.map(key => `${key}:${computed.getPropertyValue(key)}`).join(";");
-        copies[i].setAttribute("style", (copies[i].getAttribute("style") || "") + ";" + inline);
-      }
-    } catch {}
-
-    // Re-apply exclusions after computed styles are copied onto the clone.
-    for (const selector of ["#canvasBackground", "#gridLayer", "#guideLayer", "#selectionLayer", "#previewLayer"]) {
-      const excluded = clone.querySelector(selector);
-      if (excluded) excluded.style?.setProperty("display", "none", "important");
-    }
-
-    // Render only outlines: normal strokes keep their stroke, while filled-only
-    // marks are converted to a thin outline. This avoids treating a solid fill as
-    // a giant blocked area and lets the user fill inside its contour.
-    const outlineTags = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline", "line", "text"]);
-    const originals = [svg, ...svg.querySelectorAll("*")];
-    const copies = [clone, ...clone.querySelectorAll("*")];
-    for (let i = 0; i < Math.min(originals.length, copies.length); i++) {
-      const node = copies[i];
-      if (!outlineTags.has(node.localName) || node.id === "canvasBackground") continue;
-      const computed = getComputedStyle(originals[i]);
-      const stroke = computed.getPropertyValue("stroke");
-      const fill = computed.getPropertyValue("fill");
-      const hasStroke = stroke && stroke !== "none" && Number.parseFloat(computed.getPropertyValue("stroke-width")) > 0;
-      const hasFill = fill && fill !== "none" && Number.parseFloat(computed.getPropertyValue("fill-opacity") || "1") > 0;
-      node.style?.setProperty("fill", "none", "important");
-      node.setAttribute("fill", "none");
-      if (!hasStroke && hasFill) {
-        node.style?.setProperty("stroke", fill, "important");
-        node.style?.setProperty("stroke-width", "2", "important");
-        node.setAttribute("stroke", fill);
-        node.setAttribute("stroke-width", "2");
-      }
-    }
-
-    let objectUrl = null;
-    try {
-      const source = new XMLSerializer().serializeToString(clone);
-      objectUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
-      const image = new Image();
-      await new Promise((resolve, reject) => {
-        image.onload = resolve;
-        image.onerror = reject;
-        image.src = objectUrl;
-      });
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d", { willReadFrequently: true });
-      if (!context) return false;
-      context.clearRect(0, 0, width, height);
-      context.drawImage(image, 0, 0, width, height);
-      const pixels = context.getImageData(0, 0, width, height).data;
-      const boundary = new Uint8Array(total);
-      const threshold = this.bucketSettings.edgeThreshold;
-      for (let i = 0; i < total; i++) if (pixels[i * 4 + 3] >= threshold) boundary[i] = 1;
-
-      // Temporary gap closing changes only the detection mask, never the source drawing.
-      const closedBoundary = closeBoundaryMask(boundary, width, height, this.bucketSettings.gap);
-      const region = floodRegion(closedBoundary, width, height, seedX, seedY);
-      if (!region || region.touchesEdge || region.size < 2) return false;
-      const contours = traceRegionContours(region.mask, width, height);
-      if (!contours.length) return false;
-
-      const mapPoint = ({ x, y }) => {
-        const point = svg.createSVGPoint();
-        point.x = viewBox.x + x * viewBox.width / width;
-        point.y = viewBox.y + y * viewBox.height / height;
-        const screenPoint = point.matrixTransform(svgMatrix);
-        return this.coordinates.screenToWorld(screenPoint.x, screenPoint.y);
-      };
-      const path = contoursToPath(contours, mapPoint);
-      if (!path || this.activeLayer !== layer || !this.canDraw()) return false;
-
-      const element = {
-        id: EngineUtils.createId("bucket"),
-        type: "path",
-        path,
-        tool: "bucket",
-        bucketFill: true,
-        style: { fill: color, color, size: 0, opacity: this.bucketSettings.opacity, lineCap: "round", lineJoin: "round" }
-      };
-
-      // Insert below ordinary strokes to keep the original boundaries crisp.
-      let insertAt = 0;
-      while (insertAt < layer.elements.length && layer.elements[insertAt]?.bucketFill === true) insertAt++;
-      layer.elements.splice(insertAt, 0, element);
-      this.document.touch?.();
-      this.commitHistory();
-      this.renderer.render(this.document);
-      return true;
-    } catch (error) {
-      console.error("Bucket fill failed:", error);
-      return false;
-    } finally {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    }
-  }
 
   eraseAt(point) {
     const layer = this.activeLayer;
