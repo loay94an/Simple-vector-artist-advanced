@@ -4,7 +4,7 @@
    while preserving full offline support as a robust PWA.
 ========================================================= */
 
-const CACHE_NAME = "rasem-pwa-v11-network-first";
+const CACHE_NAME = "rasem-sva-advanced-v11-network-first";
 const PRECACHE_ASSETS = [
   "./",
   "./index.html",
@@ -45,7 +45,7 @@ self.addEventListener("activate", event => {
       // CacheStorage is shared by every GitHub Pages project on this origin.
       // Remove only older Rasem caches; never delete another app's caches.
       return Promise.all(
-        keys.filter(key => key.startsWith("rasem-pwa-") && key !== CACHE_NAME)
+        keys.filter(key => key.startsWith("rasem-sva-advanced-") && key !== CACHE_NAME)
           .map(key => caches.delete(key))
       );
     }).then(() => self.clients.claim())
