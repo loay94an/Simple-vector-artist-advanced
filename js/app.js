@@ -471,7 +471,8 @@ export class RasemApplication {
       document: this.modules.document,
       history: this.modules.history,
       renderer: this.modules.renderer,
-      storage: this.modules.storage
+      storage: this.modules.storage,
+      onChange: () => this.scheduleAutosave()
     });
   }
 
