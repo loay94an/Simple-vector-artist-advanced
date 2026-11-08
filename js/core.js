@@ -1075,76 +1075,32 @@ export class Scene {
 
   appendCanvasPreview(id, points, style = {}, options = {}) {
     if (!Array.isArray(points) || !points.length) return false;
-    const resized = this.resizeCanvasPreview();
-    if (!resized) return false;
-    const { rect, context } = resized;
-    if (options.reset || this.canvasPreviewId !== id) {
-      context.clearRect(0, 0, rect.width, rect.height);
-      this.canvasPreviewId = id;
-      this.canvasPreviewCount = 0;
-    }
-
-    // Image-based custom brushes need their original SVG renderer.
-    if (style.customBrush) return false;
-
-    const color = style.color || "#111111";
-    const size = Math.max(0.5, Number(style.size) || 3);
-    const opacity = Math.max(0, Math.min(1, Number(style.opacity ?? 1)));
-    const calligraphy = options.calligraphy === true;
-    const angle = (Number(options.calligraphyAngle) || 45) * Math.PI / 180;
-    const nx = Math.cos(angle), ny = Math.sin(angle);
-    const radiusFor = point => size * 0.5 *
-      (options.pressureEnabled === false ? 1 : 0.35 + (Number(point.pressure) || 1) * 0.65);
-
-    context.save();
-    context.globalAlpha = opacity;
-    context.fillStyle = color;
-    context.strokeStyle = color;
-    context.lineCap = style.lineCap || "round";
-    context.lineJoin = style.lineJoin || "round";
-    const dash = String(style.dashArray || "").trim();
-    context.setLineDash(dash ? dash.split(/[ ,]+/).map(Number).filter(value => Number.isFinite(value) && value >= 0) : []);
-
-    const drawNib = (a, b) => {
-      const ra = Math.max(0.3, radiusFor(a));
-      const rb = Math.max(0.3, radiusFor(b));
-      context.beginPath();
-      context.moveTo(a.x + nx * ra, a.y + ny * ra);
-      context.lineTo(b.x + nx * rb, b.y + ny * rb);
-      context.lineTo(b.x - nx * rb, b.y - ny * rb);
-      context.lineTo(a.x - nx * ra, a.y - ny * ra);
-      context.closePath();
-      context.fill();
-    };
-
-    if (points.length === 1) {
-      const p = points[0];
-      if (calligraphy) {
-        const r = radiusFor(p);
-        const tx = -ny, ty = nx, half = Math.max(0.6, r * 0.5);
-        drawNib({ x: p.x - tx * half, y: p.y - ty * half, pressure: p.pressure }, { x: p.x + tx * half, y: p.y + ty * half, pressure: p.pressure });
-      } else {
-        context.beginPath();
-        context.arc(p.x, p.y, Math.max(0.3, radiusFor(p) / 2), 0, Math.PI * 2);
-        context.fill();
-      }
-    } else {
-      for (let i = 1; i < points.length; i++) {
-        const a = points[i - 1], b = points[i];
-        if (calligraphy) {
-          drawNib(a, b);
-        } else {
-          context.lineWidth = Math.max(0.5, (radiusFor(a) + radiusFor(b)));
-          context.beginPath();
-          context.moveTo(a.x, a.y);
-          context.lineTo(b.x, b.y);
-          context.stroke();
-        }
-      }
-    }
-    context.restore();
-    this.canvasPreviewCount += points.length;
-    return true;
+    const resized=this.resizeCanvasPreview(); if(!resized)return false;
+    const {rect,context}=resized;
+    if(options.reset||this.canvasPreviewId!==id){context.clearRect(0,0,rect.width,rect.height);this.canvasPreviewId=id;this.canvasPreviewCount=0;}
+    if(style.customBrush)return false;
+    const color=style.color||"#111111",size=Math.max(0.5,Number(style.size)||3);
+    const opacity=Math.max(0,Math.min(1,Number(style.opacity??1)));
+    const preset=String(options.brushPreset||style.brushPreset||"round");
+    const calligraphy=options.calligraphy===true;
+    const angle=(Number(options.calligraphyAngle??style.brushAngle)||45)*Math.PI/180,nx=Math.cos(angle),ny=Math.sin(angle);
+    const pressure=p=>options.pressureEnabled===false?1:Math.max(0.25,0.35+(Number(p.pressure)||0.5)*0.65);
+    const radius=(p,a,b)=>{let r=size*0.5*pressure(p);
+      if(["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)&&a&&b)r*=0.12+Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
+      if(preset==="point")r*=0.22+pressure(p)*0.78;if(preset==="oval")r*=0.72;if(preset==="soft"||preset==="watercolor")r*=1.12;return Math.max(0.3,r);};
+    context.save();context.globalAlpha=opacity*(preset==="watercolor"?0.68:preset==="soft"?0.82:1);
+    context.fillStyle=color;context.strokeStyle=color;context.lineCap=style.lineCap||"round";context.lineJoin=style.lineJoin||"round";
+    if(preset==="soft"){context.shadowColor=color;context.shadowBlur=Math.max(2,size*0.24);}
+    const dash=String(style.dashArray||"").trim();context.setLineDash(dash?dash.split(/[ ,]+/).map(Number).filter(v=>Number.isFinite(v)&&v>=0):[]);
+    const draw=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len,ra=radius(a,a,b),rb=radius(b,a,b);
+      if(preset==="dry"||preset==="chalk"){context.globalAlpha=opacity*0.82;for(const lane of [-2,0,2]){const off=lane*size*0.13,h=Math.max(0.35,size*0.055);context.beginPath();context.moveTo(a.x+px*(off+h),a.y+py*(off+h));context.lineTo(b.x+px*(off+h),b.y+py*(off+h));context.lineTo(b.x+px*(off-h),b.y+py*(off-h));context.lineTo(a.x+px*(off-h),a.y+py*(off-h));context.closePath();context.fill();}context.globalAlpha=opacity;return;}
+      if(preset==="spray"){const steps=Math.max(1,Math.ceil(len/Math.max(3,size*0.35)));for(let q=0;q<=steps;q++){const t=q/steps,x=a.x+dx*t,y=a.y+dy*t;for(let k=0;k<5;k++){const seed=(q+1)*127+(k+3)*71,ox=Math.sin(seed)*size*0.75,oy=Math.cos(seed*1.7)*size*0.75,r=Math.max(0.35,size*(0.035+((Math.sin(seed*2.1)+1)*0.018)));context.beginPath();context.arc(x+ox,y+oy,r,0,Math.PI*2);context.fill();}}return;}
+      if(calligraphy||["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)){context.beginPath();context.moveTo(a.x+nx*ra,a.y+ny*ra);context.lineTo(b.x+nx*rb,b.y+ny*rb);context.lineTo(b.x-nx*rb,b.y-ny*rb);context.lineTo(a.x-nx*ra,a.y-ny*ra);context.closePath();context.fill();return;}
+      if(preset==="oval"){context.save();context.translate((a.x+b.x)/2,(a.y+b.y)/2);context.rotate(Math.atan2(dy,dx));context.scale(1,0.72);context.lineWidth=ra+rb;context.beginPath();context.moveTo(-len/2,0);context.lineTo(len/2,0);context.stroke();context.restore();return;}
+      context.lineWidth=Math.max(0.5,ra+rb);context.beginPath();context.moveTo(a.x,a.y);context.lineTo(b.x,b.y);context.stroke();};
+    if(points.length===1){const p=points[0],r=radius(p,p,p);if(calligraphy){const tx=-ny,ty=nx,h=Math.max(0.6,r*0.5);draw({x:p.x-tx*h,y:p.y-ty*h,pressure:p.pressure},{x:p.x+tx*h,y:p.y+ty*h,pressure:p.pressure});}else{context.beginPath();context.arc(p.x,p.y,r,0,Math.PI*2);context.fill();}}
+    else for(let i=1;i<points.length;i++)draw(points[i-1],points[i]);
+    context.restore();this.canvasPreviewCount+=points.length;return true;
   }
 
   appendPreviewChunk(element, pathChunk) {
