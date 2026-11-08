@@ -1600,19 +1600,12 @@ export class DrawingEngine {
   scheduleShapeRecognition() {
     this.clearShapeRecognitionTimer();
 
-    // لا نشغّل التصحيح المؤجل أثناء الكتابة بقلم الخط العربي؛
-    // إعادة بناء المسار أثناء الكتابة قد تسبب بطئاً أو تقطيعاً.
-    // يبقى التصحيح عند السكون متاحاً لبقية أقلام الرسم.
-    const brushPreset = String(this.builder.brushStyle?.preset || "");
-    const isCalligraphy =
-      this.builder.tool === "calligraphy" ||
-      brushPreset === "calligraphy" ||
-      brushPreset.startsWith("cal-");
-
+    // لا يجري أي تصحيح مؤجل أثناء تحرك الإصبع.
+    // ننتظر ثباته عند نهاية الضربة مع بقائه مضغوطاً،
+    // وهذا يشمل قلم الخط العربي وبقية أقلام الرسم.
     if (
       !this.drawing ||
       this.settings.tool === "eraser" ||
-      isCalligraphy ||
       this.settings.lineCorrection <= 0 ||
       this.builder.points.length < 2
     ) return;
@@ -1621,13 +1614,18 @@ export class DrawingEngine {
       this.shapeRecognitionTimer = null;
       if (!this.drawing || this.destroyed) return;
 
-      // أعد بناء المسار بعد السكون لتطبيق التنعيم على آخر عينة
-      // حتى لو لم يكن المسار شكلاً هندسياً قابلاً للتعرّف.
+      // بعد ثبات الإصبع فقط، أعد معالجة المسار مرة واحدة.
       this.renderCurrent();
 
-      // التعرف الهندسي الإضافي يظل محصوراً بالأقلام العامة؛
-      // قلم الخط العربي يحصل على التنعيم دون تحويل حروفه إلى أشكال.
+      // لا نحوّل ضربات الخط العربي إلى أشكال هندسية؛
+      // نكتفي بتنعيم مسارها بعد انتهاء الكتابة والتوقف عند نهايته.
+      const brushPreset = String(this.builder.brushStyle?.preset || "");
+      const isCalligraphy =
+        this.builder.tool === "calligraphy" ||
+        brushPreset === "calligraphy" ||
+        brushPreset.startsWith("cal-");
       if (
+        isCalligraphy ||
         this.shapeRecognitionApplied ||
         !["pen", "pencil", "marker"].includes(this.settings.tool) ||
         this.builder.points.length < 8
@@ -1644,7 +1642,7 @@ export class DrawingEngine {
       this.lastPoint = this.builder.points.at(-1) || null;
       this.shapeRecognitionApplied = true;
       this.renderCurrent();
-    }, 500);
+    }, 700);
   }
 
   buildPath(points) {
