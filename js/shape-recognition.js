@@ -266,39 +266,61 @@ function fitLine(points, strength) {
 function fitOpenPolyline(points, strength) {
   const { corners } = detectCorners(points, false);
   if (!corners.length || corners.length > 8) return null;
+
+  // Map each detected corner back to its nearest original sample so each
+  // straight segment is assessed only against the samples belonging to it.
   const vertices = [points[0], ...corners, points.at(-1)];
-  const minSegment = Math.max(12, Math.hypot(boundsOf(points).width, boundsOf(points).height) * 0.07);
-  for (let i = 1; i < vertices.length; i++) if (distance(vertices[i - 1], vertices[i]) < minSegment) return null;
-  let residual = 0, count = 0;
-  for (let s = 1; s < vertices.length; s++) {
-    const a = vertices[s - 1], b = vertices[s], chord = distance(a, b);
-    for (const p of points) {
-      // Only assess samples near this segment's arc-length interval.
-      const projection = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / Math.max(0.001, chord * chord);
-      if (projection < -0.08 || projection > 1.08) continue;
-      const t = clamp(projection, 0, 1);
-      const d = Math.hypot(p.x - (a.x + (b.x - a.x) * t), p.y - (a.y + (b.y - a.y) * t));
-      residual += d * d; count++;
+  const indices = vertices.map(vertex => {
+    let best = 0, bestDistance = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const d = distance(points[i], vertex);
+      if (d < bestDistance) { bestDistance = d; best = i; }
+    }
+    return best;
+  });
+  for (let i = 1; i < indices.length; i++) {
+    if (indices[i] <= indices[i - 1]) return null;
+  }
+
+  const diagonal = Math.hypot(boundsOf(points).width, boundsOf(points).height);
+  let squaredError = 0, sampleCount = 0;
+  for (let segment = 1; segment < vertices.length; segment++) {
+    const a = vertices[segment - 1], b = vertices[segment];
+    const chord = distance(a, b);
+    if (chord < Math.max(10, diagonal * 0.06)) return null;
+    for (let i = indices[segment - 1]; i <= indices[segment]; i++) {
+      const p = points[i];
+      const deviation = Math.abs((b.x - a.x) * (a.y - p.y) -
+        (a.x - p.x) * (b.y - a.y)) / chord;
+      squaredError += deviation * deviation;
+      sampleCount++;
     }
   }
-  const diagonal = Math.hypot(boundsOf(points).width, boundsOf(points).height);
-  const rms = Math.sqrt(residual / Math.max(1, count));
-  if (rms / Math.max(1, diagonal) > 0.035 + strength * 0.025) return null;
+  const rms = Math.sqrt(squaredError / Math.max(1, sampleCount));
+  if (rms / Math.max(1, diagonal) > 0.028 + strength * 0.025) return null;
+
   const output = [];
   for (let i = 0; i < vertices.length; i++) {
-    if (i) {
-      const a = vertices[i - 1], b = vertices[i];
-      const steps = Math.max(3, Math.ceil(distance(a, b) / 10));
-      for (let j = 1; j <= steps; j++) output.push(interpolate(a, b, j / steps));
-    } else output.push({ ...vertices[i] });
+    if (!i) { output.push({ ...vertices[i] }); continue; }
+    const a = vertices[i - 1], b = vertices[i];
+    const steps = Math.max(3, Math.ceil(distance(a, b) / 10));
+    for (let j = 1; j <= steps; j++) output.push(interpolate(a, b, j / steps));
   }
-  return { type: "polyline", points: output, corners,
-    angles: vertices.slice(1, -1).map((_, i) => {
-      const a = vertices[i], b = vertices[i + 1], c = vertices[i + 2];
-      const v1 = { x: a.x - b.x, y: a.y - b.y }, v2 = { x: c.x - b.x, y: c.y - b.y };
-      return Math.acos(clamp(dot(v1, v2) / Math.max(0.001, length(v1) * length(v2)), -1, 1)) * 180 / Math.PI;
-    }),
-    confidence: clamp(1 - rms / Math.max(1, diagonal) * 5, 0.72, 0.96) };
+  const angles = vertices.slice(1, -1).map((_, i) => {
+    const a = vertices[i], b = vertices[i + 1], c = vertices[i + 2];
+    const v1 = { x: a.x - b.x, y: a.y - b.y };
+    const v2 = { x: c.x - b.x, y: c.y - b.y };
+    return Math.acos(clamp(dot(v1, v2) /
+      Math.max(0.001, length(v1) * length(v2)), -1, 1)) * 180 / Math.PI;
+  });
+  return {
+    type: "polyline",
+    points: output,
+    corners,
+    angles,
+    angleTypes: angles.map(angle => angle < 90 ? "acute" : angle > 90 ? "obtuse" : "right"),
+    confidence: clamp(1 - rms / Math.max(1, diagonal) * 5, 0.72, 0.96)
+  };
 }
 
 export function recognizeShape(sourcePoints, options = {}) {
