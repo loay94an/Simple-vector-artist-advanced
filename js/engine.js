@@ -439,9 +439,15 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
-    // أثناء الكتابة تبقى ضربات الخط العربي خاماً. بعد السكون فقط،
-    // نطبق تنعيماً محافظاً على العينات دون حذفها أو تغيير نقاط البداية والنهاية.
-    if (this.tool === "calligraphy") {
+    // لا يُصحح مسار الخط العربي أثناء الكتابة أو الرسم أو حركة القلم.
+    // تبقى العينات الأصلية كما هي حتى يثبت القلم ويستمر الضغط طوال مهلة السكون.
+    const preset = String(this.brushStyle?.preset || "");
+    const isCalligraphy =
+      this.tool === "calligraphy" ||
+      preset === "calligraphy" ||
+      preset.startsWith("cal-");
+
+    if (isCalligraphy) {
       if (this.deferSmoothing) {
         return this.points.map(point => ({ ...point }));
       }
