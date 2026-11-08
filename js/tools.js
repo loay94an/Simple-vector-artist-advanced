@@ -204,16 +204,16 @@ activate() {
    5. MARKER
 ========================================================= */
 
-export class Marker extends BaseTool {
+export class Feather extends BaseTool {
   constructor(engine, camera) {
     super(engine, camera);
-    this.name = "marker";
+    this.name = "feather";
   }
 
 activate() {
     super.activate();
     this.engine.setSettings({
-      tool: "marker"
+      tool: "feather"
     });
   }
 
@@ -1736,7 +1736,7 @@ export class ToolManager {
   registerDefaults() {
     this.register("calligraphy", new Calligraphy(this.engine, this.camera));
     this.register("pencil", new Pencil(this.engine, this.camera));
-    this.register("marker", new Marker(this.engine, this.camera));
+    this.register("feather", new Feather(this.engine, this.camera));
     this.register("eraser", new Eraser(this.engine, this.camera));
     this.register("text", new TextTool(this.engine, this.camera));
 
