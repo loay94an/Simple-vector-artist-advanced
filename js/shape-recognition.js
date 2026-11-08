@@ -328,7 +328,7 @@ export function recognizeShape(sourcePoints, options = {}) {
   const points = sourcePoints.filter(valid);
   if (points.length < 8) return null;
   const box = boundsOf(points), diagonal = Math.hypot(box.width, box.height);
-  if (diagonal < 24 || box.width < 6 || box.height < 6) return null;
+  if (diagonal < 24 || (box.width < 6 && box.height < 6)) return null;
   const strength = clamp(Number(options.strength) || 0.35, 0, 1);
   const gap = distance(points[0], points.at(-1));
   const closed = gap <= Math.max(10, diagonal * 0.14) &&
