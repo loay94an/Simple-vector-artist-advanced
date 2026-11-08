@@ -249,8 +249,11 @@
     );
     const calRow = document.getElementById("calligraphyAngleRow");
     const calScale = document.getElementById("calligraphyAngleScale");
+    const correctionRow = document.getElementById("lineCorrectionRow");
     if (calRow) calRow.style.display = isCal ? "flex" : "none";
     if (calScale) calScale.style.display = isCal ? "block" : "none";
+    // التصحيح التلقائي غير مدعوم لقلم الخط العربي؛ أخفِ إعداد التنعيم له.
+    if (correctionRow) correctionRow.style.display = isCal ? "none" : "flex";
 
     // Eraser mode row visibility
     const eraserRow = document.getElementById("eraserModeRow");
