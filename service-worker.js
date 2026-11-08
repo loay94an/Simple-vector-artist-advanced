@@ -4,7 +4,7 @@
    while preserving full offline support as a robust PWA.
 ========================================================= */
 
-const CACHE_NAME = "rasem-pwa-v10-flex-centered-overlay";
+const CACHE_NAME = "rasem-sva-advanced-v11-network-first";
 const PRECACHE_ASSETS = [
   "./",
   "./index.html",
@@ -42,8 +42,11 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys => {
+      // CacheStorage is shared by every GitHub Pages project on this origin.
+      // Remove only older Rasem caches; never delete another app's caches.
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys.filter(key => key.startsWith("rasem-sva-advanced-") && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
       );
     }).then(() => self.clients.claim())
   );
@@ -58,22 +61,22 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(request)
-      .then(networkResponse => {
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const networkResponse = await fetch(request);
         if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseClone);
-          });
+          await cache.put(request, networkResponse.clone());
         }
         return networkResponse;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
+      } catch {
+        const cached = await cache.match(request);
         if (cached) return cached;
         if (request.mode === "navigate") {
-          return (await caches.match("./index.html")) || (await caches.match("./"));
+          return (await cache.match("./index.html")) || (await cache.match("./"));
         }
-      })
+        return Response.error();
+      }
+    })()
   );
 });

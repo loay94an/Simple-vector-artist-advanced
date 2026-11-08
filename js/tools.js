@@ -1035,7 +1035,58 @@ export class Selector extends BaseTool {
   }
 
   cancel() {
-    // Cancel the current pointer gesture without clearing the selection.
+    // Roll back an interrupted one-finger transform instead of leaving
+    // uncommitted geometry changes in the document.
+    const layer = this.getLayer();
+    let restored = false;
+
+    if (layer && this.moved && this.initialSnapshot.size) {
+      for (const [id, snapshot] of this.initialSnapshot) {
+        const element = layer.elements.find(item => item.id === id);
+        if (!element) continue;
+
+        if (snapshot.points) {
+          element.points = snapshot.points.map(point => ({ ...point }));
+        } else {
+          delete element.points;
+        }
+        if (snapshot.geometry) {
+          element.geometry = { ...snapshot.geometry };
+        } else {
+          delete element.geometry;
+        }
+        if (snapshot.style) {
+          element.style = { ...snapshot.style };
+        } else {
+          delete element.style;
+        }
+        if (snapshot.path === undefined) delete element.path;
+        else element.path = snapshot.path;
+        if (snapshot.transform === undefined) delete element.transform;
+        else element.transform = snapshot.transform;
+
+        restored = true;
+      }
+    }
+
+    // Also roll back an interrupted two-finger selection transform.
+    const multi = this.multiTouchSnapshot;
+    if (multi?.layer && multi.elements) {
+      for (const [id, snapshot] of multi.elements) {
+        const element = multi.layer.elements.find(item => item.id === id);
+        if (!element) continue;
+        if (snapshot.transform) element.transform = snapshot.transform;
+        else delete element.transform;
+        restored = true;
+      }
+    }
+
+    if (restored && this.engine?.renderer) {
+      if (layer) this.engine.renderer.renderActiveLayer?.(layer);
+      this.engine.renderer.render?.(this.engine.document);
+    }
+
+    this.multiTouchSnapshot = null;
     this.pointerDown = false;
     this.dragMode = null;
     this.activeHandle = null;
