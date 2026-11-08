@@ -716,6 +716,7 @@
     if (button) {
       if (!settings[activeTool]) settings[activeTool] = {};
       settings[activeTool].brush = button.dataset.brush;
+      restoreHeadProfile(button.dataset.brush);
 
       const isCalligraphyBrush = button.dataset.brush === "calligraphy" || button.dataset.brush.startsWith("cal-");
 
@@ -781,6 +782,7 @@
       if (navigator.vibrate) { try { navigator.vibrate(35); } catch {} }
       if (!settings[activeTool]) settings[activeTool] = {};
       settings[activeTool].brush = button.dataset.brush;
+      restoreHeadProfile(button.dataset.brush);
       const isCalligraphyBrush = button.dataset.brush === "calligraphy" || button.dataset.brush.startsWith("cal-");
       const calRow = document.getElementById("calligraphyAngleRow");
       const calScale = document.getElementById("calligraphyAngleScale");
