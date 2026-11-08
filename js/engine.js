@@ -446,9 +446,48 @@ export class StrokeBuilder {
         return this.points.map(point => ({ ...point }));
       }
 
-      this.smoothing.strength = this.lineCorrectionStrength;
-      this.smoothing.minDistance = 0;
-      return this.smoothing.filter(this.points);
+      // مرشح خفيف خاص بالخط العربي: تمريرة واحدة ثابتة الكلفة.
+      // لا نستخدم مرشح الأقلام العام لأنه قد ينفذ عشرات التمريرات
+      // على آلاف العينات ويجمّد واجهة الرسم أثناء الكتابة الطويلة.
+      const strength = EngineUtils.clamp(this.lineCorrectionStrength, 0, 1);
+      if (strength <= 0 || this.points.length < 3) {
+        return this.points.map(point => ({ ...point }));
+      }
+
+      const blend = 0.08 + strength * 0.27;
+      const source = this.points;
+      const filtered = source.map(point => ({ ...point }));
+
+      for (let i = 1; i < source.length - 1; i++) {
+        const previous = source[i - 1];
+        const current = source[i];
+        const next = source[i + 1];
+
+        const ax = current.x - previous.x;
+        const ay = current.y - previous.y;
+        const bx = next.x - current.x;
+        const by = next.y - current.y;
+        const aLength = Math.hypot(ax, ay);
+        const bLength = Math.hypot(bx, by);
+
+        if (aLength < 0.0001 || bLength < 0.0001) continue;
+
+        const turn = Math.atan2(
+          ax * by - ay * bx,
+          ax * bx + ay * by
+        );
+
+        // احتفظ بالانعطافات الحادة المقصودة؛ نعالج الاهتزازات الخفيفة فقط.
+        if (Math.abs(turn) > 0.85) continue;
+
+        const targetX = (previous.x + 2 * current.x + next.x) / 4;
+        const targetY = (previous.y + 2 * current.y + next.y) / 4;
+
+        filtered[i].x = current.x + (targetX - current.x) * blend;
+        filtered[i].y = current.y + (targetY - current.y) * blend;
+      }
+
+      return filtered;
     }
 
     this.smoothing.strength = this.baseSmoothingStrength;
