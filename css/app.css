@@ -3771,5 +3771,8 @@ body.dark .canvas-area {
 }
 
 #canvasBackground {
-  pointer-events: none !important;
+  /* Keep the full drawing surface hit-testable on touch devices.
+     EventManager listens on the parent SVG in the capture phase. */
+  pointer-events: all !important;
+  touch-action: none !important;
 }
