@@ -1323,7 +1323,13 @@ export class DrawingEngine {
           : null,
         calligraphyEndStyle: ["none", "thin", "wide", "pointed", "crescent"].includes(settings.brushStyle.calligraphyEndStyle)
           ? settings.brushStyle.calligraphyEndStyle
-          : "none"
+          : "none",
+        featherDensity: EngineUtils.clamp(Math.round(EngineUtils.number(settings.brushStyle.featherDensity, 10)), 3, 32),
+        featherGlow: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherGlow, 0), 0, 1),
+        featherSpacing: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpacing, 1), 0.25, 2.5),
+        featherSpread: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpread, 0.45), 0, 1),
+        featherSoftness: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSoftness, 0.35), 0, 1),
+        featherTaper: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherTaper, 0.7), 0, 1)
       };
     }
 
@@ -1610,7 +1616,10 @@ export class DrawingEngine {
       }
       this.canvasPreviewTransform = transform;
       const canvasNeedsReset = this.renderer.canvasPreviewId !== this.currentElement.id;
-      const from = canvasNeedsReset ? 0 : Math.max(0, this.canvasPreviewPointCount - 1);
+      // Feather geometry is a single continuous ribbon. Redraw the full
+      // accumulated stroke instead of compositing tiny tapered segments.
+      const featherFullPreview = this.builder.tool === "feather";
+      const from = (canvasNeedsReset || featherFullPreview) ? 0 : Math.max(0, this.canvasPreviewPointCount - 1);
       const screenPoints = rect ? source.slice(from).map(point => {
         const screen = this.coordinates.worldToScreen(point);
         return screen ? {
@@ -1656,6 +1665,7 @@ export class DrawingEngine {
         screenPoints,
         { ...this.currentElement.style, size: this.builder.baseSize * screenScale },
         {
+          reset: featherFullPreview,
           tool: this.builder.tool,
           calligraphy: isCalligraphy,
           calligraphyAngle: this.builder.calligraphyAngle,
