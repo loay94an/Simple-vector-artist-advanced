@@ -1,0 +1,6 @@
+{
+  "name": "رسام - برنامج رسم فيكتور | Rasem Vector",
+  "description": "تطبيق رسم وتصميم فيكتور رقمي احترافي متكامل يدعم الطبقات وأدوات الهندسة والتصدير بصيغ SVG و PNG و PDF والتحكم الدقيق.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

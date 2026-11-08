@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <title>رسام - برنامج رسم فيكتور | Rasem Vector</title>
+  <meta name="description" content="تطبيق رسم وتصميم فيكتور رقمي احترافي متكامل يدعم الطبقات وأدوات الهندسة والتصدير بصيغ SVG و PNG و PDF والتحكم الدقيق." />
+  <meta property="og:title" content="رسام - برنامج رسم فيكتور | Rasem Vector" />
+  <meta property="og:description" content="تطبيق رسم وتصميم فيكتور رقمي احترافي متكامل يدعم الطبقات وأدوات الهندسة والتصدير بصيغ SVG و PNG و PDF والتحكم الدقيق." />
+  <meta property="og:type" content="website" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <link rel="stylesheet" href="./css/app.css">
+  <script type="module" src="./js/app.js"></script>
+</head>
+
+<body class="light">
+
+  <div id="app">
+
+    <!-- HEADER -->
+    <header class="app-header">
+
+      <div class="header-actions">
+        <!-- Undo / Redo -->
+        <button id="undoBtn" class="header-tool-btn" disabled title="تراجع (Ctrl+Z)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+
+        <button id="redoBtn" class="header-tool-btn" disabled title="إعادة (Ctrl+Y)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+        </button>
+
+        <!-- Dedicated Layers Button -->
+        <button id="topLayersBtn" class="header-tool-btn" type="button" title="إدارة الطبقات">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+          <span class="btn-text">الطبقات</span>
+          <span id="layersCountBadge" class="header-badge">1</span>
+        </button>
+
+        <!-- Selection tools -->
+        <button class="header-tool-btn tool" data-tool="selector" title="أداة التحديد المباشر">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 3 7 18 3-7 7-3L3 3z"/></svg>
+          <span class="btn-text">تحديد</span>
+        </button>
+
+        <button class="header-tool-btn tool" data-tool="lasso" title="أداة التحديد الحر (Lasso)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 22a5 5 0 0 1-2-4"/><path d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1"/><path d="M5 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+        </button>
+
+        <!-- Export button -->
+        <button id="topExportBtn" class="header-action-btn primary" type="button" title="تصدير الرسم (SVG, PNG, PDF)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          <span class="btn-text">تصدير</span>
+        </button>
+
+        <!-- PWA Install button (hidden until installable) -->
+        <button id="pwaInstallBtn" class="header-tool-btn" type="button" style="display:none;" title="تثبيت التطبيق على الجهاز">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+          <span class="btn-text">تثبيت</span>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" class="header-tool-btn icon-only" type="button" title="تبديل المظهر (فاتح / داكن)">
+          ☼
+        </button>
+
+        <!-- Settings Button -->
+        <button id="settingsMenuBtn" class="header-tool-btn icon-only" type="button" aria-label="الإعدادات" aria-expanded="false" title="الإعدادات والمستند">
+          ⚙
+        </button>
+
+        <input id="importFileInput" type="file" accept=".rasem,.json,image/*,.svg,.pdf,application/pdf" hidden />
+      </div>
+
+    </header>
+
+    <!-- SETTINGS POPUP MODAL & BACKDROP -->
+    <div id="settingsModalBackdrop" class="modal-backdrop" hidden></div>
+    <div id="settingsMenu" class="settings-menu modal-centered" role="dialog" aria-label="الإعدادات" hidden>
+      <div class="settings-menu-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <strong>إدارة المستند واللوحة</strong>
+        </div>
+        <button id="closeSettingsMenu" type="button" class="concepts-close-btn" aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="settings-menu-items">
+        <!-- Save Document Option -->
+        <div class="settings-menu-item highlight-item" style="border: 1px solid var(--primary-soft); background: var(--primary-soft);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <div style="text-align:right;">
+              <strong style="color:var(--primary); display:block;">حفظ المستند واللوحة</strong>
+              <span style="font-size:11px; color:var(--text-muted);">حفظ فوري في التخزين المحلي والنسخ الاحتياطي</span>
+            </div>
+          </div>
+          <button id="saveBtn" type="button" class="header-action-btn primary" style="font-weight:700;">حفظ الآن</button>
+        </div>
+
+        <div class="settings-menu-item">
+          <span>لوحة رسم جديدة ومسح اللوحة</span>
+          <button id="newCanvasBtn" type="button" class="header-action-btn">جديد</button>
+        </div>
+
+        <div class="settings-menu-item settings-document-action">
+          <span>إدراج صورة / SVG / PDF / مشروع (.rasem)</span>
+          <button id="importBtn" type="button" class="header-action-btn">استيراد</button>
+        </div>
+
+        <div class="settings-menu-item settings-document-action">
+          <span>تصدير الرسم (SVG / PNG / PDF)</span>
+          <button id="exportBtn" type="button" class="header-action-btn">تصدير</button>
+        </div>
+
+        <div class="settings-menu-item">
+          <span>إدارة الطبقات (Layers)</span>
+          <button id="openLayersBtn" type="button" class="header-action-btn">الطبقات</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW CANVAS CONFIRMATION MODAL -->
+    <div id="newCanvasModalBackdrop" class="modal-backdrop" hidden></div>
+    <div id="newCanvasModal" class="geometry-menu modal-centered" role="dialog" aria-label="لوحة رسم جديدة" hidden>
+      <div class="geometry-menu-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          <strong>إنشاء لوحة رسم جديدة</strong>
+        </div>
+        <button id="closeNewCanvasModal" type="button" class="concepts-close-btn" aria-label="إغلاق">✕</button>
+      </div>
+
+      <div style="padding:14px 0; text-align:center;">
+        <div style="font-size:13px; color:var(--text); line-height:1.6; margin-bottom:16px;">
+          هل تريد حفظ التغييرات الحالية على اللوحة قبل البدء بصفحة جديدة؟
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button id="newCanvasSaveBtn" type="button" class="header-action-btn primary" style="width:100%; height:40px; justify-content:center; gap:8px; font-weight:700;">
+            💾 حفظ اللوحة وإنشاء لوحة جديدة
+          </button>
+          <button id="newCanvasDiscardBtn" type="button" class="header-action-btn danger" style="width:100%; height:38px; justify-content:center; gap:8px; font-weight:600;">
+            🗑 تجاهل ومسح اللوحة وإنشاء جديد
+          </button>
+          <button id="newCanvasCancelBtn" type="button" class="header-action-btn" style="width:100%; height:36px; justify-content:center;">
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SAVE CONFIRMATION MODAL -->
+    <div id="saveModalBackdrop" class="modal-backdrop" hidden></div>
+    <div id="saveModal" class="geometry-menu modal-centered" role="dialog" aria-label="تأكيد حفظ المستند" hidden>
+      <div class="geometry-menu-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <strong>تم حفظ المستند بنجاح</strong>
+        </div>
+        <button id="closeSaveModal" type="button" class="concepts-close-btn" aria-label="إغلاق">✕</button>
+      </div>
+
+      <div style="padding:14px 0; text-align:center;">
+        <div style="font-size:13px; color:var(--text); line-height:1.6; margin-bottom:16px;">
+          تم حفظ كافة عناصر الرسم والطبقات في التخزين المحلي للمتصفح تلقائياً وبأمان. يمكنك تنزيل ملف الرسم للاحتفاظ بنسخة على جهازك.
+        </div>
+        <button id="downloadRasemBtn" type="button" class="header-action-btn primary" style="width:100%; height:40px; justify-content:center; gap:8px; font-weight:700;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          تنزيل ملف النسخة الاحتياطية (.rasem)
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="workspace">
+
+      <!-- TOOLBAR -->
+      <aside id="toolbar" class="toolbar">
+
+        <!-- Pen (قلم حبر) -->
+        <button class="tool active" data-tool="pen" title="قلم حبر (ضغطة طويلة للإعدادات)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+        </button>
+
+        <!-- Calligraphy (قلم خط عربي) -->
+        <button class="tool" data-tool="calligraphy" title="قلم الخط العربي المشطوف (ضغطة طويلة للإعدادات)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+        </button>
+
+        <!-- Pencil (قلم رصاص) -->
+        <button class="tool" data-tool="pencil" title="قلم رصاص (ضغطة طويلة للإعدادات)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+        </button>
+
+        <!-- Marker (ماركر تظليل) -->
+        <button class="tool" data-tool="marker" title="ماركر تظليل شفاف (ضغطة طويلة للإعدادات)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 2-8 8 4 4 8-8-4-4Z"/><path d="m6 10-4 4 4 4 4-4"/><path d="m2 18 4 4"/></svg>
+        </button>
+
+        <!-- Smart Dual Eraser (ممحاة ذكية مزدوجة) -->
+        <button class="tool" data-tool="eraser" id="eraserToolBtn" title="الممحاة (نقرة: تبديل النمط / ضغطة طويلة: الإعدادات)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+          <span class="eraser-badge" id="eraserBadge">جزئي</span>
+        </button>
+
+        <!-- Geometry Shapes Menu Button -->
+        <div class="geometry-tool-menu">
+          <button class="tool geometry-menu-toggle" id="shapesMenuToggleBtn" data-tool="shapes" type="button" aria-expanded="false" title="الأشكال الهندسية (نقرة لاختيار الشكل والإعدادات)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <span class="shape-indicator-badge" id="shapeIndicatorBadge">▭</span>
+          </button>
+        </div>
+
+        <!-- Hand pan -->
+        <button class="tool" data-tool="hand" title="تحريك اللوحة">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        </button>
+
+        <!-- Concepts Color Wheel Trigger -->
+        <button id="colorMenuBtn" class="tool color-menu-toggle" type="button" title="عجلة الألوان Concepts (انقر أو اضغط مطولاً)">
+          <span class="color-dot" id="colorMenuPreview" style="background-color: #2563EB;"></span>
+        </button>
+
+        <input id="colorPicker" type="color" value="#2563EB" hidden />
+
+      </aside>
+
+      <!-- FLOATING TOOL SETTINGS POPUP & BACKDROP -->
+      <div id="toolSettingsBackdrop" class="modal-backdrop" hidden></div>
+      <section id="toolSettingsPopup" class="tool-settings-popup" aria-label="إعدادات الأداة" hidden>
+        <div class="tool-settings-head">
+          <strong id="toolSettingsTitle">إعدادات الأداة</strong>
+          <button id="closeToolSettings" type="button" aria-label="إغلاق">×</button>
+        </div>
+
+        <div class="tool-setting-row">
+          <label for="brushSize">الحجم / السماكة</label>
+          <output id="brushSizeValue">5</output>
+        </div>
+        <input id="brushSize" data-setting="size" type="range" min="0.5" max="120" step="0.5" value="5">
+
+        <div class="tool-setting-row">
+          <label for="brushOpacity">الشفافية</label>
+          <output id="brushOpacityValue">100%</output>
+        </div>
+        <input id="brushOpacity" data-setting="opacity" type="range" min="0.05" max="1" step="0.01" value="1">
+
+        <div class="tool-setting-row">
+          <label for="smoothing">التنعيم ومسار الخط</label>
+          <output id="smoothingValue">35%</output>
+        </div>
+        <input id="smoothing" data-setting="smoothing" type="range" min="0" max="1" step="0.05" value="0.35">
+
+        <!-- Calligraphy angle row -->
+        <div class="tool-setting-row" id="calligraphyAngleRow" style="display:none;">
+          <label for="calligraphyAngle">زاوية سن القلم</label>
+          <output id="calligraphyAngleValue">45°</output>
+        </div>
+        <div id="calligraphyAnglePresets" style="display:none; grid-template-columns:repeat(5,1fr); gap:4px; margin-bottom:8px;">
+          <button type="button" class="header-tool-btn" data-angle="0">0°</button>
+          <button type="button" class="header-tool-btn" data-angle="30">30°</button>
+          <button type="button" class="header-tool-btn active" data-angle="45">45°</button>
+          <button type="button" class="header-tool-btn" data-angle="60">60°</button>
+          <button type="button" class="header-tool-btn" data-angle="90">90°</button>
+        </div>
+        <input id="calligraphyAngle" type="range" min="0" max="180" step="5" value="45" style="display:none;">
+
+        <!-- Eraser Mode Row -->
+        <div class="tool-setting-row" id="eraserModeRow" style="display:none; flex-direction:column; gap:8px;">
+          <label>نمط المسح المفضل:</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%;">
+            <button type="button" class="header-tool-btn active" id="eraserModePartialBtn" data-eraser-mode="partial">◫ عادية جزئية</button>
+            <button type="button" class="header-tool-btn" id="eraserModeStrokeBtn" data-eraser-mode="stroke">◪ الخط بالكامل</button>
+          </div>
+        </div>
+
+        <!-- Brush presets section -->
+        <section id="brushPresetsSection" style="margin-top:12px;">
+          <strong style="font-size:12px; display:block; margin-bottom:6px;">شكل ورأس الفرشاة:</strong>
+          <div class="tool-brush-presets" style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px;">
+            <button type="button" data-brush="round" title="دائرية">● دائرية ناعمة</button>
+            <button type="button" data-brush="calligraphy" title="خط عربي">✒ خط عربي</button>
+            <button type="button" data-brush="chisel" title="عريضة">■ عريضة هندسية</button>
+            <button type="button" data-brush="spray" title="رش / بخاخ">░ رش / بخاخ</button>
+            <button type="button" data-brush="watercolor" title="تلوين مائي">◉ ألوان مائية</button>
+            <button type="button" data-brush="chalk" title="طباشيري / جاف">▧ طباشيري / جاف</button>
+            <button type="button" data-brush="ink" title="حبر هندي">✒ حبر هندي G-Pen</button>
+            <button type="button" data-brush="highlighter" title="تظليل">▮ قلم تظليل</button>
+          </div>
+
+          <!-- Custom PNG Brush Section -->
+          <div style="margin-top:12px; padding:10px; border-radius:10px; background:var(--surface-2); border:1px dashed var(--border);">
+            <label for="customBrushPNG" style="display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; font-weight:600; font-size:12px;">
+              <span>＋ إرفاق صورة PNG لفرشاة مخصصة</span>
+            </label>
+            <input id="customBrushPNG" type="file" accept="image/png,image/*" hidden>
+            <img id="customBrushPreview" hidden alt="معاينة الفرشاة المخصصة" style="max-width:60px; max-height:60px; margin:8px auto; display:block; border-radius:6px; background:#fff; padding:2px;">
+            <button type="button" id="removeCustomBrushBtn" class="header-action-btn danger" style="display:none; width:100%; margin-top:8px; font-size:11px; justify-content:center;">
+              ✕ حذف صورة الفرشاة المخصصة
+            </button>
+          </div>
+          <output id="toolBrushPreview" style="font-size:11px; color:var(--text-muted); display:block; margin-top:6px;">الفرشاة الحالية: دائرية ناعمة</output>
+        </section>
+
+        <label class="setting-toggle" style="margin-top:12px; display:flex; align-items:center; gap:8px; font-size:12px;">
+          <input id="pressureEnabled" data-setting="pressureEnabled" type="checkbox" checked>
+          <span>دعم حساسية ضغط القلم</span>
+        </label>
+      </section>
+
+      <!-- CANVAS AREA -->
+      <section id="canvasBoard" class="canvas-area">
+        <div id="viewport-container" class="canvas-viewport">
+          <svg id="drawingCanvas" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet">
+            <rect id="canvasBackground" x="0" y="0" width="1600" height="1000" fill="#ffffff"/>
+            <g id="viewport">
+              <g id="gridLayer"></g>
+              <g id="drawingLayer"></g>
+              <g id="guideLayer"></g>
+              <g id="selectionLayer"></g>
+              <g id="previewLayer"></g>
+            </g>
+          </svg>
+        </div>
+
+      </section>
+
+      <!-- FLOATING SELECTION ACTION BAR -->
+      <div id="selectionActionBar" class="selection-action-bar">
+        <button id="selDuplicateBtn" type="button" title="مضاعفة العناصر المحددة">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          <span>مضاعفة</span>
+        </button>
+        <button id="selDeleteBtn" type="button" class="danger" title="حذف العناصر المحددة">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          <span>حذف</span>
+        </button>
+        <button id="selClearBtn" type="button" title="إلغاء التحديد">
+          <span>إلغاء</span>
+        </button>
+      </div>
+
+      <!-- MODERN FLOATING LAYERS PANEL -->
+      <aside id="layersPanel" class="layers-floating-panel" hidden>
+        <div class="layers-panel-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+            <strong>الطبقات (Layers)</strong>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button id="addLayerBtn" class="header-action-btn primary" type="button" title="إضافة طبقة جديدة" style="height:28px; padding:0 8px; font-size:12px;">+ جديدة</button>
+            <button id="closeLayersPanelBtn" type="button" class="concepts-close-btn" title="إغلاق">✕</button>
+          </div>
+        </div>
+
+        <div id="layerList" class="layers-list" style="max-height:360px; overflow-y:auto; padding:4px;"></div>
+      </aside>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <span id="statusText">جاهز للرسم الفيكتوري</span>
+      <span id="coordinatesLabel">X: 0 | Y: 0</span>
+      <span id="layerCount">الطبقات: 1</span>
+    </footer>
+
+  </div>
+
+  <!-- GEOMETRIC SHAPES & STYLING MODAL -->
+  <div id="geometryModalBackdrop" class="modal-backdrop" hidden></div>
+  <div id="geometryMenu" class="geometry-menu modal-centered" role="dialog" aria-label="خيارات الأشكال الهندسية" hidden>
+    <div class="geometry-menu-head">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        <strong>خيارات الأشكال الهندسية</strong>
+      </div>
+      <button id="closeGeometryMenuBtn" type="button" class="concepts-close-btn" aria-label="إغلاق">✕</button>
+    </div>
+
+    <!-- Live Shape Preview Box -->
+    <div class="shape-live-preview-box">
+      <svg id="shapePreviewSvg" width="100%" height="80" viewBox="0 0 200 80"></svg>
+    </div>
+
+    <!-- Shapes Grid -->
+    <div class="geometry-section-title">نوع الشكل:</div>
+    <div class="geometry-items-grid">
+      <button type="button" class="geometry-item active" data-shape="rect">▭ مستطيل</button>
+      <button type="button" class="geometry-item" data-shape="square">□ مربع</button>
+      <button type="button" class="geometry-item" data-shape="circle">○ دائرة</button>
+      <button type="button" class="geometry-item" data-shape="ellipse">⬭ بيضاوي</button>
+      <button type="button" class="geometry-item" data-shape="triangle">△ مثلث</button>
+      <button type="button" class="geometry-item" data-shape="diamond">◇ معين</button>
+      <button type="button" class="geometry-item" data-shape="line">／ خط مستقيم</button>
+      <button type="button" class="geometry-item" data-shape="curve">⌒ منحنى</button>
+      <button type="button" class="geometry-item" data-shape="arrow">➜ سهم</button>
+    </div>
+
+    <!-- Stroke Thickness Slider -->
+    <div class="geometry-option-row">
+      <label for="shapeStrokeWidth">سماكة الإطار (Stroke):</label>
+      <output id="shapeStrokeWidthVal">3 px</output>
+    </div>
+    <input id="shapeStrokeWidth" type="range" min="1" max="50" step="1" value="3">
+
+    <!-- Stroke Style Buttons -->
+    <div class="geometry-option-row" style="margin-top:10px;">
+      <label>نمط الإطار:</label>
+    </div>
+    <div class="stroke-style-buttons">
+      <button type="button" class="stroke-style-btn active" data-style="solid">متصل ──</button>
+      <button type="button" class="stroke-style-btn" data-style="dashed">متقطع ╌╌</button>
+      <button type="button" class="stroke-style-btn" data-style="dotted">منقط •••</button>
+    </div>
+
+    <!-- Fill Cavity Options -->
+    <div class="geometry-fill-section">
+      <label class="geometry-checkbox-label">
+        <input type="checkbox" id="shapeFillToggle">
+        <span>تعبئة فراغ الشكل باللون المالي بعجلة الألوان (Fill Cavity)</span>
+      </label>
+    </div>
+
+    <!-- Corner Radius (Visible for Rect / Square) -->
+    <div id="shapeRadiusRow" style="margin-top:12px;">
+      <div class="geometry-option-row">
+        <label for="shapeCornerRadius">استدارة الحواف (Radius):</label>
+        <output id="shapeCornerRadiusVal">0 px</output>
+      </div>
+      <input id="shapeCornerRadius" type="range" min="0" max="40" step="1" value="0">
+    </div>
+
+    <div class="geometry-menu-footer">
+      <button id="applyShapeBtn" type="button" class="header-action-btn primary" style="width:100%; height:38px; font-weight:600; font-size:13px; justify-content:center;">
+        تطبيق والبدء بالرسم
+      </button>
+    </div>
+  </div>
+
+  <!-- MODERN COMPREHENSIVE EXPORT MODAL -->
+  <dialog id="exportDialog">
+    <div class="export-modal-head">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        <h2>تصدير الرسم الرقمي</h2>
+      </div>
+      <button id="closeExportBtn" type="button" class="concepts-close-btn">✕</button>
+    </div>
+
+    <div class="export-modal-body">
+      <!-- Format Selection -->
+      <div>
+        <div class="export-section-title">صيغة الملف:</div>
+        <div class="export-format-grid">
+          <div class="export-format-card active" data-export-format="svg">
+            <strong>SVG</strong>
+            <span>فيكتور دقيق غير محدود</span>
+          </div>
+          <div class="export-format-card" data-export-format="png">
+            <strong>PNG</strong>
+            <span>صورة بكسلية عالية الدقة</span>
+          </div>
+          <div class="export-format-card" data-export-format="pdf">
+            <strong>PDF</strong>
+            <span>مستند طباعة فوري</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scope Selection -->
+      <div>
+        <div class="export-section-title">نطاق التصدير ومساحة العمل:</div>
+        <div class="export-scope-options">
+          <label class="export-radio-label">
+            <input type="radio" name="exportScope" value="full" checked>
+            <div>
+              <strong>كامل عناصر الرسم (تلقائي بدون قص)</strong>
+              <div style="font-size:11px; color:var(--text-muted);">حساب المحيط الحقيقي لكافة العناصر المرسومة مع هوامش متناسقة</div>
+            </div>
+          </label>
+
+          <label class="export-radio-label">
+            <input type="radio" name="exportScope" value="custom">
+            <div>
+              <strong>تحديد مساحة عمل مخصصة</strong>
+              <div style="font-size:11px; color:var(--text-muted);">تحديد أبعاد العرض والارتفاع المطلوب تصديرها بدقة</div>
+            </div>
+          </label>
+
+          <div id="customAreaInputs" class="export-custom-dimensions" style="display:none;">
+            <div class="export-dim-input">
+              <label>العرض (px):</label>
+              <input type="number" id="customExportWidth" value="1920" min="10">
+            </div>
+            <div class="export-dim-input">
+              <label>الارتفاع (px):</label>
+              <input type="number" id="customExportHeight" value="1080" min="10">
+            </div>
+          </div>
+
+          <label class="export-radio-label">
+            <input type="radio" name="exportScope" value="canvas">
+            <div>
+              <strong>شاشة العرض الحالية</strong>
+              <div style="font-size:11px; color:var(--text-muted);">تصدير ما يظهر حالياً في الكاميرا (1600x1000)</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Resolution Scale (for PNG and PDF) -->
+      <div id="exportScaleRow" style="display:none;">
+        <div class="export-section-title">مضاعف الدقة (Resolution):</div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="header-tool-btn" data-scale="1">1x (عادي)</button>
+          <button type="button" class="header-tool-btn active" data-scale="2">2x (Retina فائق)</button>
+          <button type="button" class="header-tool-btn" data-scale="4">4x (Ultra 4K)</button>
+        </div>
+      </div>
+
+      <!-- Background options -->
+      <div id="exportBgRow">
+        <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" id="exportTransparentBg">
+          <span>خلفية شفافة (بدون لون أبيض خلف الرسم)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="export-modal-footer">
+      <button id="cancelExportBtn" type="button" class="header-action-btn">إلغاء</button>
+      <button id="executeExportBtn" type="button" class="header-action-btn primary" style="padding:0 20px; font-weight:600;">تصدير وتنزيل الآن</button>
+    </div>
+  </dialog>
+
+  <!-- NOTIFICATIONS TOAST -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- INLINE CONTROLLERS FOR EXPORT, LAYERS & SELECTION -->
+  <script>
+  (() => {
+    // 0. Settings Menu & Save Modal Controllers
+    const settingsMenuBtn = document.getElementById("settingsMenuBtn");
+    const settingsMenu = document.getElementById("settingsMenu");
+    const closeSettingsMenu = document.getElementById("closeSettingsMenu");
+    const settingsBackdrop = document.getElementById("settingsModalBackdrop");
+
+    const saveBtn = document.getElementById("saveBtn");
+    const saveModal = document.getElementById("saveModal");
+    const closeSaveModal = document.getElementById("closeSaveModal");
+    const saveModalBackdrop = document.getElementById("saveModalBackdrop");
+    const downloadRasemBtn = document.getElementById("downloadRasemBtn");
+
+    function openSettings() {
+      if (!settingsMenu) return;
+      settingsMenu.hidden = false;
+      if (settingsBackdrop) settingsBackdrop.hidden = false;
+      settingsMenuBtn?.setAttribute("aria-expanded", "true");
+    }
+
+    function closeSettings() {
+      if (!settingsMenu) return;
+      settingsMenu.hidden = true;
+      if (settingsBackdrop) settingsBackdrop.hidden = true;
+      settingsMenuBtn?.setAttribute("aria-expanded", "false");
+    }
+
+    function toggleSettings() {
+      if (!settingsMenu) return;
+      if (settingsMenu.hidden) {
+        openSettings();
+      } else {
+        closeSettings();
+      }
+    }
+
+    settingsMenuBtn?.addEventListener("click", toggleSettings);
+    closeSettingsMenu?.addEventListener("click", closeSettings);
+    settingsBackdrop?.addEventListener("click", closeSettings);
+
+    // Save document action
+    saveBtn?.addEventListener("click", () => {
+      closeSettings();
+      if (window.rasem?.save) {
+        window.rasem.save();
+      }
+      if (saveModal) {
+        saveModal.hidden = false;
+        if (saveModalBackdrop) saveModalBackdrop.hidden = false;
+      }
+    });
+
+    closeSaveModal?.addEventListener("click", () => {
+      if (saveModal) saveModal.hidden = true;
+      if (saveModalBackdrop) saveModalBackdrop.hidden = true;
+    });
+
+    saveModalBackdrop?.addEventListener("click", () => {
+      if (saveModal) saveModal.hidden = true;
+      if (saveModalBackdrop) saveModalBackdrop.hidden = true;
+    });
+
+    downloadRasemBtn?.addEventListener("click", () => {
+      try {
+        const data = window.rasem?.storage?.getDocumentData?.() || window.rasem?.document?.toJSON?.();
+        if (data) {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `rasem-drawing-${Date.now()}.rasem`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+      } catch (err) {
+        console.warn("Download rasem error:", err);
+      }
+    });
+
+    // New Canvas Modal Controllers
+    const newCanvasBtn = document.getElementById("newCanvasBtn");
+    const newCanvasModal = document.getElementById("newCanvasModal");
+    const newCanvasBackdrop = document.getElementById("newCanvasModalBackdrop");
+    const closeNewCanvasModal = document.getElementById("closeNewCanvasModal");
+    const newCanvasSaveBtn = document.getElementById("newCanvasSaveBtn");
+    const newCanvasDiscardBtn = document.getElementById("newCanvasDiscardBtn");
+    const newCanvasCancelBtn = document.getElementById("newCanvasCancelBtn");
+
+    function openNewCanvasModal() {
+      closeSettings();
+      if (newCanvasModal) newCanvasModal.hidden = false;
+      if (newCanvasBackdrop) newCanvasBackdrop.hidden = false;
+    }
+
+    function closeNewCanvasModalFunc() {
+      if (newCanvasModal) newCanvasModal.hidden = true;
+      if (newCanvasBackdrop) newCanvasBackdrop.hidden = true;
+    }
+
+    newCanvasBtn?.addEventListener("click", openNewCanvasModal);
+    closeNewCanvasModal?.addEventListener("click", closeNewCanvasModalFunc);
+    newCanvasCancelBtn?.addEventListener("click", closeNewCanvasModalFunc);
+    newCanvasBackdrop?.addEventListener("click", closeNewCanvasModalFunc);
+
+    newCanvasSaveBtn?.addEventListener("click", () => {
+      closeNewCanvasModalFunc();
+      if (window.rasem?.createNewCanvas) {
+        window.rasem.createNewCanvas(true);
+      } else if (window.rasem?.save) {
+        window.rasem.save();
+        window.rasem.clear?.();
+      }
+    });
+
+    newCanvasDiscardBtn?.addEventListener("click", () => {
+      closeNewCanvasModalFunc();
+      if (window.rasem?.createNewCanvas) {
+        window.rasem.createNewCanvas(false);
+      } else {
+        window.rasem?.clear?.();
+      }
+    });
+
+    // Import from Settings
+    document.getElementById("importBtn")?.addEventListener("click", () => {
+      closeSettings();
+      document.getElementById("importFileInput")?.click();
+    });
+
+    // 1. Dedicated Layers Button and Panel Toggle
+    const topLayersBtn = document.getElementById("topLayersBtn");
+    const layersPanel = document.getElementById("layersPanel");
+    const closeLayersPanelBtn = document.getElementById("closeLayersPanelBtn");
+
+    function toggleLayers() {
+      if (!layersPanel) return;
+      const willShow = layersPanel.hidden;
+      layersPanel.hidden = !willShow;
+      topLayersBtn?.classList.toggle("active", willShow);
+    }
+
+    topLayersBtn?.addEventListener("click", toggleLayers);
+    closeLayersPanelBtn?.addEventListener("click", () => {
+      if (layersPanel) layersPanel.hidden = true;
+      topLayersBtn?.classList.remove("active");
+    });
+
+    document.getElementById("openLayersBtn")?.addEventListener("click", () => {
+      closeSettings();
+      if (layersPanel) layersPanel.hidden = false;
+      topLayersBtn?.classList.add("active");
+    });
+
+    // 2. Add Layer button in Header
+    document.getElementById("addLayerBtn")?.addEventListener("click", () => {
+      window.rasem?.ui?.components?.layerPanel?.add?.();
+    });
+
+    // 3. Selection action bar
+    const selBar = document.getElementById("selectionActionBar");
+    window.addEventListener("rasem:selection-change", e => {
+      const count = e.detail?.count || 0;
+      if (selBar) {
+        selBar.classList.toggle("visible", count > 0);
+      }
+    });
+
+    document.getElementById("selDuplicateBtn")?.addEventListener("click", () => {
+      const selector = window.rasem?.tools?.get?.("selector");
+      selector?.duplicateSelected?.();
+    });
+
+    document.getElementById("selDeleteBtn")?.addEventListener("click", () => {
+      const selector = window.rasem?.tools?.get?.("selector");
+      selector?.deleteSelected?.();
+    });
+
+    document.getElementById("selClearBtn")?.addEventListener("click", () => {
+      const selector = window.rasem?.tools?.get?.("selector");
+      selector?.clearSelection?.();
+    });
+
+    // 4. Eraser Mode badge indicator
+    window.addEventListener("rasem:eraser-mode", e => {
+      const mode = e.detail?.mode || "partial";
+      const badge = document.getElementById("eraserBadge");
+      if (badge) {
+        badge.textContent = mode === "partial" ? "جزئي" : "خط";
+      }
+    });
+
+    // 4b. Sync tool button active highlights (e.g. when Lasso finishes and transfers to Selector)
+    window.addEventListener("rasem:tool-changed", e => {
+      const toolName = e.detail?.tool;
+      if (!toolName) return;
+      document.querySelectorAll("[data-tool]").forEach(b => {
+        b.classList.toggle("active", b.dataset.tool === toolName);
+      });
+    });
+
+    // 5. Theme Toggle
+    const themeBtn = document.getElementById("themeToggleBtn");
+    themeBtn?.addEventListener("click", () => {
+      const isLight = document.body.classList.contains("light");
+      document.body.classList.toggle("light", !isLight);
+      document.body.classList.toggle("dark", isLight);
+      themeBtn.textContent = isLight ? "☾" : "☼";
+    });
+
+    // 6. Export Dialog Controller
+    const exportDialog = document.getElementById("exportDialog");
+    const topExportBtn = document.getElementById("topExportBtn");
+    const openExportMenuBtn = document.getElementById("exportBtn");
+    const closeExportBtn = document.getElementById("closeExportBtn");
+    const cancelExportBtn = document.getElementById("cancelExportBtn");
+    const executeExportBtn = document.getElementById("executeExportBtn");
+    const customAreaInputs = document.getElementById("customAreaInputs");
+    const exportScaleRow = document.getElementById("exportScaleRow");
+
+    let currentFormat = "svg";
+    let currentScale = 2;
+
+    function openExport() {
+      if (exportDialog) {
+        exportDialog.showModal();
+        document.getElementById("settingsMenu").hidden = true;
+      }
+    }
+
+    function closeExport() {
+      if (exportDialog) exportDialog.close();
+    }
+
+    topExportBtn?.addEventListener("click", openExport);
+    openExportMenuBtn?.addEventListener("click", openExport);
+    closeExportBtn?.addEventListener("click", closeExport);
+    cancelExportBtn?.addEventListener("click", closeExport);
+
+    // Format Cards selection
+    document.querySelectorAll("[data-export-format]").forEach(card => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll("[data-export-format]").forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        currentFormat = card.dataset.exportFormat;
+        if (exportScaleRow) {
+          exportScaleRow.style.display = currentFormat === "svg" ? "none" : "block";
+        }
+      });
+    });
+
+    // Scope Radio changes
+    document.querySelectorAll('input[name="exportScope"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        if (customAreaInputs) {
+          customAreaInputs.style.display = radio.value === "custom" ? "grid" : "none";
+        }
+      });
+    });
+
+    // Scale buttons
+    document.querySelectorAll("[data-scale]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-scale]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentScale = Number(btn.dataset.scale || 2);
+      });
+    });
+
+    // Execute Export
+    executeExportBtn?.addEventListener("click", async () => {
+      const doc = window.rasem?.document;
+      if (!doc) {
+        alert("لا يوجد مستند للتصدير");
+        return;
+      }
+
+      executeExportBtn.disabled = true;
+      executeExportBtn.textContent = "جاري التصدير...";
+
+      try {
+        const scope = document.querySelector('input[name="exportScope"]:checked')?.value || "full";
+        const transparent = document.getElementById("exportTransparentBg")?.checked || false;
+        const bg = transparent ? null : "#ffffff";
+
+        let options = {
+          mode: scope,
+          scale: currentScale,
+          background: bg
+        };
+
+        if (scope === "custom") {
+          const w = Number(document.getElementById("customExportWidth")?.value || 1920);
+          const h = Number(document.getElementById("customExportHeight")?.value || 1080);
+
+          if (!Number.isFinite(w) || !Number.isFinite(h) || w < 10 || h < 10) {
+            throw new Error("أبعاد مساحة التصدير غير صحيحة");
+          }
+
+          options.area = { x: 0, y: 0, width: Math.round(w), height: Math.round(h) };
+
+        } else if (scope === "canvas") {
+          const camera = window.rasem?.camera;
+          const svg = document.getElementById("drawingCanvas");
+
+          if (!camera || !svg || typeof camera.screenToWorld !== "function") {
+            throw new Error("تعذر الوصول إلى الكاميرا ومساحة الرسم");
+          }
+
+          const rect = svg.getBoundingClientRect();
+
+          if (!rect.width || !rect.height) {
+            throw new Error("مساحة الرسم غير ظاهرة");
+          }
+
+          const corners = [
+            [rect.left, rect.top],
+            [rect.right, rect.top],
+            [rect.right, rect.bottom],
+            [rect.left, rect.bottom]
+          ].map(([x, y]) => camera.screenToWorld(x, y));
+
+          if (corners.some(p => !p || !Number.isFinite(p.x) || !Number.isFinite(p.y))) {
+            throw new Error("تعذر حساب حدود الشاشة في إحداثيات الرسم");
+          }
+
+          const xs = corners.map(p => p.x);
+          const ys = corners.map(p => p.y);
+
+          const left = Math.min(...xs);
+          const top = Math.min(...ys);
+          const right = Math.max(...xs);
+          const bottom = Math.max(...ys);
+
+          options.area = {
+            x: left,
+            y: top,
+            width: Math.max(10, right - left),
+            height: Math.max(10, bottom - top)
+          };
+        }
+
+        const data = typeof doc.toJSON === "function" ? doc.toJSON() : doc;
+
+        const storageModule = await import("./js/storage-export.js");
+        if (currentFormat === "svg") {
+          storageModule.SVGExport.download(data, options);
+        } else if (currentFormat === "png") {
+          await storageModule.PNGExport.download(data, options);
+        } else if (currentFormat === "pdf") {
+          await storageModule.PDFExport.download(data, options);
+        }
+
+        closeExport();
+      } catch (err) {
+        console.error("Export error:", err);
+        alert("حدث خطأ أثناء التصدير: " + err.message);
+      } finally {
+        executeExportBtn.disabled = false;
+        executeExportBtn.textContent = "تصدير وتنزيل الآن";
+      }
+    });
+
+    // 7. PWA Install prompt listener
+    let deferredPrompt = null;
+    const pwaBtn = document.getElementById("pwaInstallBtn");
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (pwaBtn) pwaBtn.style.display = "inline-flex";
+    });
+
+    pwaBtn?.addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        pwaBtn.style.display = "none";
+      }
+      deferredPrompt = null;
+    });
+
+  })();
+  </script>
+
+  <!-- MODULE SCRIPTS -->
+  <script type="module" src="./js/color-ui.js"></script>
+  <script type="module" src="./js/shapes-ui.js"></script>
+  <script type="module" src="./js/tool-settings-popup.js"></script>
+  <script type="module" src="./js/brush-library.js"></script>
+
+  <!-- PWA REGISTRATION -->
+  <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js")
+        .then(reg => {
+          reg.update();
+          console.log("Rasem PWA: Service Worker registered and checked for updates");
+        })
+        .catch(err => console.warn("PWA registration failed:", err));
+    });
+  }
+  </script>
+
+</body>
+</html>
