@@ -102,3 +102,13 @@ test("leaves a freeform S curve unforced into geometry", () => {
   });
   assert.equal(recognizeShape(points), null);
 });
+
+test("detects a deliberate corner in an open polyline", () => {
+  const points = [];
+  for (let i = 0; i <= 40; i++) points.push({ x: 20 + i * 3, y: 30 + Math.sin(i * 0.8) * 0.2, pressure: 0.5, time: i * 8 });
+  for (let i = 1; i <= 40; i++) points.push({ x: 140 + Math.sin(i * 0.8) * 0.2, y: 30 + i * 3, pressure: 0.5, time: (40 + i) * 8 });
+  const result = recognizeShape(points);
+  assert.equal(result?.type, "polyline");
+  assert.ok(result.corners.length >= 1);
+  assert.ok(result.angles.some(angle => Math.abs(angle - 90) < 20));
+});
