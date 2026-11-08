@@ -1,6 +1,6 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
-import { recognizeShape } from "./shape-recognition.js";
+import { recognizeShape } from "./shape-recognition.js?v=20261108-02";
 
 /* =========================================================
    RASEM 2.0
