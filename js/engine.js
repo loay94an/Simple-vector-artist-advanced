@@ -1639,7 +1639,6 @@ export class DrawingEngine {
   }
 
   end(event = {}) {
-    this.clearShapeRecognitionTimer();
     if (!this.drawing || this.destroyed) {
       return false;
     }
@@ -1650,6 +1649,46 @@ export class DrawingEngine {
       event.pointerId !== this.activePointer
     ) {
       return false;
+    }
+
+    // رفع القلم هو الحدث الحاسم لنهاية الضربة:
+    // نلتقط إحداثيات pointerup نفسها قبل بناء المسار النهائي،
+    // لأن آخر pointermove قد لا يصل إلى آخر موضع فعلي للمس.
+    this.clearShapeRecognitionTimer();
+
+    let finalizedElement = null;
+    if (this.settings.tool !== "eraser" && this.currentElement) {
+      const finalPoint = this.getWorldPoint(event);
+      const lastPoint = this.builder.points.at(-1);
+
+      if (
+        finalPoint &&
+        EngineUtils.validPoint(finalPoint) &&
+        (!lastPoint || EngineUtils.distance(finalPoint, lastPoint) > 0.02)
+      ) {
+        // بعض الأجهزة ترسل pressure=0 في pointerup؛ احتفظ بضغط آخر
+        // عينة حقيقية حتى لا تظهر نقطة النهاية كرفيعة أو مقطوعة.
+        const finalEvent = (
+          event.pointerType === "pen" &&
+          (!Number.isFinite(event.pressure) || event.pressure <= 0)
+        )
+          ? { ...event, pressure: lastPoint?.pressure ?? 0.5 }
+          : event;
+
+        this.addPoint(finalPoint, finalEvent, true);
+      }
+
+      // نفّذ التصحيح على كامل الضربة بعد معرفة نقطة نهايتها،
+      // ثم حدّث المعاينة واعتمد نفس النسخة النهائية في المستند.
+      finalizedElement = this.builder.build();
+      if (finalizedElement) {
+        this.currentElement = {
+          ...this.currentElement,
+          ...finalizedElement,
+          points: this.builder.points
+        };
+        this.renderer.updateElement(this.currentElement);
+      }
     }
 
     const layer = this.activeLayer;
@@ -1666,7 +1705,7 @@ export class DrawingEngine {
           committed = true;
         }
       } else if (this.currentElement && this.points.length) {
-        const element = this.builder.build();
+        const element = finalizedElement || this.builder.build();
 
         if (element) {
           const brushStyle = this.brushStyle || {
