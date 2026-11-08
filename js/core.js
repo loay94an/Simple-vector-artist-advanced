@@ -1086,7 +1086,19 @@ export class Scene {
     const angle=(Number(options.calligraphyAngle??style.brushAngle)||45)*Math.PI/180,nx=Math.cos(angle),ny=Math.sin(angle);
     const pressure=p=>options.pressureEnabled===false?1:Math.max(0.25,0.35+(Number(p.pressure)||0.5)*0.65);
     const radius=(p,a,b)=>{let r=size*0.5*pressure(p);
-      if((["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)||calligraphy&&["cal-kufi","cal-italic","cal-oblique"].includes(preset))&&a&&b)r*=0.12+Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
+      if(calligraphy){
+        const nibScale={"cal-thuluth":1.30,"cal-naskh":1,"cal-ruqah":0.82,"cal-fine":0.48,"cal-kufi":1.38,"cal-italic":1.12,"cal-stub":0.96,"cal-oblique":1.06,"cal-diwani":1.18,"cal-jali":1.42,"cal-maghribi":1.16,"cal-taliq":0.92,"cal-sini":1.04,"cal-brush":1.22,"cal-needle":0.38,"cal-square":1.28};
+        r*=nibScale[preset]||1;
+      }
+      if((["flat","chisel","cal-kufi","cal-square","cal-jali","cal-sini","cal-stub","cal-italic","cal-oblique"].includes(preset))&&a&&b)r*=0.10+Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.90;
+      if(calligraphy&&a&&b){
+        const direction=Math.atan2(b.y-a.y,b.x-a.x)-angle;
+        if(preset==="cal-ruqah")r*=0.78+0.22*Math.abs(Math.sin(direction));
+        else if(preset==="cal-diwani")r*=0.88+0.12*Math.abs(Math.cos(direction));
+        else if(preset==="cal-taliq")r*=0.82+0.18*Math.abs(Math.cos(direction));
+        else if(preset==="cal-maghribi")r*=0.92+0.08*Math.abs(Math.sin(direction));
+        else if(preset==="cal-brush"||preset==="cal-fine"||preset==="cal-needle")r*=0.72+0.28*pressure(p);
+      }
       if(preset==="point")r*=0.22+pressure(p)*0.78;if(preset==="oval")r*=0.72;if(preset==="soft"||preset==="watercolor")r*=1.12;
       if(a&&b){const dt=Math.max(1,Number(b.time||0)-Number(a.time||0)),speed=Math.hypot(b.x-a.x,b.y-a.y)/dt;r*=Math.max(0.78,Math.min(1.12,1.12-speed*0.22));}
       return Math.max(0.3,r);};
