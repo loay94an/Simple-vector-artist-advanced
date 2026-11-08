@@ -298,7 +298,7 @@
         base.lineCorrection = 0.35;
         base.brush = "calligraphy";
         base.calligraphyAngle = 45;
-        base.calligraphyEndStyle = "thin";
+        base.calligraphyEndStyle = "none";
       } else if (tool === "eraser") {
         base.size = 20;
         base.eraserMode = "partial";
