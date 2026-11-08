@@ -682,6 +682,12 @@ export class StrokeBuilder {
         this.calligraphyPreviewPointCount = 1;
       }
 
+      // A one-point stroke uses the existing nib-cap preview. Once a second
+      // point arrives, replace that temporary cap with the normal first segment.
+      if (this.calligraphyPreviewPointCount === 1 && points.length > 1) {
+        this.calligraphyPreviewPath = "";
+      }
+
       for (
         let i = Math.max(1, this.calligraphyPreviewPointCount);
         i < points.length;
