@@ -3876,3 +3876,33 @@ body.dark .canvas-area {
   width: 18px;
   height: 15px;
 }
+
+/* Compact brush-head gallery: small icons arranged in a clear multi-column grid. */
+#brushPresetsSection .tool-brush-presets,
+#brushPresetsSection .brush-presets-calligraphy,
+#brushPresetsSection .brush-presets-feather {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  align-items: stretch;
+}
+#brushPresetsSection .brush-preset {
+  min-width: 0;
+  min-height: 52px !important;
+  padding: 4px 2px !important;
+  gap: 2px !important;
+  border-radius: 9px;
+  font-size: 9px !important;
+}
+#brushPresetsSection .brush-preset .brush-icon {
+  width: 20px !important;
+  height: 16px !important;
+  flex: 0 0 auto;
+}
+#brushPresetsSection .brush-preset span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
