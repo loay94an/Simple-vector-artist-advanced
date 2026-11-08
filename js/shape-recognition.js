@@ -69,7 +69,7 @@ function isNearlyCircular(points, bounds) {
   const radii = points.map(p => Math.hypot((p.x - cx) / rx, (p.y - cy) / ry));
   const mean = radii.reduce((sum, value) => sum + value, 0) / radii.length;
   const variance = radii.reduce((sum, value) => sum + (value - mean) ** 2, 0) / radii.length;
-  return mean > 0 && Math.sqrt(variance) / mean <= 0.16;
+  return mean > 0 && Math.sqrt(variance) / mean <= 0.07;
 }
 
 function isRightAngleQuad(vertices) {
@@ -106,6 +106,11 @@ export function recognizeShape(input) {
   const closed = direct <= Math.max(8, diagonal * 0.18);
   if (!closed) return null;
 
+  if (isNearlyCircular(points, bounds)) {
+    const ratio = bounds.width / Math.max(1, bounds.height);
+    return ratio >= 0.82 && ratio <= 1.22 ? "circle" : "ellipse";
+  }
+
   const closedPoints = [...points];
   if (distance(closedPoints[0], closedPoints[closedPoints.length - 1]) > 0.001) {
     closedPoints.push(closedPoints[0]);
@@ -123,14 +128,15 @@ export function recognizeShape(input) {
       ? Math.sqrt(sides.reduce((sum, value) => sum + (value - meanSide) ** 2, 0) / 4) / meanSide
       : 1;
     if (isRightAngleQuad(vertices)) {
-      return sideVariation <= 0.18 ? "square" : "rect";
+      if (sideVariation <= 0.18) {
+        const edge = { x: vertices[1].x - vertices[0].x, y: vertices[1].y - vertices[0].y };
+        const length = Math.hypot(edge.x, edge.y) || 1;
+        const diagonalOrientation = Math.abs(Math.abs(edge.x) - Math.abs(edge.y)) / length;
+        return diagonalOrientation <= 0.35 ? "diamond" : "square";
+      }
+      return "rect";
     }
     return sideVariation <= 0.22 ? "diamond" : "rect";
-  }
-
-  if (vertices.length >= 5 && isNearlyCircular(points, bounds)) {
-    const ratio = bounds.width / Math.max(1, bounds.height);
-    return ratio >= 0.82 && ratio <= 1.22 ? "circle" : "ellipse";
   }
 
   return null;
