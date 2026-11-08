@@ -694,11 +694,19 @@ export class StrokeBuilder {
     const nibScale = nibWidths[this.brushStyle?.preset] || 1;
     const radius = Math.max(0.6, (this.baseSize / 2) * nibScale);
 
-    const getRadius = (point) => {
+    const getRadius = (point, index) => {
       const pressureMultiplier = this.pressureEnabled
         ? (0.35 + (point.pressure || 1) * 0.65)
         : 1;
-      return radius * pressureMultiplier;
+      const previous=points[Math.max(0,index-1)], next=points[Math.min(points.length-1,index+1)];
+      const direction=Math.atan2(next.y-previous.y,next.x-previous.x);
+      const preset=String(this.brushStyle?.preset||"");
+      const broadNib=["cal-kufi","cal-italic","cal-oblique"].includes(preset);
+      const contrast=broadNib ? (0.12+Math.abs(Math.sin(direction-angleRad))*0.88) : 1;
+      const elapsed=Math.max(1,EngineUtils.number(next.time,point.time)-EngineUtils.number(previous.time,point.time));
+      const speed=EngineUtils.distance(previous,next)/elapsed;
+      const speedFactor=EngineUtils.clamp(1.12-speed*0.22,0.78,1.12);
+      return radius * pressureMultiplier * contrast * speedFactor;
     };
 
     // كل مقطع يُرسم كمضلع مستقل داخل مسار واحد.
@@ -750,7 +758,7 @@ export class StrokeBuilder {
 
       if (this.calligraphyPreviewPointCount === 0 && points.length > 0) {
         const point = points[0];
-        const r = getRadius(point);
+        const r = getRadius(point, 0);
         const halfLength = Math.max(0.6, r * 0.5);
         const tangentX = -sinA;
         const tangentY = cosA;
@@ -781,8 +789,8 @@ export class StrokeBuilder {
         const segment = makeSegment(
           points[i - 1],
           points[i],
-          getRadius(points[i - 1]),
-          getRadius(points[i])
+          getRadius(points[i - 1], i - 1),
+          getRadius(points[i], i)
         );
         this.calligraphyPreviewPath += " " + segment;
         delta += " " + segment;
@@ -800,7 +808,7 @@ export class StrokeBuilder {
     // the second point arrives. Without it, the first quadrilateral starts
     // exactly at the first sample and leaves a visibly cut/flat stroke head.
     const firstPoint = points[0];
-    const firstRadius = getRadius(firstPoint);
+    const firstRadius = getRadius(firstPoint, 0);
     const halfLength = Math.max(0.6, firstRadius * 0.5);
     const tangentX = -sinA;
     const tangentY = cosA;
@@ -818,7 +826,7 @@ export class StrokeBuilder {
       const start = points[i - 1];
       const end = points[i];
       segments.push(
-        makeSegment(start, end, getRadius(start), getRadius(end))
+        makeSegment(start, end, getRadius(start, i - 1), getRadius(end, i))
       );
     }
 
