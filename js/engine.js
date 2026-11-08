@@ -1586,9 +1586,12 @@ export class DrawingEngine {
 
     if (added) {
       this.renderCurrent();
-      // اكتشاف نهاية الضربة عند توقف حركة الإصبع مع بقائه ملامساً للشاشة.
-      this.scheduleShapeRecognition();
     }
+
+    // أعد تشغيل مؤقت السكون عند كل حدث حركة، حتى لو كانت الحركة
+    // أصغر من minDistance ولم تُضف عينة جديدة إلى المسار.
+    // بذلك لا يبدأ التصحيح ما دام المستخدم يحرك القلم.
+    this.scheduleShapeRecognition();
 
     return added;
   }
@@ -1647,7 +1650,7 @@ export class DrawingEngine {
       this.lastPoint = this.builder.points.at(-1) || null;
       this.shapeRecognitionApplied = true;
       this.renderCurrent();
-    }, 700);
+    }, 1300);
   }
 
   buildPath(points) {
@@ -1720,26 +1723,9 @@ export class DrawingEngine {
         this.addPoint(finalPoint, finalEvent, true);
       }
 
-      // عند رفع الإصبع نعيد محاولة التعرف الهندسي كاحتياط أخير؛
-      // أما التنعيم العام فيُطبّق أيضاً أثناء توقف الإصبع على الشاشة.
-      if (
-        !this.shapeRecognitionApplied &&
-        ["pen", "pencil", "marker"].includes(this.settings.tool) &&
-        this.settings.lineCorrection > 0 &&
-        this.builder.points.length >= 8
-      ) {
-        const confirmed = recognizeHeldShape(
-          this.builder.points,
-          this.settings.lineCorrection
-        );
-
-        if (confirmed?.points?.length) {
-          this.builder.points = confirmed.points.map(point => ({ ...point }));
-          this.points = this.builder.points;
-          this.lastPoint = this.builder.points.at(-1) || null;
-          this.shapeRecognitionApplied = true;
-        }
-      }
+      // لا ننفذ أي تصحيح عند رفع الإصبع.
+      // التصحيح لا يحدث إلا إذا اكتملت مهلة السكون الطويل أثناء بقاء
+      // المؤشر مضغوطاً على الشاشة.
 
       // بناء النسخة المصححة وعرضها بعد رفع الإصبع مباشرة.
       finalizedElement = this.builder.build();
