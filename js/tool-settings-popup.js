@@ -104,6 +104,7 @@
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.bucketGap = Number(document.getElementById("bucketGap")?.value ?? 1);
     result.bucketEdgeThreshold = Number(document.getElementById("bucketEdgeThreshold")?.value ?? 12);
+    result.bucketOpacity = Number(document.getElementById("bucketOpacity")?.value ?? 1);
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
 
     return result;
@@ -127,7 +128,7 @@
     const engine = window.rasem?.engine;
     if (engine) {
       if (activeTool === "bucket") {
-        engine.setBucketSettings?.({ gap: current.bucketGap ?? 1, edgeThreshold: current.bucketEdgeThreshold ?? 12 });
+        engine.setBucketSettings?.({ gap: current.bucketGap ?? 1, edgeThreshold: current.bucketEdgeThreshold ?? 12, opacity: current.bucketOpacity ?? 1 });
       } else if (activeTool === "eraser") {
         engine.setSettings({
           eraserSize: current.size || 16,
@@ -253,6 +254,10 @@
     if (bucketThreshold) bucketThreshold.value = String(current.bucketEdgeThreshold ?? 12);
     const bucketThresholdOutput = document.getElementById("bucketEdgeThresholdValue");
     if (bucketThresholdOutput) bucketThresholdOutput.textContent = String(current.bucketEdgeThreshold ?? 12);
+    const bucketOpacity = document.getElementById("bucketOpacity");
+    if (bucketOpacity) bucketOpacity.value = String(current.bucketOpacity ?? 1);
+    const bucketOpacityOutput = document.getElementById("bucketOpacityValue");
+    if (bucketOpacityOutput) bucketOpacityOutput.textContent = Math.round((current.bucketOpacity ?? 1) * 100) + "%";
 
     for (const [key, id] of Object.entries(ids)) {
       const el = document.getElementById(id);
