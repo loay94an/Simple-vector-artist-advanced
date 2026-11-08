@@ -730,6 +730,13 @@ export class Scene {
     if (style.calligraphyClean === true) {
       node.style.filter = "none";
       node.removeAttribute("filter");
+    } else {
+      const featherGlow = clamp(numberOr(Number(style.featherGlow), 0), 0, 1);
+      if (style.brushPreset?.startsWith("feather-") && featherGlow > 0) {
+        node.style.filter = `drop-shadow(0 0 ${(Number(style.size) || 2) * featherGlow * 0.9}px ${color})`;
+      } else {
+        node.style.filter = "none";
+      }
     }
     const customBrush = style.customBrush;
 
@@ -1109,11 +1116,13 @@ export class Scene {
     if(options.tool==="feather"){
       const density=Math.max(3,Math.min(32,Math.round(Number(options.featherDensity??style.featherDensity??10))));
       const spread=Math.max(0,Math.min(1,Number(options.featherSpread??style.featherSpread??0.45)));
+      const spacing=Math.max(0.25,Math.min(2.5,Number(options.featherSpacing??style.featherSpacing??1)));
+      const glow=Math.max(0,Math.min(1,Number(options.featherGlow??style.featherGlow??0)));
       const softness=Math.max(0,Math.min(1,Number(options.featherSoftness??style.featherSoftness??0.35)));
       const taper=Math.max(0,Math.min(1,Number(options.featherTaper??style.featherTaper??0.7)));
       context.save();context.globalAlpha=opacity;
       // Feather strokes should stay crisp: no colored shadow or blur halo.
-      context.shadowColor="transparent";context.shadowBlur=0;
+      context.shadowColor=glow>0?color:"transparent";context.shadowBlur=glow>0?size*glow*0.9:0;
       const lanes=preset==="feather-fan"?density:preset==="feather-dry"?Math.max(3,Math.round(density*0.65)):preset==="feather-flat"?Math.max(3,Math.round(density*0.45)):preset==="feather-soft"?Math.max(3,Math.round(density*0.7)):1;
       for(let lane=0;lane<lanes;lane++){
         const ratio=lanes===1?0:lane/(lanes-1)-0.5;
@@ -1124,7 +1133,7 @@ export class Scene {
           const progress=points.length<=1?0.5:i/(points.length-1);
           const fade=Math.max(0.08,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
           const r=radius(p,prev,next)*fade;
-          const offset=ratio*spread*r*1.65;
+          const offset=ratio*spread*spacing*r*1.65;
           const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
           const x=p.x+nx*offset,y=p.y+ny*offset;
           if(i===0)context.moveTo(x+nx*laneWidth,y+ny*laneWidth);else context.lineTo(x+nx*laneWidth,y+ny*laneWidth);
@@ -1134,7 +1143,7 @@ export class Scene {
           const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
           const progress=points.length<=1?0.5:i/(points.length-1);
           const fade=Math.max(0.08,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
-          const r=radius(p,prev,next)*fade,offset=ratio*spread*r*1.65;
+          const r=radius(p,prev,next)*fade,offset=ratio*spread*spacing*r*1.65;
           const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
           context.lineTo(p.x+nx*offset-nx*laneWidth,p.y+ny*offset-ny*laneWidth);
         }
