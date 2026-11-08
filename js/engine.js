@@ -612,7 +612,11 @@ export class StrokeBuilder {
       "cal-thuluth": 1.25,
       "cal-naskh": 1.0,
       "cal-ruqah": 0.85,
-      "cal-fine": 0.60
+      "cal-fine": 0.60,
+      "cal-kufi": 1.35,
+      "cal-italic": 1.10,
+      "cal-stub": 0.95,
+      "cal-oblique": 1.05
     };
 
     const nibScale = nibWidths[this.brushStyle?.preset] || 1;
