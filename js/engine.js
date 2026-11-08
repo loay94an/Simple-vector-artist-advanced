@@ -1915,7 +1915,7 @@ export class DrawingEngine {
         return true;
       }
 
-      if (this.currentElement.tool === "calligraphy" && this.builder.calligraphyPreviewDelta) {
+      if (this.currentElement.tool === "calligraphy" && this.builder.points.length > 1 && this.builder.calligraphyPreviewDelta) {
         const appended = this.renderer.appendPreviewChunk?.(
           this.currentElement,
           this.builder.calligraphyPreviewDelta
