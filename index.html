@@ -75,7 +75,7 @@
       display: none !important;
     }
   </style>
-  <script type="module" src="./js/app.js?v=20261108-17"></script>
+  <script type="module" src="./js/app.js?v=20261108-18"></script>
 </head>
 
 <body class="light">
@@ -439,12 +439,16 @@
             <strong style="font-size:12px;">إعدادات الريشة</strong>
             <div class="tool-setting-row"><label for="featherDensity">عدد الشعيرات</label><output id="featherDensityValue">10</output></div>
             <input id="featherDensity" data-setting="featherDensity" type="range" min="3" max="32" step="1" value="10">
+            <div class="tool-setting-row"><label for="featherGlow">التوهج</label><output id="featherGlowValue">0%</output></div>
+            <input id="featherGlow" data-setting="featherGlow" type="range" min="0" max="1" step="0.05" value="0">
             <div class="tool-setting-row"><label for="featherSpread">انتشار الشعيرات</label><output id="featherSpreadValue">45%</output></div>
             <input id="featherSpread" data-setting="featherSpread" type="range" min="0" max="1" step="0.05" value="0.45">
             <div class="tool-setting-row"><label for="featherSoftness">نعومة الأثر</label><output id="featherSoftnessValue">35%</output></div>
             <input id="featherSoftness" data-setting="featherSoftness" type="range" min="0" max="1" step="0.05" value="0.35">
-            <div class="tool-setting-row"><label for="featherTaper">تدرّج البداية والنهاية</label><output id="featherTaperValue">70%</output></div>
+            <div class="tool-setting-row"><label for="featherTaper">التلاشي عند البداية والنهاية</label><output id="featherTaperValue">70%</output></div>
             <input id="featherTaper" data-setting="featherTaper" type="range" min="0" max="1" step="0.05" value="0.7">
+            <div class="tool-setting-row"><label for="featherSpacing">التباعد بين الشعيرات</label><output id="featherSpacingValue">100%</output></div>
+            <input id="featherSpacing" data-setting="featherSpacing" type="range" min="0.25" max="2.5" step="0.05" value="1">
           </div>
           <!-- Custom PNG Brush Section -->
           <div style="margin-top:12px; padding:10px; border-radius:10px; background:var(--surface-2); border:1px dashed var(--border);">
@@ -1152,7 +1156,7 @@
   <!-- MODULE SCRIPTS -->
   <script type="module" src="./js/color-ui.js?v=20261108-02"></script>
   <script type="module" src="./js/shapes-ui.js"></script>
-  <script type="module" src="./js/tool-settings-popup.js?v=20261108-04"></script>
+  <script type="module" src="./js/tool-settings-popup.js?v=20261108-05"></script>
   <script type="module" src="./js/brush-library.js"></script>
 
   <!-- PWA REGISTRATION & CACHE PURGE -->
