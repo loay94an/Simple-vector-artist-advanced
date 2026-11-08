@@ -1001,7 +1001,7 @@ function recognizeHeldShape(sourcePoints, strength = 0.35) {
       if (compact.length > 2 && shapePointDistance(compact[0], compact.at(-1)) < diagonal * 0.12) compact.pop();
       vertices = compact;
 
-      if (vertices.length === 3 || vertices.length === 4) {
+      if (vertices.length >= 3 && vertices.length <= 12) {
         let rightAngles = 0;
         for (let i = 0; i < vertices.length; i++) {
           const previous = vertices[(i + vertices.length - 1) % vertices.length];
@@ -1032,6 +1032,51 @@ function recognizeHeldShape(sourcePoints, strength = 0.35) {
             points: interpolateShapeEdges(vertices, averagePressure, 8)
           };
         }
+
+        if (vertices.length === 4) {
+          const sides = vertices.map((p, i) =>
+            shapePointDistance(p, vertices[(i + 1) % 4]));
+          const oppositeParallel = (a, b) => {
+            const cross = a.x * b.y - a.y * b.x;
+            return Math.abs(cross) / Math.max(1, Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y));
+          };
+          const edgeA = { x: vertices[1].x - vertices[0].x, y: vertices[1].y - vertices[0].y };
+          const edgeB = { x: vertices[3].x - vertices[2].x, y: vertices[3].y - vertices[2].y };
+          const edgeC = { x: vertices[2].x - vertices[1].x, y: vertices[2].y - vertices[1].y };
+          const edgeD = { x: vertices[0].x - vertices[3].x, y: vertices[0].y - vertices[3].y };
+          const parallelA = oppositeParallel(edgeA, edgeB) < 0.16;
+          const parallelB = oppositeParallel(edgeC, edgeD) < 0.16;
+          const equalSides = sides.every(side =>
+            Math.abs(side - sides[0]) / Math.max(1, sides[0]) < 0.18);
+          const type = parallelA && parallelB
+            ? (equalSides ? "rhombus" : "parallelogram")
+            : (parallelA || parallelB ? "trapezoid" : "quadrilateral");
+          return { type, points: interpolateShapeEdges(vertices, averagePressure, 8) };
+        }
+
+        if (vertices.length >= 5) {
+          const center = {
+            x: vertices.reduce((sum, p) => sum + p.x, 0) / vertices.length,
+            y: vertices.reduce((sum, p) => sum + p.y, 0) / vertices.length
+          };
+          const radii = vertices.map(p => shapePointDistance(center, p));
+          const high = Math.max(...radii);
+          const low = Math.min(...radii);
+          const alternating = vertices.length >= 8 &&
+            radii.every((r, i) =>
+              i % 2 === 0 ? r >= (high + low) / 2 : r <= (high + low) / 2);
+          if (alternating && low / Math.max(1, high) < 0.78) {
+            return { type: "star", points: interpolateShapeEdges(vertices, averagePressure, 8) };
+          }
+          const names = {
+            5: "pentagon", 6: "hexagon", 7: "heptagon", 8: "octagon",
+            9: "nonagon", 10: "decagon", 11: "hendecagon", 12: "dodecagon"
+          };
+          return {
+            type: names[vertices.length] || "polygon",
+            points: interpolateShapeEdges(vertices, averagePressure, 8)
+          };
+        }
       }
     }
   }
@@ -1055,6 +1100,90 @@ function recognizeHeldShape(sourcePoints, strength = 0.35) {
           { ...last, pressure: averagePressure }
         ]
       };
+    }
+  }
+
+  // المنحنيات المفتوحة: قوس دائري أو منحنى حر ناعم.
+  if (!isClosed && points.length >= 8) {
+    const start = points[0];
+    const middle = points[Math.floor(points.length / 2)];
+    const finish = points[points.length - 1];
+    const determinant = 2 * (
+      start.x * (middle.y - finish.y) +
+      middle.x * (finish.y - start.y) +
+      finish.x * (start.y - middle.y)
+    );
+
+    if (Math.abs(determinant) > 0.001) {
+      const a2 = start.x * start.x + start.y * start.y;
+      const b2 = middle.x * middle.x + middle.y * middle.y;
+      const c2 = finish.x * finish.x + finish.y * finish.y;
+      const cx = (a2 * (middle.y - finish.y) +
+        b2 * (finish.y - start.y) + c2 * (start.y - middle.y)) / determinant;
+      const cy = (a2 * (finish.x - middle.x) +
+        b2 * (start.x - finish.x) + c2 * (middle.x - start.x)) / determinant;
+      const radius = shapePointDistance({ x: cx, y: cy }, start);
+      if (Number.isFinite(radius) && radius >= 8) {
+        const angles = points.map(p => Math.atan2(p.y - cy, p.x - cx));
+        let sweep = 0;
+        for (let i = 1; i < angles.length; i++) {
+          let delta = angles[i] - angles[i - 1];
+          while (delta > Math.PI) delta -= Math.PI * 2;
+          while (delta < -Math.PI) delta += Math.PI * 2;
+          sweep += delta;
+        }
+        let radialError = 0;
+        for (const p of points) {
+          radialError += Math.abs(shapePointDistance({ x: cx, y: cy }, p) - radius);
+        }
+        radialError /= points.length * radius;
+        if (Math.abs(sweep) > 0.25 && Math.abs(sweep) < Math.PI * 2.1 && radialError < 0.075) {
+          const arcPoints = [];
+          const steps = Math.max(24, Math.ceil(Math.abs(sweep) * 20));
+          for (let i = 0; i <= steps; i++) {
+            const angle = angles[0] + sweep * i / steps;
+            arcPoints.push({
+              x: cx + Math.cos(angle) * radius,
+              y: cy + Math.sin(angle) * radius,
+              pressure: averagePressure,
+              time: Date.now()
+            });
+          }
+          return { type: "arc", points: arcPoints };
+        }
+      }
+    }
+
+    // منحنى حر: نعيد أخذ العينات على المسار لتقليل الاهتزاز دون تغيير اتجاهه.
+    let pathLength = 0;
+    for (let i = 1; i < points.length; i++) {
+      pathLength += shapePointDistance(points[i - 1], points[i]);
+    }
+    const chordLength = shapePointDistance(start, finish);
+    if (pathLength > chordLength * 1.08 && pathLength < chordLength * 3.8) {
+      const sampled = [];
+      const count = Math.max(48, Math.min(120, points.length * 3));
+      const cumulative = [0];
+      for (let i = 1; i < points.length; i++) {
+        cumulative.push(cumulative[i - 1] + shapePointDistance(points[i - 1], points[i]));
+      }
+      const total = cumulative[cumulative.length - 1];
+      let segment = 1;
+      for (let i = 0; i < count; i++) {
+        const target = total * i / (count - 1);
+        while (segment < cumulative.length - 1 && cumulative[segment] < target) segment++;
+        const a = points[segment - 1];
+        const b = points[segment];
+        const span = cumulative[segment] - cumulative[segment - 1];
+        const t = span > 0 ? (target - cumulative[segment - 1]) / span : 0;
+        sampled.push({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+          pressure: averagePressure,
+          time: Date.now()
+        });
+      }
+      return { type: "freeform-curve", points: sampled };
     }
   }
 
