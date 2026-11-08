@@ -1,7 +1,7 @@
 /* =========================================================
    RASEM 3.0 - TOOL SETTINGS POPUP MODULE
    js/tool-settings-popup.js
-   Supports Pen, Calligraphy, Pencil, Marker, Eraser, and Custom PNG Brushes.
+   Supports Calligraphy, Pencil, Marker, Eraser, and Custom PNG Brushes.
 ========================================================= */
 
 (() => {
@@ -16,7 +16,6 @@
   if (!popup || !toolbar || !close) return;
 
   const names = {
-    pen: "إعدادات قلم الحبر",
     calligraphy: "إعدادات قلم الخط العربي",
     pencil: "إعدادات قلم الرصاص",
     marker: "إعدادات ماركر التظليل",
@@ -67,7 +66,7 @@
   const STORAGE = "rasem-per-tool-settings-v2";
 
   let settings = {};
-  let activeTool = "pen";
+  let activeTool = "pencil";
   let opened = false;
 
   try {
