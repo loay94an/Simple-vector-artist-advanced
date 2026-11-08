@@ -1414,8 +1414,12 @@ export class DrawingEngine {
 
     this.builder.smoothing.strength =
       this.settings.lineCorrection;
+    this.builder.baseSmoothingStrength =
+      this.settings.lineCorrection;
 
     this.builder.smoothing.minDistance =
+      this.settings.minDistance;
+    this.builder.baseSmoothingMinDistance =
       this.settings.minDistance;
 
     return true;
