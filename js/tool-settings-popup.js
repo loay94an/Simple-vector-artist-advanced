@@ -157,6 +157,7 @@
 
     result.brush = settings[activeTool]?.brush || (activeTool === "calligraphy" ? "calligraphy" : "round");
     result.customBrush = settings[activeTool]?.customBrush || null;
+    result.headSettings = settings[activeTool]?.headSettings || {};
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
     result.calligraphyEndStyle = document.getElementById("calligraphyEndStyle")?.value || "none";
@@ -302,6 +303,8 @@
   let headPressTimer = null;
   let headPressMoved = false;
   let headPressButton = null;
+  let headPressStartX = 0;
+  let headPressStartY = 0;
   let headLongPressFired = false;
 
   function headKeysFor(brush) {
@@ -456,8 +459,6 @@
     }
 
     const current = settings[tool];
-    restoreHeadProfile(current.brush || (tool === "calligraphy" ? "calligraphy" : "round"));
-
     const brushSettings = [
       ["brushSize", "brushSizeValue"],
       ["brushOpacity", "brushOpacityValue"],
@@ -558,6 +559,7 @@
       }
     }
 
+    restoreHeadProfile(current.brush || (tool === "calligraphy" ? "calligraphy" : "round"));
     updateOutputs();
     apply();
   }
@@ -729,7 +731,9 @@
 
       save();
       updateOutputs();
-      showHeadOptions(button.dataset.brush);
+      if (headLongPressFired) showHeadOptions(button.dataset.brush);
+      else if (headOptionsPanel) headOptionsPanel.hidden = true;
+      headLongPressFired = false;
       return;
     }
 
@@ -763,6 +767,8 @@
     const button = event.target.closest("#brushPresetsSection [data-brush]");
     if (!button) return;
     headPressButton = button;
+    headPressStartX = event.clientX;
+    headPressStartY = event.clientY;
     headPressMoved = false;
     headLongPressFired = false;
     clearTimeout(headPressTimer);
@@ -770,15 +776,15 @@
     headPressTimer = setTimeout(() => {
       if (!headPressButton || headPressMoved) return;
       headLongPressFired = true;
+      headPressTimer = null;
       button.classList.remove("tool-pressing");
       if (navigator.vibrate) { try { navigator.vibrate(35); } catch {} }
       button.click();
-      showHeadOptions(button.dataset.brush);
     }, 450);
   });
   popup.addEventListener("pointermove", event => {
     if (!headPressTimer) return;
-    if (headPressButton && Math.hypot(event.clientX - Number(headPressButton.dataset.pressX || event.clientX), event.clientY - Number(headPressButton.dataset.pressY || event.clientY)) > 14) {
+    if (headPressButton && Math.hypot(event.clientX - headPressStartX, event.clientY - headPressStartY) > 14) {
       headPressMoved = true; clearTimeout(headPressTimer); headPressTimer = null;
       headPressButton.classList.remove("tool-pressing");
     }
