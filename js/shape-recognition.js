@@ -229,7 +229,10 @@ function fitEllipse(points, box) {
     error += Math.abs(Math.hypot((p.x - localCx) / rx, (p.y - localCy) / ry) - 1);
   }
   error /= projected.length;
-  if (error > 0.105) return null;
+  // Sharp polygon vertices inflate the radial residual even when their
+  // covariance resembles an ellipse. Keep ellipse fitting strict so rotated
+  // rectangles and polygons can reach the corner-based classifier.
+  if (error > 0.075) return null;
 
   const aspect = Math.max(rx, ry) / Math.min(rx, ry);
   const isCircle = aspect < 1.12;
