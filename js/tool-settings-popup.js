@@ -779,7 +779,16 @@
       headPressTimer = null;
       button.classList.remove("tool-pressing");
       if (navigator.vibrate) { try { navigator.vibrate(35); } catch {} }
-      button.click();
+      if (!settings[activeTool]) settings[activeTool] = {};
+      settings[activeTool].brush = button.dataset.brush;
+      const isCalligraphyBrush = button.dataset.brush === "calligraphy" || button.dataset.brush.startsWith("cal-");
+      const calRow = document.getElementById("calligraphyAngleRow");
+      const calScale = document.getElementById("calligraphyAngleScale");
+      if (calRow) calRow.style.display = isCalligraphyBrush ? "flex" : "none";
+      if (calScale) calScale.style.display = isCalligraphyBrush ? "block" : "none";
+      save();
+      updateOutputs();
+      showHeadOptions(button.dataset.brush);
     }, 450);
   });
   popup.addEventListener("pointermove", event => {
