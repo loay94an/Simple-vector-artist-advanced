@@ -1494,7 +1494,7 @@ export class DrawingEngine {
         angleTypes: confirmed.angleTypes || []
       };
       this.renderCurrent();
-    }, 1000);
+    }, 400);
   }
 
   requestWorkerSmoothing() {
