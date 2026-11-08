@@ -4,7 +4,7 @@
    while preserving full offline support as a robust PWA.
 ========================================================= */
 
-const CACHE_NAME = "rasem-pwa-v10-flex-centered-overlay";
+const CACHE_NAME = "rasem-pwa-v11-network-first";
 const PRECACHE_ASSETS = [
   "./",
   "./index.html",
