@@ -171,22 +171,6 @@ export class BaseTool {
 ========================================================= */
 
 
-/* =========================================================
-   BUCKET FILL TOOL
-========================================================= */
-export class Bucket extends BaseTool {
-  constructor(engine, camera) {
-    super(engine, camera);
-    this.name = "bucket";
-  }
-
-  down(event) {
-    if (!this.active || !this.engine) return false;
-    this.engine.fillAt(event);
-    return true;
-  }
-}
-
 export class Pen extends BaseTool {
   constructor(engine, camera) {
     super(engine, camera);
@@ -1789,7 +1773,6 @@ export class ToolManager {
     this.register("calligraphy", new Calligraphy(this.engine, this.camera));
     this.register("pencil", new Pencil(this.engine, this.camera));
     this.register("marker", new Marker(this.engine, this.camera));
-    this.register("bucket", new Bucket(this.engine, this.camera));
     this.register("eraser", new Eraser(this.engine, this.camera));
     this.register("text", new TextTool(this.engine, this.camera));
 
