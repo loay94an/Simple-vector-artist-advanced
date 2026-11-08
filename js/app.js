@@ -921,6 +921,22 @@ export class RasemApplication {
       });
     }
 
+    // Canvas grid visibility preference
+    const canvasGridCheckbox = getElement("canvasGridCheckbox");
+    const gridLayer = getElement("gridLayer");
+    if (canvasGridCheckbox && gridLayer) {
+      let gridEnabled = false;
+      try { gridEnabled = localStorage.getItem("rasem_canvas_grid") === "true"; } catch {}
+      canvasGridCheckbox.checked = gridEnabled;
+      gridLayer.style.display = gridEnabled ? "" : "none";
+      const gridToggleHandler = () => {
+        gridLayer.style.display = canvasGridCheckbox.checked ? "" : "none";
+        try { localStorage.setItem("rasem_canvas_grid", String(canvasGridCheckbox.checked)); } catch {}
+      };
+      canvasGridCheckbox.addEventListener("change", gridToggleHandler);
+      this.cleanupCallbacks.push(() => canvasGridCheckbox.removeEventListener("change", gridToggleHandler));
+    }
+
     // Two-Finger Pan Settings Checkbox listener
     const twoFingerPanCheckbox = getElement("twoFingerPanCheckbox");
     if (twoFingerPanCheckbox) {
