@@ -158,6 +158,10 @@
     result.customBrush = settings[activeTool]?.customBrush || null;
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
+    result.featherDensity = Number(document.getElementById("featherDensity")?.value ?? 10);
+    result.featherSpread = Number(document.getElementById("featherSpread")?.value ?? 0.45);
+    result.featherSoftness = Number(document.getElementById("featherSoftness")?.value ?? 0.35);
+    result.featherTaper = Number(document.getElementById("featherTaper")?.value ?? 0.7);
 
     return result;
   }
@@ -231,7 +235,11 @@
       ["brushSize", "brushSizeValue", "", false],
       ["brushOpacity", "brushOpacityValue", "%", true],
       ["lineCorrection", "lineCorrectionValue", "%", true],
-      ["calligraphyAngle", "calligraphyAngleValue", "°", false],\n      ["featherDensity", "featherDensityValue", "", false],\n      ["featherSpread", "featherSpreadValue", "%", true],\n      ["featherSoftness", "featherSoftnessValue", "%", true],\n      ["featherTaper", "featherTaperValue", "%", true]
+      ["calligraphyAngle", "calligraphyAngleValue", "°", false],
+      ["featherDensity", "featherDensityValue", "", false],
+      ["featherSpread", "featherSpreadValue", "%", true],
+      ["featherSoftness", "featherSoftnessValue", "%", true],
+      ["featherTaper", "featherTaperValue", "%", true]
     ]) {
       const input = document.getElementById(id);
       const output = document.getElementById(outputId);
@@ -366,6 +374,11 @@
     if (calligraphyBrushes) {
       calligraphyBrushes.style.display = tool === "calligraphy" ? "grid" : "none";
     }
+    const featherBrushes = popup.querySelector(".brush-presets-feather");
+    if (featherBrushes) featherBrushes.style.display = tool === "feather" ? "grid" : "none";
+    if (generalBrushes && tool === "feather") generalBrushes.style.display = "none";
+    const featherSettings = popup.querySelector(".feather-settings");
+    if (featherSettings) featherSettings.style.display = tool === "feather" ? "block" : "none";
 
     // Custom PNG preview & remove button
     const pngPreview = document.getElementById("customBrushPreview");
