@@ -807,9 +807,19 @@ export class StrokeBuilder {
         this.calligraphyPreviewPath = "";
       }
 
-      if (this.calligraphyPreviewPointCount === 0 && points.length > 0) {
+      const getStartTaper = () => {
+        const preset = String(this.brushStyle?.preset || "");
+        if (["cal-fine", "cal-needle"].includes(preset)) return 0.18;
+        if (preset === "cal-brush") return 0.58;
+        if (["cal-diwani", "cal-taliq"].includes(preset)) return 0.72;
+        return 1;
+      };
+
+      const buildStartCap = () => {
         const point = points[0];
         const r = getRadius(point, 0);
+        // يمتد غطاء البداية على محور السن المشطوف، ويُحدّث نصف قطره
+        // عند وصول اتجاه الحركة الحقيقي بدلاً من تخمينه من أول عينة.
         const halfLength = Math.max(0.6, r * 0.5);
         const tangentX = -sinA;
         const tangentY = cosA;
@@ -821,15 +831,20 @@ export class StrokeBuilder {
           x: point.x + tangentX * halfLength,
           y: point.y + tangentY * halfLength
         };
-        this.calligraphyPreviewPath = makeSegment(start, end, r, r);
+        return makeSegment(start, end, r * getStartTaper(), r);
+      };
+
+      if (this.calligraphyPreviewPointCount === 0 && points.length > 0) {
+        this.calligraphyPreviewPath = buildStartCap();
         delta = this.calligraphyPreviewPath;
         this.calligraphyPreviewPointCount = 1;
       }
 
-      // A one-point stroke uses the existing nib-cap preview. Once a second
-      // point arrives, replace that temporary cap with the normal first segment.
+      // عند وصول العينة الثانية نعيد بناء غطاء البداية باتجاه الحركة
+      // الفعلي، ولا نحذفه؛ وبذلك يتطابق رأس المعاينة مع المسار النهائي.
       if (this.calligraphyPreviewPointCount === 1 && points.length > 1) {
-        this.calligraphyPreviewPath = "";
+        this.calligraphyPreviewPath = buildStartCap();
+        delta = this.calligraphyPreviewPath;
       }
 
       for (
