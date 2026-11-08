@@ -126,7 +126,9 @@
 
     const engine = window.rasem?.engine;
     if (engine) {
-      if (activeTool === "eraser") {
+      if (activeTool === "bucket") {
+        engine.setBucketSettings?.({ gap: current.bucketGap ?? 1, edgeThreshold: current.bucketEdgeThreshold ?? 12 });
+      } else if (activeTool === "eraser") {
         engine.setSettings({
           eraserSize: current.size || 16,
           eraserMode: current.eraserMode || "partial"
@@ -223,6 +225,34 @@
     }
 
     const current = settings[tool];
+
+    const isBucket = tool === "bucket";
+    const bucketSection = document.getElementById("bucketSettingsSection");
+    if (bucketSection) bucketSection.style.display = isBucket ? "block" : "none";
+    const brushSettings = [
+      ["brushSize", "brushSizeValue"],
+      ["brushOpacity", "brushOpacityValue"],
+      ["lineCorrection", "lineCorrectionValue"],
+      ["pressureEnabled", null]
+    ];
+    for (const [id, outputId] of brushSettings) {
+      const input = document.getElementById(id);
+      const row = input?.previousElementSibling;
+      if (input) input.style.display = isBucket ? "none" : "";
+      if (row?.classList.contains("tool-setting-row")) row.style.display = isBucket ? "none" : "";
+      if (outputId) {
+        const output = document.getElementById(outputId);
+        if (output) output.style.display = isBucket ? "none" : "";
+      }
+    }
+    const presetsSectionForBucket = document.getElementById("brushPresetsSection");
+    if (presetsSectionForBucket) presetsSectionForBucket.style.display = isBucket ? "none" : (tool === "eraser" ? "none" : "block");
+    const bucketGap = document.getElementById("bucketGap");
+    const bucketThreshold = document.getElementById("bucketEdgeThreshold");
+    if (bucketGap) bucketGap.value = String(current.bucketGap ?? 1);
+    if (bucketThreshold) bucketThreshold.value = String(current.bucketEdgeThreshold ?? 12);
+    const bucketThresholdOutput = document.getElementById("bucketEdgeThresholdValue");
+    if (bucketThresholdOutput) bucketThresholdOutput.textContent = String(current.bucketEdgeThreshold ?? 12);
 
     for (const [key, id] of Object.entries(ids)) {
       const el = document.getElementById(id);
