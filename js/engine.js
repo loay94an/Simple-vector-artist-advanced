@@ -1243,7 +1243,8 @@ export class DrawingEngine {
     this.shapeRecognitionApplied = false;
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
-      this.renderer
+      this.renderer,
+      { onCommit: () => this.commitHistory() }
     );
   }
 
@@ -1644,6 +1645,15 @@ export class DrawingEngine {
             dashArray: brushStyle.dashArray,
             customBrush: brushStyle.image || null
           };
+
+          if (element.tool === "calligraphy") {
+            element.calligraphyMeta = {
+              angle: this.settings.calligraphyAngle,
+              preset: brushStyle.preset || null,
+              pressureEnabled: this.settings.pressureEnabled !== false,
+              sensitivity: this.settings.sensitivity
+            };
+          }
 
           const exists = layer.elements.some(
             item => item.id === element.id
