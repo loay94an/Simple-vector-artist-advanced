@@ -53,17 +53,15 @@ const EngineUtils = {
 ========================================================= */
 
 // Preserve the sampled stroke as a straight polyline; no curve fitting.
-export class Smoothing {
-  toPath(points) {
-    if (!Array.isArray(points) || !points.length) return "";
-    if (points.length === 1) {
-      const point = points[0];
-      return `M ${point.x} ${point.y} l 0.01 0`;
-    }
-    return points.map((point, index) =>
-      `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
-    ).join(" ");
+function pointsToPath(points) {
+  if (!Array.isArray(points) || !points.length) return "";
+  if (points.length === 1) {
+    const point = points[0];
+    return `M ${point.x} ${point.y} l 0.01 0`;
   }
+  return points.map((point, index) =>
+    `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
+  ).join(" ");
 }
 
 /* =========================================================
@@ -154,10 +152,6 @@ export class Pressure {
 
 export class StrokeBuilder {
   constructor(options = {}) {
-    this.smoothing = new Smoothing({
-      strength: options.smoothing ?? 0.3,
-      minDistance: options.minDistance ?? 0.35
-    });
 
     this.pressure = new Pressure();
     this.reset();
@@ -187,7 +181,6 @@ export class StrokeBuilder {
     this.calligraphyPreviewPointCount = 0;
     this.calligraphyPreviewPath = "";
     this.calligraphyPreviewDelta = "";
-    this.workerFilteredPoints = null;
 
     this.pressure.reset();
   }
@@ -269,7 +262,7 @@ export class StrokeBuilder {
   }
 
   getCenterPath() {
-    return this.smoothing.toPath(
+    return pointsToPath(
       this.getFilteredPoints()
     );
   }
@@ -974,8 +967,6 @@ export class DrawingEngine {
     this.canvasPreviewTransform = null;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
-    this.workerRequestId = 0;
-    this.smoothingWorker = null;
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
       this.renderer,
@@ -1266,9 +1257,7 @@ export class DrawingEngine {
       this.clearShapeRecognitionTimer();
       // Resume directly from the captured samples.
       this.builder.deferSmoothing = true;
-      this.builder.workerFilteredPoints = null;
-      this.workerRequestId++;
-    }
+        }
 
     const added = this.addPoint(point, input);
 
@@ -1296,7 +1285,7 @@ export class DrawingEngine {
   }
 
   buildPath(points) {
-    return this.builder.smoothing.toPath(points);
+    return pointsToPath(points);
   }
 
   scheduleRenderCurrent() {
@@ -1955,7 +1944,6 @@ export class DrawingEngine {
   reset() {
     this.cancelScheduledRender();
     this.clearShapeRecognitionTimer();
-    this.workerRequestId++;
     this.renderer?.clearCanvasPreview?.();
     this.canvasPreviewPointCount = 0;
     this.canvasPreviewTransform = null;
@@ -1985,7 +1973,6 @@ export class DrawingEngine {
 
     this.arabicWriting?.destroy();
     this.arabicWriting = null;
-    this.smoothingWorker = null;
 
     this.document = null;
     this.renderer = null;
