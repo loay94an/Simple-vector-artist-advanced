@@ -2709,6 +2709,7 @@ export class DrawingEngine {
   reset() {
     this.cancelScheduledRender();
     this.clearShapeRecognitionTimer();
+    this.workerRequestId++;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.drawing = false;
@@ -2735,6 +2736,8 @@ export class DrawingEngine {
 
     this.arabicWriting?.destroy();
     this.arabicWriting = null;
+    this.smoothingWorker?.terminate?.();
+    this.smoothingWorker = null;
 
     this.document = null;
     this.renderer = null;
