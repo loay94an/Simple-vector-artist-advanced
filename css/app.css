@@ -3869,3 +3869,10 @@ body.dark .canvas-area {
 /* Compact nib thumbnails while keeping touch targets comfortable. */
 .brush-preset .brush-icon { width: 30px; height: 24px; }
 .brush-preset { min-height: 64px; gap: 3px; padding: 5px 4px; }
+
+
+/* Smaller thumbnails for feather-head choices only. */
+.brush-presets-feather .brush-preset .brush-icon {
+  width: 18px;
+  height: 15px;
+}
