@@ -840,6 +840,228 @@ export class HitTesting {
 }
 
 /* =========================================================
+   AUTO SHAPE RECOGNITION
+   Converts a held, completed hand-drawn shape into clean geometry.
+========================================================= */
+
+function shapePointDistance(a, b) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function simplifyShapePath(points, tolerance) {
+  if (points.length <= 2) return points.slice();
+
+  let farthestIndex = 0;
+  let farthestDistance = 0;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const dx = last.x - first.x;
+  const dy = last.y - first.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    let distance;
+    if (lengthSquared < 0.0001) {
+      distance = shapePointDistance(first, points[i]);
+    } else {
+      const t = EngineUtils.clamp(
+        ((points[i].x - first.x) * dx + (points[i].y - first.y) * dy) /
+          lengthSquared,
+        0,
+        1
+      );
+      distance = Math.hypot(
+        points[i].x - (first.x + t * dx),
+        points[i].y - (first.y + t * dy)
+      );
+    }
+    if (distance > farthestDistance) {
+      farthestDistance = distance;
+      farthestIndex = i;
+    }
+  }
+
+  if (farthestDistance <= tolerance) return [first, last];
+
+  const left = simplifyShapePath(points.slice(0, farthestIndex + 1), tolerance);
+  const right = simplifyShapePath(points.slice(farthestIndex), tolerance);
+  return [...left.slice(0, -1), ...right];
+}
+
+function interpolateShapeEdges(vertices, pressure, stepsPerEdge = 5) {
+  const result = [];
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i];
+    const b = vertices[(i + 1) % vertices.length];
+    for (let step = 0; step < stepsPerEdge; step++) {
+      const t = step / stepsPerEdge;
+      result.push({
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        pressure,
+        time: Date.now()
+      });
+    }
+  }
+  return result;
+}
+
+function recognizeHeldShape(sourcePoints, strength = 0.35) {
+  if (!Array.isArray(sourcePoints) || sourcePoints.length < 8) return null;
+
+  const points = sourcePoints.filter(EngineUtils.validPoint);
+  if (points.length < 8) return null;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let pressureTotal = 0;
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+    pressureTotal += EngineUtils.number(point.pressure, 1);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const diagonal = Math.hypot(width, height);
+  if (diagonal < 24 || (width < 8 && height < 8)) return null;
+
+  const averagePressure = pressureTotal / points.length;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const endGap = shapePointDistance(first, last);
+  const isClosed = endGap <= Math.max(12, diagonal * 0.22);
+  const tolerance = Math.max(2, diagonal * (0.025 + strength * 0.025));
+
+  if (isClosed) {
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const rx = width / 2;
+    const ry = height / 2;
+    const aspect = width / height;
+
+    // دائرة أو بيضاوي: نقيس انتظام نصف القطر بعد تطبيع حدود الرسم.
+    if (aspect >= 0.55 && aspect <= 1.8) {
+      let radialError = 0;
+      for (const point of points) {
+        const nx = (point.x - centerX) / rx;
+        const ny = (point.y - centerY) / ry;
+        radialError += Math.abs(Math.hypot(nx, ny) - 1);
+      }
+      radialError /= points.length;
+
+      if (radialError < 0.24 + strength * 0.12) {
+        const makeCircle = aspect >= 0.82 && aspect <= 1.22;
+        const radiusX = makeCircle ? (rx + ry) / 2 : rx;
+        const radiusY = makeCircle ? radiusX : ry;
+        const circlePoints = [];
+        for (let i = 0; i < 64; i++) {
+          const angle = (Math.PI * 2 * i) / 64;
+          circlePoints.push({
+            x: centerX + Math.cos(angle) * radiusX,
+            y: centerY + Math.sin(angle) * radiusY,
+            pressure: averagePressure,
+            time: Date.now()
+          });
+        }
+        circlePoints.push({ ...circlePoints[0], time: Date.now() });
+        return { type: makeCircle ? "circle" : "ellipse", points: circlePoints };
+      }
+    }
+
+    // تبسيط المسار المغلق إلى زواياه الرئيسية لاكتشاف المثلث والمستطيل.
+    const ring = points.slice();
+    if (endGap < diagonal * 0.18) ring.pop();
+    if (ring.length >= 6) {
+      let splitIndex = 1;
+      let splitDistance = 0;
+      for (let i = 1; i < ring.length; i++) {
+        const distance = shapePointDistance(ring[0], ring[i]);
+        if (distance > splitDistance) {
+          splitDistance = distance;
+          splitIndex = i;
+        }
+      }
+
+      const firstArc = simplifyShapePath(ring.slice(0, splitIndex + 1), tolerance);
+      const secondArc = simplifyShapePath(
+        [...ring.slice(splitIndex), ring[0]],
+        tolerance
+      );
+      let vertices = [...firstArc.slice(0, -1), ...secondArc.slice(0, -1)];
+
+      // إزالة الرؤوس المتقاربة الناتجة عن الاهتزاز حول الزاوية نفسها.
+      const compact = [];
+      for (const vertex of vertices) {
+        if (!compact.length || shapePointDistance(compact[compact.length - 1], vertex) > diagonal * 0.12) {
+          compact.push(vertex);
+        }
+      }
+      if (compact.length > 2 && shapePointDistance(compact[0], compact.at(-1)) < diagonal * 0.12) compact.pop();
+      vertices = compact;
+
+      if (vertices.length === 3 || vertices.length === 4) {
+        let rightAngles = 0;
+        for (let i = 0; i < vertices.length; i++) {
+          const previous = vertices[(i + vertices.length - 1) % vertices.length];
+          const current = vertices[i];
+          const next = vertices[(i + 1) % vertices.length];
+          const ax = previous.x - current.x;
+          const ay = previous.y - current.y;
+          const bx = next.x - current.x;
+          const by = next.y - current.y;
+          const denominator = Math.hypot(ax, ay) * Math.hypot(bx, by);
+          if (denominator > 0 && Math.abs((ax * bx + ay * by) / denominator) < 0.38) {
+            rightAngles++;
+          }
+        }
+
+        if (vertices.length === 3) {
+          return {
+            type: "triangle",
+            points: interpolateShapeEdges(vertices, averagePressure, 8)
+          };
+        }
+
+        if (rightAngles >= 3) {
+          return {
+            type: Math.abs(width - height) / Math.max(width, height) < 0.16
+              ? "square"
+              : "rectangle",
+            points: interpolateShapeEdges(vertices, averagePressure, 8)
+          };
+        }
+      }
+    }
+  }
+
+  // الخط المستقيم: يجب أن يكون طويلاً ومنخفض الانحراف عن المحور بين طرفيه.
+  const lineLength = shapePointDistance(first, last);
+  if (lineLength >= 30 && !isClosed) {
+    let maximumDeviation = 0;
+    for (const point of points) {
+      const deviation = Math.abs(
+        (last.x - first.x) * (first.y - point.y) -
+        (first.x - point.x) * (last.y - first.y)
+      ) / lineLength;
+      maximumDeviation = Math.max(maximumDeviation, deviation);
+    }
+    if (maximumDeviation / lineLength < 0.035 + strength * 0.025) {
+      return {
+        type: "line",
+        points: [
+          { ...first, pressure: averagePressure },
+          { ...last, pressure: averagePressure }
+        ]
+      };
+    }
+  }
+
+  return null;
+}
+
+/* =========================================================
    5. DRAWING ENGINE
 ========================================================= */
 
@@ -886,6 +1108,8 @@ export class DrawingEngine {
 
     this.erasedIds = new Set();
     this.destroyed = false;
+    this.shapeRecognitionTimer = null;
+    this.shapeRecognitionApplied = false;
   }
 
   get activeLayer() {
@@ -1058,6 +1282,8 @@ export class DrawingEngine {
 
     if (!point) return false;
 
+    this.clearShapeRecognitionTimer();
+    this.shapeRecognitionApplied = false;
     this.drawing = true;
     this.activePointer = event.pointerId ?? null;
 
@@ -1144,7 +1370,7 @@ export class DrawingEngine {
   }
 
   move(event, pointerData = null) {
-    if (!this.drawing || this.destroyed) {
+    if (!this.drawing || this.destroyed || this.shapeRecognitionApplied) {
       return false;
     }
 
@@ -1169,9 +1395,52 @@ export class DrawingEngine {
 
     if (added) {
       this.renderCurrent();
+      this.scheduleShapeRecognition();
     }
 
     return added;
+  }
+
+  clearShapeRecognitionTimer() {
+    if (this.shapeRecognitionTimer !== null) {
+      clearTimeout(this.shapeRecognitionTimer);
+      this.shapeRecognitionTimer = null;
+    }
+  }
+
+  scheduleShapeRecognition() {
+    this.clearShapeRecognitionTimer();
+    if (
+      !this.drawing ||
+      this.shapeRecognitionApplied ||
+      !["pen", "pencil", "marker"].includes(this.settings.tool) ||
+      this.settings.lineCorrection <= 0 ||
+      this.builder.points.length < 8
+    ) return;
+
+    const candidate = recognizeHeldShape(
+      this.builder.points,
+      this.settings.lineCorrection
+    );
+    if (!candidate) return;
+
+    // لا نثبت الشكل إلا بعد توقف الإصبع فترة قصيرة عند نهاية الرسم.
+    this.shapeRecognitionTimer = setTimeout(() => {
+      this.shapeRecognitionTimer = null;
+      if (!this.drawing || this.shapeRecognitionApplied) return;
+
+      const confirmed = recognizeHeldShape(
+        this.builder.points,
+        this.settings.lineCorrection
+      );
+      if (!confirmed) return;
+
+      this.builder.points = confirmed.points.map(point => ({ ...point }));
+      this.points = this.builder.points;
+      this.lastPoint = this.builder.points.at(-1) || null;
+      this.shapeRecognitionApplied = true;
+      this.renderCurrent();
+    }, 650);
   }
 
   buildPath(points) {
@@ -1199,6 +1468,7 @@ export class DrawingEngine {
   }
 
   end(event = {}) {
+    this.clearShapeRecognitionTimer();
     if (!this.drawing || this.destroyed) {
       return false;
     }
@@ -1274,6 +1544,7 @@ export class DrawingEngine {
   }
 
   cancel() {
+    this.clearShapeRecognitionTimer();
     if (!this.drawing) return false;
 
     this.renderer.clearPreview();
@@ -1956,6 +2227,8 @@ export class DrawingEngine {
   }
 
   reset() {
+    this.clearShapeRecognitionTimer();
+    this.shapeRecognitionApplied = false;
     this.drawing = false;
     this.activePointer = null;
 
