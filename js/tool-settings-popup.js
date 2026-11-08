@@ -159,7 +159,7 @@
     result.customBrush = settings[activeTool]?.customBrush || null;
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
-    result.calligraphyEndStyle = document.getElementById("calligraphyEndStyle")?.value || "thin";
+    result.calligraphyEndStyle = document.getElementById("calligraphyEndStyle")?.value || "none";
     result.featherDensity = Number(document.getElementById("featherDensity")?.value ?? 10);
     result.featherGlow = Number(document.getElementById("featherGlow")?.value ?? 0);
     result.featherSpacing = Number(document.getElementById("featherSpacing")?.value ?? 1);
@@ -199,9 +199,10 @@
           lineCorrection: current.lineCorrection ?? current.smoothing ?? 0.35,
           pressureEnabled: current.pressureEnabled,
           calligraphyAngle: Number.isFinite(current.calligraphyAngle) ? current.calligraphyAngle : 45,
-          calligraphyEndStyle: current.calligraphyEndStyle || "thin",
+          calligraphyEndStyle: current.calligraphyEndStyle || "none",
           brushStyle: {
             preset: brush,
+            calligraphyEndStyle: current.calligraphyEndStyle || "none",
             lineCap: style.lineCap || "round",
             dashArray: style.dashArray || "",
             image: current.customBrush || null,
@@ -360,7 +361,7 @@
     if (calRow) calRow.style.display = isCal ? "flex" : "none";
     if (calScale) calScale.style.display = isCal ? "block" : "none";
     if (calEndRow) calEndRow.style.display = isCal ? "flex" : "none";
-    if (calEndSelect) { calEndSelect.style.display = isCal ? "block" : "none"; calEndSelect.value = current.calligraphyEndStyle || "thin"; }
+    if (calEndSelect) { calEndSelect.style.display = isCal ? "block" : "none"; calEndSelect.value = current.calligraphyEndStyle || "none"; }
     // إظهار شدة تنعيم الانحناءات لقلم الخط العربي أيضاً.
     if (correctionRow) correctionRow.style.display = isCal ? "flex" : "flex";
 
