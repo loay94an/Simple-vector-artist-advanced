@@ -357,6 +357,8 @@ export class StrokeBuilder {
       image: null
     };
     this.active = false;
+    // أثناء الضربة نعرض العينات الخام؛ لا يبدأ التنعيم إلا بعد سكون الإصبع.
+    this.deferSmoothing = false;
 
     this.pressure.reset();
   }
@@ -441,6 +443,12 @@ export class StrokeBuilder {
     this.smoothing.minDistance = isCalligraphy
       ? Math.min(this.baseSmoothingMinDistance, 0.02)
       : this.baseSmoothingMinDistance;
+
+    // لا تطبق أي تنعيم أو تبسيط أثناء تحريك الإصبع.
+    // يعاد تفعيل المعالجة فقط بعد اكتمال مؤقت السكون مع بقاء الضغط.
+    if (this.deferSmoothing) {
+      return this.points.map(point => ({ ...point }));
+    }
 
     return this.smoothing.process(this.points);
   }
@@ -1497,6 +1505,9 @@ export class DrawingEngine {
       brushStyle: { ...this.brushStyle }
     });
 
+    // يبدأ كل قلم بضربة خام؛ لا تصحيح بصرياً أثناء الكتابة.
+    this.builder.deferSmoothing = true;
+
     this.points = this.builder.points;
 
     this.currentElement = {
@@ -1580,6 +1591,8 @@ export class DrawingEngine {
       this.shapeRecognitionApplied = false;
       this.idleCorrectionApplied = false;
       this.clearShapeRecognitionTimer();
+      // استئناف الحركة يعيد المسار إلى العرض الخام ويعيد انتظار السكون.
+      this.builder.deferSmoothing = true;
     }
 
     const added = this.addPoint(point, input);
@@ -1620,9 +1633,10 @@ export class DrawingEngine {
       this.shapeRecognitionTimer = null;
       if (!this.drawing || this.destroyed) return;
 
-      // بعد ثبات الإصبع فقط، أعد معالجة المسار مرة واحدة.
-      // نعلّم الضربة كي لا نضيف pointerup كنقطة جديدة بعد التصحيح.
+      // لا نفعّل التنعيم إلا بعد 1.3 ثانية من السكون مع استمرار الضغط.
+      // هذا هو الموضع الوحيد الذي يسمح بتنعيم مسار الضربة الحالية.
       this.idleCorrectionApplied = true;
+      this.builder.deferSmoothing = false;
       this.renderCurrent();
 
       // لا نحوّل ضربات الخط العربي إلى أشكال هندسية؛

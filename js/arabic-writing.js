@@ -350,15 +350,10 @@ export class ArabicWritingAssistant {
         }
       };
 
-      if (element.tool === "calligraphy") {
-        // Preserve the calligraphic nib angle and pressure while smoothing
-        // only tiny deviations along nearly straight portions of the baseline.
-        changed = smoothCalligraphyCenterline(element) || changed;
-        changed = rebuildCalligraphyOutline(element) || changed;
-      } else {
-        changed = conservativeSmooth(element) || changed;
-      }
-      changed = true; // group/analysis metadata is also a document change
+      // لا نعدّل هندسة الضربة بعد رفع الإصبع؛ ذلك كان مسار تصحيح ثانياً
+      // يعمل بمؤقت مستقل بعد انتهاء الكتابة ويتجاوز شرط الضغط المطوّل.
+      // يبقى هنا تحليل بنية الحروف وتجميع الضربات كبيانات وصفية فقط.
+      changed = true;
     });
 
     if (changed) {
