@@ -720,32 +720,30 @@ export class StrokeBuilder {
     this.calligraphyPreviewDelta = "";
     const segments = [];
 
-    if (points.length === 1) {
-      const point = points[0];
-      const r = getRadius(point);
-      const halfLength = Math.max(0.6, r * 0.5);
-      const tangentX = -sinA;
-      const tangentY = cosA;
+    // Keep the angled nib cap at the true stroke origin even after
+    // the second point arrives. Without it, the first quadrilateral starts
+    // exactly at the first sample and leaves a visibly cut/flat stroke head.
+    const firstPoint = points[0];
+    const firstRadius = getRadius(firstPoint);
+    const halfLength = Math.max(0.6, firstRadius * 0.5);
+    const tangentX = -sinA;
+    const tangentY = cosA;
+    const capStart = {
+      x: firstPoint.x - tangentX * halfLength,
+      y: firstPoint.y - tangentY * halfLength
+    };
+    const capEnd = {
+      x: firstPoint.x + tangentX * halfLength,
+      y: firstPoint.y + tangentY * halfLength
+    };
+    segments.push(makeSegment(capStart, capEnd, firstRadius, firstRadius));
 
-      const start = {
-        x: point.x - tangentX * halfLength,
-        y: point.y - tangentY * halfLength
-      };
-      const end = {
-        x: point.x + tangentX * halfLength,
-        y: point.y + tangentY * halfLength
-      };
-
-      segments.push(makeSegment(start, end, r, r));
-    } else {
-      for (let i = 1; i < points.length; i++) {
-        const start = points[i - 1];
-        const end = points[i];
-
-        segments.push(
-          makeSegment(start, end, getRadius(start), getRadius(end))
-        );
-      }
+    for (let i = 1; i < points.length; i++) {
+      const start = points[i - 1];
+      const end = points[i];
+      segments.push(
+        makeSegment(start, end, getRadius(start), getRadius(end))
+      );
     }
 
     return segments.join(" ");
