@@ -590,6 +590,30 @@ export class Scene {
     this.previewElements = new Map();
 
     this.lastDocument = null;
+    this.canvasPreview = null;
+    this.canvasPreviewContext = null;
+    this.canvasPreviewRect = null;
+    this.canvasPreviewId = null;
+    this.canvasPreviewCount = 0;
+
+    const canvasHost = svg.parentElement;
+    if (canvasHost && typeof document !== "undefined") {
+      if (!canvasHost.style.position) canvasHost.style.position = "relative";
+      const canvas = document.createElement("canvas");
+      canvas.className = "rasem-live-canvas-preview";
+      canvas.setAttribute("aria-hidden", "true");
+      Object.assign(canvas.style, {
+        position: "absolute",
+        inset: "0",
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: "2"
+      });
+      canvasHost.appendChild(canvas);
+      this.canvasPreview = canvas;
+      this.canvasPreviewContext = canvas.getContext("2d", { alpha: true });
+    }
   }
 
   assertAlive() {
@@ -1016,6 +1040,129 @@ export class Scene {
     return true;
   }
 
+  resizeCanvasPreview() {
+    const canvas = this.canvasPreview;
+    const context = this.canvasPreviewContext;
+    if (!canvas || !context) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!(rect.width > 0 && rect.height > 0)) return null;
+    const ratio = Math.max(1, Math.min(3, globalThis.devicePixelRatio || 1));
+    const width = Math.round(rect.width * ratio);
+    const height = Math.round(rect.height * ratio);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      this.canvasPreviewRect = { width: rect.width, height: rect.height, ratio };
+      this.canvasPreviewId = null;
+      this.canvasPreviewCount = 0;
+    }
+    return { rect, context };
+  }
+
+  clearCanvasPreview() {
+    const resized = this.resizeCanvasPreview();
+    if (resized) {
+      resized.context.clearRect(0, 0, resized.rect.width, resized.rect.height);
+    }
+    this.canvasPreviewId = null;
+    this.canvasPreviewCount = 0;
+  }
+
+  appendCanvasPreview(id, points, style = {}, options = {}) {
+    if (!Array.isArray(points) || !points.length) return false;
+    const resized = this.resizeCanvasPreview();
+    if (!resized) return false;
+    const { rect, context } = resized;
+    if (options.reset || this.canvasPreviewId !== id) {
+      context.clearRect(0, 0, rect.width, rect.height);
+      this.canvasPreviewId = id;
+      this.canvasPreviewCount = 0;
+    }
+
+    const color = style.color || "#111111";
+    const size = Math.max(0.5, Number(style.size) || 3);
+    const opacity = Math.max(0, Math.min(1, Number(style.opacity ?? 1)));
+    const calligraphy = options.calligraphy === true;
+    const angle = (Number(options.calligraphyAngle) || 45) * Math.PI / 180;
+    const nx = Math.cos(angle), ny = Math.sin(angle);
+    const radiusFor = point => size * 0.5 *
+      (options.pressureEnabled === false ? 1 : 0.35 + (Number(point.pressure) || 1) * 0.65);
+
+    context.save();
+    context.globalAlpha = opacity;
+    context.fillStyle = color;
+    context.strokeStyle = color;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+
+    const drawNib = (a, b) => {
+      const ra = Math.max(0.3, radiusFor(a));
+      const rb = Math.max(0.3, radiusFor(b));
+      context.beginPath();
+      context.moveTo(a.x + nx * ra, a.y + ny * ra);
+      context.lineTo(b.x + nx * rb, b.y + ny * rb);
+      context.lineTo(b.x - nx * rb, b.y - ny * rb);
+      context.lineTo(a.x - nx * ra, a.y - ny * ra);
+      context.closePath();
+      context.fill();
+    };
+
+    if (points.length === 1) {
+      const p = points[0];
+      if (calligraphy) {
+        const r = radiusFor(p);
+        const tx = -ny, ty = nx, half = Math.max(0.6, r * 0.5);
+        drawNib({ x: p.x - tx * half, y: p.y - ty * half, pressure: p.pressure }, { x: p.x + tx * half, y: p.y + ty * half, pressure: p.pressure });
+      } else {
+        context.beginPath();
+        context.arc(p.x, p.y, Math.max(0.3, radiusFor(p) / 2), 0, Math.PI * 2);
+        context.fill();
+      }
+    } else {
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i];
+        if (calligraphy) {
+          drawNib(a, b);
+        } else {
+          context.lineWidth = Math.max(0.5, (radiusFor(a) + radiusFor(b)));
+          context.beginPath();
+          context.moveTo(a.x, a.y);
+          context.lineTo(b.x, b.y);
+          context.stroke();
+        }
+      }
+    }
+    context.restore();
+    this.canvasPreviewCount += points.length;
+    return true;
+  }
+
+  appendPreviewChunk(element, pathChunk) {
+    this.assertAlive();
+    if (!this.isValidElement(element) || typeof pathChunk !== "string" || !pathChunk.trim()) return false;
+    let group = this.previewElements.get(element.id);
+    if (group && group.localName !== "g") {
+      group.remove();
+      this.previewElements.delete(element.id);
+      group = null;
+    }
+    if (!group) {
+      group = document.createElementNS(SVG_NS, "g");
+      group.dataset.id = element.id;
+      group.setAttribute("pointer-events", "none");
+      this.previewElements.set(element.id, group);
+      this.previewLayer.appendChild(group);
+    }
+    const chunk = this.createNode({
+      ...element,
+      id: element.id + "-chunk-" + group.childElementCount,
+      path: pathChunk
+    });
+    group.appendChild(chunk);
+    return true;
+  }
+
   updateElement(element) {
     this.assertAlive();
 
@@ -1071,6 +1218,7 @@ export class Scene {
 
   clearPreview(id) {
     if (this.destroyed) return;
+    this.clearCanvasPreview();
 
     if (id !== undefined) {
       const node = this.previewElements.get(id);
@@ -1106,6 +1254,10 @@ export class Scene {
     this.drawingLayer = null;
     this.previewLayer = null;
 
+    this.canvasPreview?.remove?.();
+    this.canvasPreview = null;
+    this.canvasPreviewContext = null;
+    this.canvasPreviewRect = null;
     this.lastDocument = null;
 
     this.destroyed = true;
