@@ -775,7 +775,8 @@ export class StrokeBuilder {
       );
     }
 
-    // نهاية مستقلة قابلة للاختيار، تتبع اتجاه آخر مقطع حقيقي.
+    // شكل النهاية يُبنى على محور الضربة، لا على زاوية سن القلم؛
+    // لذلك تبقى سماكته المختارة ثابتة مهما تغيّرت زاوية الخط.
     if (points.length > 1) {
       const lastIndex = points.length - 1;
       const lastPoint = points[lastIndex];
@@ -783,40 +784,44 @@ export class StrokeBuilder {
       const dx = lastPoint.x - previousPoint.x;
       const dy = lastPoint.y - previousPoint.y;
       const length = Math.hypot(dx, dy) || 1;
-      const tangentX = dx / length;
-      const tangentY = dy / length;
-      const normalX = -tangentY;
-      const normalY = tangentX;
-      const lastRadius = getRadius(lastPoint, lastIndex);
+      const tx = dx / length, ty = dy / length;
+      const nx = -ty, ny = tx;
       const endStyle = ["thin", "wide", "pointed", "crescent"].includes(this.brushStyle?.calligraphyEndStyle)
         ? this.brushStyle.calligraphyEndStyle
-        : "thin";
-      const endCapLength = Math.max(0.6, lastRadius * 0.5);
-      if (endStyle === "crescent") {
-        const r = lastRadius;
-        const bx = lastPoint.x - tangentX * r * 0.22;
-        const by = lastPoint.y - tangentY * r * 0.22;
-        const leftX = bx + normalX * r;
-        const leftY = by + normalY * r;
-        const rightX = bx - normalX * r;
-        const rightY = by - normalY * r;
-        const tipX = lastPoint.x + tangentX * r * 0.72;
-        const tipY = lastPoint.y + tangentY * r * 0.72;
-        const hollowX = lastPoint.x + tangentX * r * 0.08;
-        const hollowY = lastPoint.y + tangentY * r * 0.08;
-        segments.push(
-          `M ${leftX.toFixed(2)} ${leftY.toFixed(2)} Q ${tipX.toFixed(2)} ${tipY.toFixed(2)} ${rightX.toFixed(2)} ${rightY.toFixed(2)} Q ${hollowX.toFixed(2)} ${hollowY.toFixed(2)} ${leftX.toFixed(2)} ${leftY.toFixed(2)} Z`
-        );
-      } else {
-        const endTaper = endStyle === "pointed" ? 0.025 : endStyle === "wide" ? 1.22 : 0.22;
-        const start = {
-          x: lastPoint.x - tangentX * endCapLength,
-          y: lastPoint.y - tangentY * endCapLength
-        };
-        const end = endStyle === "pointed"
-          ? lastPoint
-          : { x: lastPoint.x + tangentX * endCapLength, y: lastPoint.y + tangentY * endCapLength };
-        segments.push(makeSegment(start, end, lastRadius, lastRadius * endTaper));
+        : "none";
+
+      if (endStyle !== "none") {
+        // احذف المقطع الأخير ذي السماكة المرتبطة بزاوية السن واستبدله
+        // بوصلة مستقلة ذات عرض نهائي ثابت مشتق من حجم القلم فقط.
+        segments.pop();
+        const baseRadius = Math.max(0.45, this.baseSize * nibScale * 0.5);
+        const pressureFactor = this.pressureEnabled
+          ? EngineUtils.clamp(0.35 + EngineUtils.number(lastPoint.pressure, 1) * 0.65, 0.25, 1.15)
+          : 1;
+        const endRadius = baseRadius * pressureFactor;
+        const capLength = Math.max(1.2, Math.min(endRadius * 1.15, length * 0.8));
+        const start = { x: lastPoint.x - tx * capLength, y: lastPoint.y - ty * capLength };
+        const startRadius = getRadius(previousPoint, lastIndex - 1);
+        const endWidth = endStyle === "wide" ? endRadius * 1.18
+          : endStyle === "pointed" ? 0.035
+          : endStyle === "thin" ? Math.max(0.12, endRadius * 0.10)
+          : endRadius * 0.72;
+        const poly = [
+          { x: start.x + nx * startRadius, y: start.y + ny * startRadius },
+          { x: lastPoint.x + nx * endWidth, y: lastPoint.y + ny * endWidth },
+          { x: lastPoint.x - nx * endWidth, y: lastPoint.y - ny * endWidth },
+          { x: start.x - nx * startRadius, y: start.y - ny * startRadius }
+        ];
+        segments.push(poly.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z");
+
+        if (endStyle === "crescent") {
+          const r = endRadius;
+          const left = { x: lastPoint.x - tx * r * 0.18 + nx * r, y: lastPoint.y - ty * r * 0.18 + ny * r };
+          const right = { x: lastPoint.x - tx * r * 0.18 - nx * r, y: lastPoint.y - ty * r * 0.18 - ny * r };
+          const tip = { x: lastPoint.x + tx * r * 0.55, y: lastPoint.y + ty * r * 0.55 };
+          const hollow = { x: lastPoint.x + tx * r * 0.05, y: lastPoint.y + ty * r * 0.05 };
+          segments.push(`M ${left.x.toFixed(2)} ${left.y.toFixed(2)} Q ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} ${right.x.toFixed(2)} ${right.y.toFixed(2)} Q ${hollow.x.toFixed(2)} ${hollow.y.toFixed(2)} ${left.x.toFixed(2)} ${left.y.toFixed(2)} Z`);
+        }
       }
     }
 
@@ -874,7 +879,7 @@ export class StrokeBuilder {
         calligraphyClean: isCalligraphy,
         brushPreset: preset,
         brushAngle: this.calligraphyAngle,
-        calligraphyEndStyle: brushStyle.calligraphyEndStyle || "thin",
+        calligraphyEndStyle: brushStyle.calligraphyEndStyle || "none",
         brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity,
         featherDensity: this.brushStyle?.featherDensity ?? 10,
         featherGlow: this.brushStyle?.featherGlow ?? 0,
@@ -1315,7 +1320,10 @@ export class DrawingEngine {
           /^[\d\s.,-]*$/.test(dash) ? dash : "",
         image: typeof img === "string" && img.startsWith("data:image/")
           ? img
-          : null
+          : null,
+        calligraphyEndStyle: ["none", "thin", "wide", "pointed", "crescent"].includes(settings.brushStyle.calligraphyEndStyle)
+          ? settings.brushStyle.calligraphyEndStyle
+          : "none"
       };
     }
 
@@ -1634,6 +1642,7 @@ export class DrawingEngine {
         calligraphyClean: isCalligraphy,
         brushPreset: brushStyle.preset || "round",
         brushAngle: this.builder.calligraphyAngle,
+        calligraphyEndStyle: brushStyle.calligraphyEndStyle || "none",
         featherDensity: brushStyle.featherDensity ?? 10,
         featherGlow: brushStyle.featherGlow ?? 0,
         featherSpacing: brushStyle.featherSpacing ?? 1,
@@ -1650,6 +1659,7 @@ export class DrawingEngine {
           tool: this.builder.tool,
           calligraphy: isCalligraphy,
           calligraphyAngle: this.builder.calligraphyAngle,
+          calligraphyEndStyle: brushStyle.calligraphyEndStyle || "none",
           brushPreset: brushStyle.preset || "round",
           featherDensity: brushStyle.featherDensity,
           featherGlow: brushStyle.featherGlow,
