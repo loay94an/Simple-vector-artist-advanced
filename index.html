@@ -385,6 +385,20 @@
           </div>
         </div>
 
+        <section id="bucketSettingsSection" style="display:none; margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2);">
+          <strong style="font-size:12px; display:block; margin-bottom:8px;">إعدادات التعبئة الذكية</strong>
+          <div class="tool-setting-row"><label for="bucketGap">إغلاق الفجوات</label></div>
+          <select id="bucketGap" style="width:100%; min-height:34px; border-radius:8px; padding:5px;">
+            <option value="0">معطل — الحدود المفتوحة لا تُغلق</option>
+            <option value="1" selected>فجوات صغيرة</option>
+            <option value="2">فجوات متوسطة</option>
+            <option value="3">فجوات أكبر بحذر</option>
+          </select>
+          <div class="tool-setting-row" style="margin-top:10px;"><label for="bucketEdgeThreshold">حساسية التقاط الحدود</label><output id="bucketEdgeThresholdValue">12</output></div>
+          <input id="bucketEdgeThreshold" type="range" min="1" max="64" step="1" value="12" style="width:100%;">
+          <p style="font-size:10px; line-height:1.5; color:var(--text-muted); margin:6px 0 0;">تقرأ الأداة كل الطبقات المرئية، وتضيف التعبئة كمسار SVG مستقل أسفل خطوط الطبقة النشطة. لا تُعدّل الخطوط الأصلية.</p>
+        </section>
+
         <!-- Brush presets section -->
         <section id="brushPresetsSection" style="margin-top:12px;">
           <strong style="font-size:12px; display:block; margin-bottom:6px;">شكل ورأس الفرشاة:</strong>
