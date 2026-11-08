@@ -731,44 +731,12 @@ export class StrokeBuilder {
         this.calligraphyPreviewPath = "";
       }
 
-      const getStartTaper = () => {
-        const preset = String(this.brushStyle?.preset || "");
-        if (["cal-fine", "cal-needle"].includes(preset)) return 0.18;
-        if (preset === "cal-brush") return 0.58;
-        if (["cal-diwani", "cal-taliq"].includes(preset)) return 0.72;
-        return 1;
-      };
-
-      const buildStartCap = () => {
-        const point = points[0];
-        const r = getRadius(point, 0);
-        // يمتد غطاء البداية على محور السن المشطوف، ويُحدّث نصف قطره
-        // عند وصول اتجاه الحركة الحقيقي بدلاً من تخمينه من أول عينة.
-        const halfLength = Math.max(0.6, r * 0.5);
-        const tangentX = -sinA;
-        const tangentY = cosA;
-        const start = {
-          x: point.x - tangentX * halfLength,
-          y: point.y - tangentY * halfLength
-        };
-        const end = {
-          x: point.x + tangentX * halfLength,
-          y: point.y + tangentY * halfLength
-        };
-        return makeSegment(start, end, r * getStartTaper(), r);
-      };
-
-      if (this.calligraphyPreviewPointCount === 0 && points.length > 0) {
-        this.calligraphyPreviewPath = buildStartCap();
-        delta = this.calligraphyPreviewPath;
+      // لا ننشئ بصمة اصطناعية عند أول نقطة لمس؛ ننتظر أول مقطع
+      // حركة حقيقي حتى يتحدد اتجاه الضربة وتظهر هيئة السن كما ينبغي.
+      if (this.calligraphyPreviewPointCount === 0) {
+        this.calligraphyPreviewPath = "";
+        this.calligraphyPreviewDelta = "";
         this.calligraphyPreviewPointCount = 1;
-      }
-
-      // عند وصول العينة الثانية نعيد بناء غطاء البداية باتجاه الحركة
-      // الفعلي، ولا نحذفه؛ وبذلك يتطابق رأس المعاينة مع المسار النهائي.
-      if (this.calligraphyPreviewPointCount === 1 && points.length > 1) {
-        this.calligraphyPreviewPath = buildStartCap();
-        delta = this.calligraphyPreviewPath;
       }
 
       for (
@@ -794,27 +762,9 @@ export class StrokeBuilder {
     this.calligraphyPreviewDelta = "";
     const segments = [];
 
-    // Keep the angled nib cap at the true stroke origin even after
-    // the second point arrives. Without it, the first quadrilateral starts
-    // exactly at the first sample and leaves a visibly cut/flat stroke head.
-    const firstPoint = points[0];
-    const firstRadius = getRadius(firstPoint, 0);
-    const halfLength = Math.max(0.6, firstRadius * 0.5);
-    const tangentX = -sinA;
-    const tangentY = cosA;
-    const capStart = {
-      x: firstPoint.x - tangentX * halfLength,
-      y: firstPoint.y - tangentY * halfLength
-    };
-    const capEnd = {
-      x: firstPoint.x + tangentX * halfLength,
-      y: firstPoint.y + tangentY * halfLength
-    };
+    // The first real segment supplies the nib-shaped stroke head.
+    // Do not add a synthetic cap at the initial pointer-down coordinate.
     const preset = String(this.brushStyle?.preset || "");
-    const startTaper = ["cal-fine", "cal-needle"].includes(preset) ? 0.18
-      : preset === "cal-brush" ? 0.58
-      : ["cal-diwani", "cal-taliq"].includes(preset) ? 0.72 : 1;
-    segments.push(makeSegment(capStart, capEnd, firstRadius * startTaper, firstRadius));
 
     for (let i = 1; i < points.length; i++) {
       const start = points[i - 1];
