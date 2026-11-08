@@ -20,8 +20,7 @@
     calligraphy: "إعدادات قلم الخط العربي",
     pencil: "إعدادات قلم الرصاص",
     marker: "إعدادات ماركر التظليل",
-    eraser: "إعدادات الممحاة الذكية",
-    bucket: "إعدادات دلو التعبئة الذكي"
+    eraser: "إعدادات الممحاة الذكية"
   };
 
   const ids = {
@@ -102,9 +101,6 @@
     result.brush = settings[activeTool]?.brush || (activeTool === "calligraphy" ? "calligraphy" : "round");
     result.customBrush = settings[activeTool]?.customBrush || null;
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
-    result.bucketGap = Number(document.getElementById("bucketGap")?.value ?? 1);
-    result.bucketEdgeThreshold = Number(document.getElementById("bucketEdgeThreshold")?.value ?? 12);
-    result.bucketOpacity = Number(document.getElementById("bucketOpacity")?.value ?? 1);
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
 
     return result;
@@ -127,9 +123,7 @@
 
     const engine = window.rasem?.engine;
     if (engine) {
-      if (activeTool === "bucket") {
-        engine.setBucketSettings?.({ gap: current.bucketGap ?? 1, edgeThreshold: current.bucketEdgeThreshold ?? 12, opacity: current.bucketOpacity ?? 1 });
-      } else if (activeTool === "eraser") {
+      if (activeTool === "eraser") {
         engine.setSettings({
           eraserSize: current.size || 16,
           eraserMode: current.eraserMode || "partial"
@@ -227,9 +221,6 @@
 
     const current = settings[tool];
 
-    const isBucket = tool === "bucket";
-    const bucketSection = document.getElementById("bucketSettingsSection");
-    if (bucketSection) bucketSection.style.display = isBucket ? "block" : "none";
     const brushSettings = [
       ["brushSize", "brushSizeValue"],
       ["brushOpacity", "brushOpacityValue"],
@@ -239,26 +230,13 @@
     for (const [id, outputId] of brushSettings) {
       const input = document.getElementById(id);
       const row = input?.previousElementSibling;
-      if (input) input.style.display = isBucket ? "none" : "";
-      if (row?.classList.contains("tool-setting-row")) row.style.display = isBucket ? "none" : "";
+      if (input) input.style.display = "";
+      if (row?.classList.contains("tool-setting-row")) row.style.display = "";
       if (outputId) {
         const output = document.getElementById(outputId);
-        if (output) output.style.display = isBucket ? "none" : "";
+        if (output) output.style.display = "";
       }
     }
-    const presetsSectionForBucket = document.getElementById("brushPresetsSection");
-    if (presetsSectionForBucket) presetsSectionForBucket.style.display = isBucket ? "none" : (tool === "eraser" ? "none" : "block");
-    const bucketGap = document.getElementById("bucketGap");
-    const bucketThreshold = document.getElementById("bucketEdgeThreshold");
-    if (bucketGap) bucketGap.value = String(current.bucketGap ?? 1);
-    if (bucketThreshold) bucketThreshold.value = String(current.bucketEdgeThreshold ?? 12);
-    const bucketThresholdOutput = document.getElementById("bucketEdgeThresholdValue");
-    if (bucketThresholdOutput) bucketThresholdOutput.textContent = String(current.bucketEdgeThreshold ?? 12);
-    const bucketOpacity = document.getElementById("bucketOpacity");
-    if (bucketOpacity) bucketOpacity.value = String(current.bucketOpacity ?? 1);
-    const bucketOpacityOutput = document.getElementById("bucketOpacityValue");
-    if (bucketOpacityOutput) bucketOpacityOutput.textContent = Math.round((current.bucketOpacity ?? 1) * 100) + "%";
-
     for (const [key, id] of Object.entries(ids)) {
       const el = document.getElementById(id);
       if (!el || !(key in current)) continue;
@@ -541,6 +519,8 @@
   toolbar.addEventListener("pointerdown", event => {
     const button = event.target.closest("#toolbar [data-tool]");
     if (!button) return;
+    // Apply the remembered settings immediately when a drawing tool is selected.
+    if (names[button.dataset.tool]) restore(button.dataset.tool);
 
     pressedButton = button;
     pressStartX = event.clientX;
