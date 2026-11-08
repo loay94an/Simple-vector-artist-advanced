@@ -16,11 +16,12 @@ function filterAxis(points, key, minCutoff, beta, derivativeCutoff) {
   );
   const output = values.slice();
   let previous = values[0];
+  let previousRaw = values[0];
   let previousDerivative = 0;
 
   for (let i = 1; i < values.length - 1; i++) {
     const dt = Math.max(1, times[i] - times[i - 1]);
-    const derivative = (values[i] - previous) / dt;
+    const derivative = (values[i] - previousRaw) / dt;
     const derivativeAlpha = alpha(derivativeCutoff, dt);
     const filteredDerivative =
       derivativeAlpha * derivative +
@@ -32,6 +33,7 @@ function filterAxis(points, key, minCutoff, beta, derivativeCutoff) {
 
     output[i] = filtered;
     previous = filtered;
+    previousRaw = values[i];
     previousDerivative = filteredDerivative;
   }
 
