@@ -54,7 +54,7 @@ test("recognizes a rotated rectangular polygon and its corners", () => {
     { x: 40, y: 60 }, { x: 150, y: 35 },
     { x: 175, y: 125 }, { x: 65, y: 150 }
   ]));
-  assert.ok(["rectangle", "parallelogram"].includes(result?.type));
+  assert.ok(["rectangle", "parallelogram"].includes(result?.type), `unexpected recognition: ${JSON.stringify({ type: result?.type, corners: result?.corners?.length, confidence: result?.confidence })}`);
   assert.equal(result.corners.length, 4);
   assert.equal(result.angles.length, 4);
 });
