@@ -1600,11 +1600,19 @@ export class DrawingEngine {
   scheduleShapeRecognition() {
     this.clearShapeRecognitionTimer();
 
-    // التصحيح عند السكون يعمل مع قلم الخط العربي وجميع أقلام الرسم،
-    // ولا يشمل الممحاة. ننتظر توقف الحركة مع بقاء المؤشر مضغوطاً.
+    // لا نشغّل التصحيح المؤجل أثناء الكتابة بقلم الخط العربي؛
+    // إعادة بناء المسار أثناء الكتابة قد تسبب بطئاً أو تقطيعاً.
+    // يبقى التصحيح عند السكون متاحاً لبقية أقلام الرسم.
+    const brushPreset = String(this.builder.brushStyle?.preset || "");
+    const isCalligraphy =
+      this.builder.tool === "calligraphy" ||
+      brushPreset === "calligraphy" ||
+      brushPreset.startsWith("cal-");
+
     if (
       !this.drawing ||
       this.settings.tool === "eraser" ||
+      isCalligraphy ||
       this.settings.lineCorrection <= 0 ||
       this.builder.points.length < 2
     ) return;
