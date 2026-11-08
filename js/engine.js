@@ -2808,6 +2808,8 @@ export class DrawingEngine {
     this.cancelScheduledRender();
     this.clearShapeRecognitionTimer();
     this.workerRequestId++;
+    this.renderer?.clearCanvasPreview?.();
+    this.canvasPreviewPointCount = 0;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.drawing = false;
