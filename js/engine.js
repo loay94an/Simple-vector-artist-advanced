@@ -1427,10 +1427,24 @@ export class DrawingEngine {
         );
         this.smoothingWorker.onmessage = event => {
           const result = event.data || {};
-          if (result.id !== this.workerRequestId || !Array.isArray(result.points)) return;
+          if (result.id !== this.workerRequestId) return;
           if (!this.drawing || this.destroyed || this.builder.deferSmoothing) return;
+          if (!Array.isArray(result.points)) {
+            this.builder.workerFilteredPoints = null;
+            this.renderCurrent();
+            return;
+          }
           this.builder.workerFilteredPoints = result.points;
           this.renderCurrent();
+        };
+        this.smoothingWorker.onerror = error => {
+          console.warn("Rasem smoothing worker failed; using main-thread fallback.", error);
+          this.smoothingWorker?.terminate?.();
+          this.smoothingWorker = null;
+          if (this.drawing && !this.builder.deferSmoothing) {
+            this.builder.workerFilteredPoints = null;
+            this.renderCurrent();
+          }
         };
       } catch (error) {
         console.warn("Rasem smoothing worker unavailable; using main-thread fallback.", error);
