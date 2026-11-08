@@ -442,18 +442,20 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
-    if (!this.deferSmoothing && Array.isArray(this.workerFilteredPoints)) {
-      return this.workerFilteredPoints;
-    }
-
-    // لا يُصحح مسار الخط العربي أثناء الكتابة أو الرسم أو حركة القلم.
-    // تبقى العينات الأصلية كما هي حتى يثبت القلم ويستمر الضغط طوال مهلة السكون.
     const preset = String(this.brushStyle?.preset || "");
     const isCalligraphy =
       this.tool === "calligraphy" ||
       preset === "calligraphy" ||
       preset.startsWith("cal-");
 
+    // لا نمرر الخط العربي إلى عامل التنعيم العام؛ له مرشح محافظ يحافظ
+    // على زوايا الحروف وتغيّر الضغط ويعمل فقط بعد مهلة السكون والضغط.
+    if (!isCalligraphy && !this.deferSmoothing && Array.isArray(this.workerFilteredPoints)) {
+      return this.workerFilteredPoints;
+    }
+
+    // لا يُصحح مسار الخط العربي أثناء الكتابة أو الرسم أو حركة القلم.
+    // تبقى العينات الأصلية كما هي حتى يثبت القلم ويستمر الضغط طوال مهلة السكون.
     if (isCalligraphy) {
       if (this.deferSmoothing) {
         // Raw input samples are immutable during live drawing. Reuse the
@@ -469,37 +471,42 @@ export class StrokeBuilder {
         return this.points.map(point => ({ ...point }));
       }
 
-      const blend = 0.08 + strength * 0.27;
+      const blend = 0.10 + strength * 0.30;
       const source = this.points;
-      const filtered = source.map(point => ({ ...point }));
+      let filtered = source.map(point => ({ ...point }));
 
-      for (let i = 1; i < source.length - 1; i++) {
-        const previous = source[i - 1];
-        const current = source[i];
-        const next = source[i + 1];
+      // تمريرتان خفيفتان لتقليل رجفة اليد في المنحنيات القصيرة والطويلة،
+      // مع تثبيت أول وآخر نقطة وحماية الزوايا الحادة ونقاط الضغط.
+      for (let pass = 0; pass < 2; pass++) {
+        const input = filtered;
+        const output = input.map(point => ({ ...point }));
+        for (let i = 1; i < input.length - 1; i++) {
+          const previous = input[i - 1];
+          const current = input[i];
+          const next = input[i + 1];
+          const ax = current.x - previous.x;
+          const ay = current.y - previous.y;
+          const bx = next.x - current.x;
+          const by = next.y - current.y;
+          const aLength = Math.hypot(ax, ay);
+          const bLength = Math.hypot(bx, by);
+          if (aLength < 0.0001 || bLength < 0.0001) continue;
 
-        const ax = current.x - previous.x;
-        const ay = current.y - previous.y;
-        const bx = next.x - current.x;
-        const by = next.y - current.y;
-        const aLength = Math.hypot(ax, ay);
-        const bLength = Math.hypot(bx, by);
+          const turn = Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
+          if (Math.abs(turn) > 0.92) continue;
 
-        if (aLength < 0.0001 || bLength < 0.0001) continue;
-
-        const turn = Math.atan2(
-          ax * by - ay * bx,
-          ax * bx + ay * by
-        );
-
-        // احتفظ بالانعطافات الحادة المقصودة؛ نعالج الاهتزازات الخفيفة فقط.
-        if (Math.abs(turn) > 0.85) continue;
-
-        const targetX = (previous.x + 2 * current.x + next.x) / 4;
-        const targetY = (previous.y + 2 * current.y + next.y) / 4;
-
-        filtered[i].x = current.x + (targetX - current.x) * blend;
-        filtered[i].y = current.y + (targetY - current.y) * blend;
+          const targetX = (previous.x + 2 * current.x + next.x) / 4;
+          const targetY = (previous.y + 2 * current.y + next.y) / 4;
+          const segmentScale = EngineUtils.clamp(
+            Math.min(aLength, bLength) / Math.max(1, this.baseSize * 0.7),
+            0.25,
+            1
+          );
+          const localBlend = blend * segmentScale;
+          output[i].x = current.x + (targetX - current.x) * localBlend;
+          output[i].y = current.y + (targetY - current.y) * localBlend;
+        }
+        filtered = output;
       }
 
       return filtered;
@@ -681,14 +688,22 @@ export class StrokeBuilder {
     const sinA = Math.sin(angleRad);
 
     const nibWidths = {
-      "cal-thuluth": 1.25,
-      "cal-naskh": 1.0,
-      "cal-ruqah": 0.85,
-      "cal-fine": 0.60,
-      "cal-kufi": 1.35,
-      "cal-italic": 1.10,
-      "cal-stub": 0.95,
-      "cal-oblique": 1.05
+      "cal-thuluth": 1.30,
+      "cal-naskh": 1.00,
+      "cal-ruqah": 0.82,
+      "cal-fine": 0.48,
+      "cal-kufi": 1.38,
+      "cal-italic": 1.12,
+      "cal-stub": 0.96,
+      "cal-oblique": 1.06,
+      "cal-diwani": 1.18,
+      "cal-jali": 1.42,
+      "cal-maghribi": 1.16,
+      "cal-taliq": 0.92,
+      "cal-sini": 1.04,
+      "cal-brush": 1.22,
+      "cal-needle": 0.38,
+      "cal-square": 1.28
     };
 
     const nibScale = nibWidths[this.brushStyle?.preset] || 1;
@@ -828,6 +843,24 @@ export class StrokeBuilder {
       segments.push(
         makeSegment(start, end, getRadius(start, i - 1), getRadius(end, i))
       );
+    }
+
+    // غطاء نهاية مستقل: يمنع القص الحاد عند رفع القلم ويُبقي شكل السن
+    // متصلاً بالمسار. تتغير سماكته مع الضغط ونوع سن الخط المختار.
+    if (points.length > 1) {
+      const lastIndex = points.length - 1;
+      const lastPoint = points[lastIndex];
+      const lastRadius = getRadius(lastPoint, lastIndex);
+      const endCapLength = Math.max(0.6, lastRadius * 0.5);
+      const endCapStart = {
+        x: lastPoint.x - tangentX * endCapLength,
+        y: lastPoint.y - tangentY * endCapLength
+      };
+      const endCapEnd = {
+        x: lastPoint.x + tangentX * endCapLength,
+        y: lastPoint.y + tangentY * endCapLength
+      };
+      segments.push(makeSegment(endCapStart, endCapEnd, lastRadius, lastRadius));
     }
 
     return segments.join(" ");
