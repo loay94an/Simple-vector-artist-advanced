@@ -1086,7 +1086,7 @@ export class Scene {
     const angle=(Number(options.calligraphyAngle??style.brushAngle)||45)*Math.PI/180,nx=Math.cos(angle),ny=Math.sin(angle);
     const pressure=p=>options.pressureEnabled===false?1:Math.max(0.25,0.35+(Number(p.pressure)||0.5)*0.65);
     const radius=(p,a,b)=>{let r=size*0.5*pressure(p);
-      if(["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)&&a&&b)r*=0.12+Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
+      if((["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)||calligraphy&&["cal-kufi","cal-italic","cal-oblique"].includes(preset))&&a&&b)r*=0.12+Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
       if(preset==="point")r*=0.22+pressure(p)*0.78;if(preset==="oval")r*=0.72;if(preset==="soft"||preset==="watercolor")r*=1.12;
       if(a&&b){const dt=Math.max(1,Number(b.time||0)-Number(a.time||0)),speed=Math.hypot(b.x-a.x,b.y-a.y)/dt;r*=Math.max(0.78,Math.min(1.12,1.12-speed*0.22));}
       return Math.max(0.3,r);};
