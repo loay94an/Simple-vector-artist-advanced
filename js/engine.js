@@ -1,4 +1,6 @@
 
+import { ArabicWritingAssistant } from "./arabic-writing.js";
+
 /* =========================================================
    RASEM 2.0
    ENGINE MODULE
@@ -1239,6 +1241,10 @@ export class DrawingEngine {
     this.destroyed = false;
     this.shapeRecognitionTimer = null;
     this.shapeRecognitionApplied = false;
+    this.arabicWriting = new ArabicWritingAssistant(
+      this.document,
+      this.renderer
+    );
   }
 
   get activeLayer() {
@@ -1655,6 +1661,7 @@ export class DrawingEngine {
 
             if (committed) {
               this.commitHistory();
+              this.arabicWriting?.observe(element, layer, this.settings);
             }
           }
         }
@@ -2379,6 +2386,9 @@ export class DrawingEngine {
     }
 
     this.reset();
+
+    this.arabicWriting?.destroy();
+    this.arabicWriting = null;
 
     this.document = null;
     this.renderer = null;
