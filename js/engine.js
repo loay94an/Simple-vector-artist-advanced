@@ -133,7 +133,7 @@ export class Smoothing {
     // full-array passes on the UI thread.
     const passes = points.length < 5
       ? 1
-      : (strength >= 0.85 ? 4 : strength >= 0.72 ? 3 : strength >= 0.22 ? 2 : 1);
+      : (strength >= 0.85 ? 6 : strength >= 0.72 ? 4 : strength >= 0.22 ? 2 : 1);
 
     // الضربات الكثيفة تستفيد من تنعيم إضافي خفيف، أما النقاط المتباعدة
     // فلا نبالغ في تحريكها حتى لا نفقد شكل المسار الأصلي.
@@ -145,9 +145,9 @@ export class Smoothing {
     // استجابة تصاعدية: القيم المنخفضة تبقى قريبة من سلوكها السابق،
     // بينما تزداد قوة التصحيح بقفزة واضحة قرب 100%.
     const blend = EngineUtils.clamp(
-      (0.18 + strength * 0.44 + Math.pow(strength, 4) * 0.22) * densityFactor,
+      (0.18 + strength * 0.48 + Math.pow(strength, 4) * 0.24) * densityFactor,
       0.12,
-      0.86
+      0.90
     );
 
     const turnAt = (source, index) => {
