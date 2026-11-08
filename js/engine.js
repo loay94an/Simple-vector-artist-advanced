@@ -1909,6 +1909,12 @@ export class DrawingEngine {
       }
     } catch {}
 
+    // Re-apply exclusions after computed styles are copied onto the clone.
+    for (const selector of ["#canvasBackground", "#gridLayer", "#guideLayer", "#selectionLayer", "#previewLayer"]) {
+      const excluded = clone.querySelector(selector);
+      if (excluded) excluded.style?.setProperty("display", "none", "important");
+    }
+
     // Render only outlines: normal strokes keep their stroke, while filled-only
     // marks are converted to a thin outline. This avoids treating a solid fill as
     // a giant blocked area and lets the user fill inside its contour.
