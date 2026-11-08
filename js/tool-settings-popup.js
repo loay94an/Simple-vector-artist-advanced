@@ -28,9 +28,11 @@
     lineCorrection: "lineCorrection",
     pressureEnabled: "pressureEnabled",
     featherDensity: "featherDensity",
+    featherGlow: "featherGlow",
     featherSpread: "featherSpread",
     featherSoftness: "featherSoftness",
-    featherTaper: "featherTaper"
+    featherTaper: "featherTaper",
+    featherSpacing: "featherSpacing"
   };
 
   const presets = {
@@ -157,6 +159,8 @@
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
     result.featherDensity = Number(document.getElementById("featherDensity")?.value ?? 10);
+    result.featherGlow = Number(document.getElementById("featherGlow")?.value ?? 0);
+    result.featherSpacing = Number(document.getElementById("featherSpacing")?.value ?? 1);
     result.featherSpread = Number(document.getElementById("featherSpread")?.value ?? 0.45);
     result.featherSoftness = Number(document.getElementById("featherSoftness")?.value ?? 0.35);
     result.featherTaper = Number(document.getElementById("featherTaper")?.value ?? 0.7);
@@ -199,6 +203,8 @@
             dashArray: style.dashArray || "",
             image: current.customBrush || null,
             featherDensity: current.featherDensity ?? 10,
+            featherGlow: current.featherGlow ?? 0,
+            featherSpacing: current.featherSpacing ?? 1,
             featherSpread: current.featherSpread ?? 0.45,
             featherSoftness: current.featherSoftness ?? 0.35,
             featherTaper: current.featherTaper ?? 0.7
@@ -235,6 +241,8 @@
       ["lineCorrection", "lineCorrectionValue", "%", true],
       ["calligraphyAngle", "calligraphyAngleValue", "°", false],
       ["featherDensity", "featherDensityValue", "", false],
+      ["featherGlow", "featherGlowValue", "%", true],
+      ["featherSpacing", "featherSpacingValue", "%", true],
       ["featherSpread", "featherSpreadValue", "%", true],
       ["featherSoftness", "featherSoftnessValue", "%", true],
       ["featherTaper", "featherTaperValue", "%", true]
@@ -269,6 +277,8 @@
         base.lineCorrection = 0.25;
         base.brush = "feather-pointed";
         base.featherDensity = 10;
+        base.featherGlow = 0;
+        base.featherSpacing = 1;
         base.featherSpread = 0.45;
         base.featherSoftness = 0.35;
         base.featherTaper = 0.7;
