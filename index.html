@@ -75,7 +75,7 @@
       display: none !important;
     }
   </style>
-  <script type="module" src="./js/app.js?v=20261108-12"></script>
+  <script type="module" src="./js/app.js?v=20261108-13"></script>
 </head>
 
 <body class="light">
@@ -295,9 +295,9 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
         </button>
 
-        <!-- Marker (ماركر تظليل) -->
-        <button class="tool" data-tool="marker" title="ماركر تظليل شفاف (ضغطة طويلة للإعدادات)">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 2-8 8 4 4 8-8-4-4Z"/><path d="m6 10-4 4 4 4 4-4"/><path d="m2 18 4 4"/></svg>
+        <!-- Feather brush (ريشة رسم) -->
+        <button class="tool" data-tool="feather" title="ريشة الرسم (ضغطة طويلة للإعدادات)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 3.2C13.8 2.7 7.1 6.2 4.2 12.2c-1.1 2.3-.6 5.2 1.2 7.1 1.9 1.8 4.8 2.3 7.1 1.2 6-2.9 9.5-9.6 9-16.6Z"/><path d="M3 22 14.5 9.5M8 16l-3.5-.5M11 12l-.5-3.5M14 9l3 .5"/></svg>
         </button>
 
         <!-- Smart Dual Eraser (ممحاة ذكية مزدوجة) -->
@@ -423,6 +423,27 @@
 <button type="button" class="brush-preset" data-brush="cal-brush" title="رأس فرشاة خطية مرنة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M22 5 Q18 13 11 24 Q22 30 33 24 Q26 13 22 5 Z"/></svg><span>فرشاة خطية</span></button>
 <button type="button" class="brush-preset" data-brush="cal-needle" title="سن إبرة رفيع للتفاصيل" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><path d="M22 4 L25 27 L22 23 L19 27 Z"/></svg><span>إبرة دقيقة</span></button>
 <button type="button" class="brush-preset" data-brush="cal-square" title="سن كوفي مربع مستقيم" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36" aria-hidden="true"><rect x="8" y="8" width="28" height="19"/></svg><span>كوفي مربع</span></button>
+          </div>
+          <div class="brush-presets-feather" style="display:none;">
+<button type="button" class="brush-preset" data-brush="feather-pointed" title="ريشة مدببة مرنة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M22 3 Q27 14 30 26 Q22 23 14 26 Q17 14 22 3Z"/></svg><span>مدببة</span></button>
+<button type="button" class="brush-preset" data-brush="feather-flat" title="ريشة مسطحة عريضة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M8 10H36V25H8Z"/></svg><span>مسطحة</span></button>
+<button type="button" class="brush-preset" data-brush="feather-round" title="ريشة مستديرة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><ellipse cx="22" cy="18" rx="12" ry="8"/></svg><span>مستديرة</span></button>
+<button type="button" class="brush-preset" data-brush="feather-fan" title="ريشة مروحية متعددة الشعيرات" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M22 29L8 7M22 29L14 5M22 29L22 4M22 29L30 5M22 29L36 7"/></svg><span>مروحية</span></button>
+<button type="button" class="brush-preset" data-brush="feather-soft" title="ريشة ناعمة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M22 4C10 14 10 25 22 29 34 25 34 14 22 4Z"/></svg><span>ناعمة</span></button>
+<button type="button" class="brush-preset" data-brush="feather-dry" title="ريشة جافة ذات أثر متقطع" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M9 10L35 12M12 17L32 18M15 24L29 24"/></svg><span>جافة</span></button>
+<button type="button" class="brush-preset" data-brush="feather-quill" title="ريشة قصبة دقيقة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M22 3L29 25L22 21L15 25Z"/></svg><span>قصبة</span></button>
+<button type="button" class="brush-preset" data-brush="feather-script" title="ريشة كتابة مشطوفة" aria-pressed="false"><svg class="brush-icon" viewBox="0 0 44 36"><path d="M9 23L18 7H35L26 23Z"/></svg><span>كتابة</span></button>
+          </div>
+          <div class="feather-settings" style="display:none; margin-top:12px; padding:10px; border:1px solid var(--border); border-radius:10px;">
+            <strong style="font-size:12px;">إعدادات الريشة</strong>
+            <div class="tool-setting-row"><label for="featherDensity">عدد الشعيرات</label><output id="featherDensityValue">10</output></div>
+            <input id="featherDensity" data-setting="featherDensity" type="range" min="3" max="32" step="1" value="10">
+            <div class="tool-setting-row"><label for="featherSpread">انتشار الشعيرات</label><output id="featherSpreadValue">45%</output></div>
+            <input id="featherSpread" data-setting="featherSpread" type="range" min="0" max="1" step="0.05" value="0.45">
+            <div class="tool-setting-row"><label for="featherSoftness">نعومة الأثر</label><output id="featherSoftnessValue">35%</output></div>
+            <input id="featherSoftness" data-setting="featherSoftness" type="range" min="0" max="1" step="0.05" value="0.35">
+            <div class="tool-setting-row"><label for="featherTaper">تدرّج البداية والنهاية</label><output id="featherTaperValue">70%</output></div>
+            <input id="featherTaper" data-setting="featherTaper" type="range" min="0" max="1" step="0.05" value="0.7">
           </div>
           <!-- Custom PNG Brush Section -->
           <div style="margin-top:12px; padding:10px; border-radius:10px; background:var(--surface-2); border:1px dashed var(--border);">
