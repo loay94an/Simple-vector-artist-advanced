@@ -356,6 +356,10 @@ export class StrokeBuilder {
     // أثناء الضربة نعرض العينات الخام؛ لا يبدأ التنعيم إلا بعد سكون الإصبع.
     this.deferSmoothing = false;
 
+    // Incremental live calligraphy outline cache. It is reset with each stroke.
+    this.calligraphyPreviewPointCount = 0;
+    this.calligraphyPreviewPath = "";
+
     this.pressure.reset();
   }
 
@@ -445,7 +449,9 @@ export class StrokeBuilder {
 
     if (isCalligraphy) {
       if (this.deferSmoothing) {
-        return this.points.map(point => ({ ...point }));
+        // Raw input samples are immutable during live drawing. Reuse the
+        // array instead of cloning every old point on every animation frame.
+        return this.points;
       }
 
       // مرشح خفيف خاص بالخط العربي: تمريرة واحدة ثابتة الكلفة.
@@ -649,6 +655,51 @@ export class StrokeBuilder {
       ).join(" ") + " Z";
     };
 
+    // While the pointer is down, append only the newly received segment.
+    // Rebuilding every previous quadrilateral on every frame made long
+    // calligraphy strokes approach quadratic work.
+    if (this.active && this.deferSmoothing) {
+      if (this.calligraphyPreviewPointCount > points.length) {
+        this.calligraphyPreviewPointCount = 0;
+        this.calligraphyPreviewPath = "";
+      }
+
+      if (this.calligraphyPreviewPointCount === 0 && points.length > 0) {
+        const point = points[0];
+        const r = getRadius(point);
+        const halfLength = Math.max(0.6, r * 0.5);
+        const tangentX = -sinA;
+        const tangentY = cosA;
+        const start = {
+          x: point.x - tangentX * halfLength,
+          y: point.y - tangentY * halfLength
+        };
+        const end = {
+          x: point.x + tangentX * halfLength,
+          y: point.y + tangentY * halfLength
+        };
+        this.calligraphyPreviewPath = makeSegment(start, end, r, r);
+        this.calligraphyPreviewPointCount = 1;
+      }
+
+      for (
+        let i = Math.max(1, this.calligraphyPreviewPointCount);
+        i < points.length;
+        i++
+      ) {
+        const segment = makeSegment(
+          points[i - 1],
+          points[i],
+          getRadius(points[i - 1]),
+          getRadius(points[i])
+        );
+        this.calligraphyPreviewPath += " " + segment;
+      }
+
+      this.calligraphyPreviewPointCount = points.length;
+      return this.calligraphyPreviewPath;
+    }
+
     const segments = [];
 
     if (points.length === 1) {
@@ -716,7 +767,12 @@ export class StrokeBuilder {
       type: "stroke",
       tool: this.tool,
 
-      points: this.points.map(p => ({ ...p })),
+      // The live preview already owns this array; cloning it on every
+      // frame adds another full pass over long strokes. Finalized elements
+      // still receive an independent point snapshot.
+      points: this.active && this.deferSmoothing
+        ? this.points
+        : this.points.map(p => ({ ...p })),
 
       path,
 
