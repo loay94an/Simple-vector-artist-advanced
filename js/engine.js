@@ -126,12 +126,12 @@ export class Smoothing {
       totalLength += this.distance(points[i - 1], points[i]);
     }
     const averageStep = totalLength / Math.max(1, points.length - 1);
-    // عند 100% نرفع عدد التمريرات بوضوح، مع مراعاة أن
-    // المسارات القصيرة جداً قليلة العينات لا تحتمل الإفراط في التنعيم.
+    // عند 100% نرفع تدخل التصحيح إلى 50 تمريرة لمعالجة الاهتزازات
+    // بقوة أكبر، مع إبقاء الضربات القصيرة قليلة العينات محمية من الإفراط.
     const passes = points.length < 3
       ? 1
       : (strength >= 0.95
-        ? (points.length < 5 ? 1 : 6)
+        ? (points.length < 5 ? 1 : 50)
         : (strength >= 0.85
           ? (points.length < 5 ? 1 : 5)
           : (strength >= 0.72
