@@ -1,7 +1,7 @@
 /* =========================================================
    RASEM 3.0 - TOOL SETTINGS POPUP MODULE
    js/tool-settings-popup.js
-   Supports Calligraphy, Pencil, Marker, Eraser, and Custom PNG Brushes.
+   Supports Calligraphy, Pencil, Feather, Eraser, and Custom PNG Brushes.
 ========================================================= */
 
 (() => {
@@ -18,7 +18,7 @@
   const names = {
     calligraphy: "إعدادات قلم الخط العربي",
     pencil: "إعدادات قلم الرصاص",
-    marker: "إعدادات ماركر التظليل",
+    feather: "إعدادات الريشة",
     eraser: "إعدادات الممحاة الذكية"
   };
 
@@ -26,7 +26,11 @@
     size: "brushSize",
     opacity: "brushOpacity",
     lineCorrection: "lineCorrection",
-    pressureEnabled: "pressureEnabled"
+    pressureEnabled: "pressureEnabled",
+    featherDensity: "featherDensity",
+    featherSpread: "featherSpread",
+    featherSoftness: "featherSoftness",
+    featherTaper: "featherTaper"
   };
 
   const presets = {
@@ -65,6 +69,14 @@
     "cal-italic": { lineCap: "square", dashArray: "", preset: "cal-italic" },
     "cal-stub": { lineCap: "round", dashArray: "", preset: "cal-stub" },
     "cal-oblique": { lineCap: "square", dashArray: "", preset: "cal-oblique" },
+    "feather-pointed": { lineCap: "round", dashArray: "", preset: "feather-pointed" },
+    "feather-flat": { lineCap: "square", dashArray: "", preset: "feather-flat" },
+    "feather-round": { lineCap: "round", dashArray: "", preset: "feather-round" },
+    "feather-fan": { lineCap: "round", dashArray: "", preset: "feather-fan" },
+    "feather-soft": { lineCap: "round", dashArray: "", preset: "feather-soft" },
+    "feather-dry": { lineCap: "butt", dashArray: "", preset: "feather-dry" },
+    "feather-quill": { lineCap: "round", dashArray: "", preset: "feather-quill" },
+    "feather-script": { lineCap: "square", dashArray: "", preset: "feather-script" },
     custom: { lineCap: "round", dashArray: "" }
   };
 
@@ -97,6 +109,14 @@
     "cal-brush": "فرشاة خطية",
     "cal-needle": "سن إبرة دقيق",
     "cal-square": "سن كوفي مربع",
+    "feather-pointed": "ريشة مدببة",
+    "feather-flat": "ريشة مسطحة",
+    "feather-round": "ريشة مستديرة",
+    "feather-fan": "ريشة مروحية",
+    "feather-soft": "ريشة ناعمة",
+    "feather-dry": "ريشة جافة",
+    "feather-quill": "ريشة قصبة",
+    "feather-script": "ريشة كتابة",
     custom: "فرشاة PNG مخصصة"
   };
 
@@ -175,7 +195,11 @@
             preset: brush,
             lineCap: style.lineCap || "round",
             dashArray: style.dashArray || "",
-            image: current.customBrush || null
+            image: current.customBrush || null,
+            featherDensity: current.featherDensity ?? 10,
+            featherSpread: current.featherSpread ?? 0.45,
+            featherSoftness: current.featherSoftness ?? 0.35,
+            featherTaper: current.featherTaper ?? 0.7
           }
         });
       }
@@ -207,7 +231,7 @@
       ["brushSize", "brushSizeValue", "", false],
       ["brushOpacity", "brushOpacityValue", "%", true],
       ["lineCorrection", "lineCorrectionValue", "%", true],
-      ["calligraphyAngle", "calligraphyAngleValue", "°", false]
+      ["calligraphyAngle", "calligraphyAngleValue", "°", false],\n      ["featherDensity", "featherDensityValue", "", false],\n      ["featherSpread", "featherSpreadValue", "%", true],\n      ["featherSoftness", "featherSoftnessValue", "%", true],\n      ["featherTaper", "featherTaperValue", "%", true]
     ]) {
       const input = document.getElementById(id);
       const output = document.getElementById(outputId);
@@ -232,6 +256,16 @@
         base.pressureEnabled = false;
         base.lineCorrection = 0.5;
         base.brush = "round";
+      } else if (tool === "feather") {
+        base.pressureEnabled = true;
+        base.opacity = 0.9;
+        base.size = 16;
+        base.lineCorrection = 0.25;
+        base.brush = "feather-pointed";
+        base.featherDensity = 10;
+        base.featherSpread = 0.45;
+        base.featherSoftness = 0.35;
+        base.featherTaper = 0.7;
       } else if (tool === "marker") {
         base.pressureEnabled = false;
         base.opacity = 0.45;
