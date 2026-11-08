@@ -3906,3 +3906,23 @@ body.dark .canvas-area {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* Per-brush-head settings opened by a long press on its thumbnail. */
+.brush-head-options {
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.brush-head-options[hidden] { display: none !important; }
+.brush-head-options-head { display:flex; flex-direction:column; gap:3px; margin-bottom:9px; }
+.brush-head-options-head strong { font-size:12px; color:var(--text); }
+.brush-head-options-head span, .brush-head-options-note { font-size:10px; color:var(--text-muted); }
+.brush-head-options-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px 12px; }
+.brush-head-option { display:flex; flex-direction:column; gap:5px; min-width:0; font-size:11px; color:var(--text); }
+.brush-head-option input[type="range"] { width:100%; min-width:0; }
+.brush-head-option select { width:100%; min-height:32px; border:1px solid var(--border); border-radius:7px; padding:4px 6px; background:var(--surface); color:var(--text); }
+.brush-head-option output { color:var(--primary); font-size:10px; font-weight:700; }
+.brush-head-options-note { margin:9px 0 0; line-height:1.5; }
