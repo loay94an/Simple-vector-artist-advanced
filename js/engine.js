@@ -112,54 +112,85 @@ export class Smoothing {
   filter(points) {
     if (!Array.isArray(points) || points.length <= 2) {
       return Array.isArray(points)
-        ? points.map(p => ({ ...p }))
+        ? points.map(point => ({ ...point }))
         : [];
     }
 
-    const result = points.map(point => ({ ...point }));
     const strength = EngineUtils.clamp(this.strength, 0, 1);
+    let result = points.map(point => ({ ...point }));
     if (strength <= 0) return result;
 
-    // تصحيح الانحرافات الصغيرة فقط مع الحفاظ على الزوايا والانحناءات الواضحة.
-    const minimumStraightness = Math.cos(38 * Math.PI / 180);
+    // تقدير كثافة أخذ العينات وطول الضربة لاختيار عدد تمريرات مناسب.
+    let totalLength = 0;
+    for (let i = 1; i < points.length; i++) {
+      totalLength += this.distance(points[i - 1], points[i]);
+    }
+    const averageStep = totalLength / Math.max(1, points.length - 1);
+    const passes = points.length < 5
+      ? 1
+      : (strength >= 0.72 ? 3 : (strength >= 0.22 ? 2 : 1));
 
-    for (let i = 1; i < points.length - 1; i++) {
-      const previous = points[i - 1];
-      const current = points[i];
-      const next = points[i + 1];
+    // الضربات الكثيفة تستفيد من تنعيم إضافي خفيف، أما النقاط المتباعدة
+    // فلا نبالغ في تحريكها حتى لا نفقد شكل المسار الأصلي.
+    const densityFactor = EngineUtils.clamp(
+      1.15 - Math.max(0, averageStep - 2) * 0.035,
+      0.78,
+      1.15
+    );
+    const blend = EngineUtils.clamp(
+      (0.18 + strength * 0.44) * densityFactor,
+      0.12,
+      0.68
+    );
 
-      const inX = current.x - previous.x;
-      const inY = current.y - previous.y;
-      const outX = next.x - current.x;
-      const outY = next.y - current.y;
-      const inLength = Math.hypot(inX, inY);
-      const outLength = Math.hypot(outX, outY);
+    const turnAt = (source, index) => {
+      if (index <= 0 || index >= source.length - 1) return 0;
+      const a = source[index - 1];
+      const b = source[index];
+      const c = source[index + 1];
+      const ax = b.x - a.x;
+      const ay = b.y - a.y;
+      const bx = c.x - b.x;
+      const by = c.y - b.y;
+      if (Math.hypot(ax, ay) < 0.0001 || Math.hypot(bx, by) < 0.0001) return 0;
+      return Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
+    };
 
-      if (inLength < 0.0001 || outLength < 0.0001) continue;
+    for (let pass = 0; pass < passes; pass++) {
+      const source = result;
+      const filtered = source.map(point => ({ ...point }));
 
-      const directionDot =
-        (inX * outX + inY * outY) / (inLength * outLength);
+      for (let i = 1; i < source.length - 1; i++) {
+        const previous = source[i - 1];
+        const current = source[i];
+        const next = source[i + 1];
+        const turn = turnAt(source, i);
 
-      // لا نصحح الزوايا الحادة حتى لا تتحول الرسمة أو الحروف إلى مسارات مفلطحة.
-      if (directionDot < minimumStraightness) continue;
+        // نحافظ على الزوايا المقصودة عندما يكون الانعطاف حاداً ومستقراً.
+        // أما الانحراف الحاد الذي ينعكس مباشرة في النقطة التالية فعادةً
+        // يكون اهتزازاً عابراً من اليد ويُسمح بتصحيحه.
+        if (source.length >= 5 && Math.abs(turn) > 0.96) {
+          const beforeTurn = turnAt(source, i - 1);
+          const afterTurn = turnAt(source, i + 1);
+          const isAlternatingJitter =
+            beforeTurn * turn < 0 &&
+            afterTurn * turn < 0 &&
+            Math.abs(beforeTurn) > Math.abs(turn) * 0.28 &&
+            Math.abs(afterTurn) > Math.abs(turn) * 0.28;
 
-      const lineX = next.x - previous.x;
-      const lineY = next.y - previous.y;
-      const lineLengthSquared = lineX * lineX + lineY * lineY;
-      if (lineLengthSquared < 0.0001) continue;
+          if (!isAlternatingJitter) continue;
+        }
 
-      const t = EngineUtils.clamp(
-        ((current.x - previous.x) * lineX +
-          (current.y - previous.y) * lineY) / lineLengthSquared,
-        0,
-        1
-      );
+        // مرشح محلي منخفض التردد: يقلل التعرجات السريعة من دون
+        // تسطيح المنحنى كله أو تغيير نقطة البداية والنهاية.
+        const targetX = (previous.x + 2 * current.x + next.x) / 4;
+        const targetY = (previous.y + 2 * current.y + next.y) / 4;
 
-      const projectedX = previous.x + t * lineX;
-      const projectedY = previous.y + t * lineY;
+        filtered[i].x = current.x + (targetX - current.x) * blend;
+        filtered[i].y = current.y + (targetY - current.y) * blend;
+      }
 
-      result[i].x = current.x + (projectedX - current.x) * strength;
-      result[i].y = current.y + (projectedY - current.y) * strength;
+      result = filtered;
     }
 
     return result;
@@ -393,9 +424,9 @@ export class StrokeBuilder {
   getFilteredPoints() {
     const isCalligraphy = this.tool === "calligraphy";
 
-    this.smoothing.strength = isCalligraphy
-      ? this.baseSmoothingStrength * 0.65
-      : this.baseSmoothingStrength;
+    // استخدم قوة التصحيح نفسها لقلم الخط العربي وبقية الأقلام؛
+    // خفضها سابقاً كان يترك اهتزازات المنحنيات ظاهرة.
+    this.smoothing.strength = this.baseSmoothingStrength;
 
     this.smoothing.minDistance = isCalligraphy
       ? Math.min(this.baseSmoothingMinDistance, 0.02)
