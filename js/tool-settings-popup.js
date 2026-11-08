@@ -154,10 +154,9 @@
     }));
 
     popup.querySelectorAll("[data-brush]").forEach(button => {
-      button.classList.toggle(
-        "active",
-        button.dataset.brush === brush
-      );
+      const selected = button.dataset.brush === brush;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
     });
 
     const preview = document.getElementById("toolBrushPreview");
