@@ -20,7 +20,8 @@
     calligraphy: "إعدادات قلم الخط العربي",
     pencil: "إعدادات قلم الرصاص",
     marker: "إعدادات ماركر التظليل",
-    eraser: "إعدادات الممحاة الذكية"
+    eraser: "إعدادات الممحاة الذكية",
+    bucket: "إعدادات دلو التعبئة الذكي"
   };
 
   const ids = {
@@ -101,6 +102,8 @@
     result.brush = settings[activeTool]?.brush || (activeTool === "calligraphy" ? "calligraphy" : "round");
     result.customBrush = settings[activeTool]?.customBrush || null;
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
+    result.bucketGap = Number(document.getElementById("bucketGap")?.value ?? 1);
+    result.bucketEdgeThreshold = Number(document.getElementById("bucketEdgeThreshold")?.value ?? 12);
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
 
     return result;
