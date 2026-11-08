@@ -1111,8 +1111,9 @@ export class Scene {
       const spread=Math.max(0,Math.min(1,Number(options.featherSpread??style.featherSpread??0.45)));
       const softness=Math.max(0,Math.min(1,Number(options.featherSoftness??style.featherSoftness??0.35)));
       const taper=Math.max(0,Math.min(1,Number(options.featherTaper??style.featherTaper??0.7)));
-      context.save();context.globalAlpha=opacity*(0.88-softness*0.22);
-      context.shadowColor=color;context.shadowBlur=softness*size*0.22;
+      context.save();context.globalAlpha=opacity;
+      // Feather strokes should stay crisp: no colored shadow or blur halo.
+      context.shadowColor="transparent";context.shadowBlur=0;
       const lanes=preset==="feather-fan"?density:preset==="feather-dry"?Math.max(3,Math.round(density*0.65)):preset==="feather-flat"?Math.max(3,Math.round(density*0.45)):preset==="feather-soft"?Math.max(3,Math.round(density*0.7)):1;
       for(let lane=0;lane<lanes;lane++){
         const ratio=lanes===1?0:lane/(lanes-1)-0.5;
