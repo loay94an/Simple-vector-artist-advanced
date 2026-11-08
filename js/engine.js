@@ -359,6 +359,7 @@ export class StrokeBuilder {
     // Incremental live calligraphy outline cache. It is reset with each stroke.
     this.calligraphyPreviewPointCount = 0;
     this.calligraphyPreviewPath = "";
+    this.calligraphyPreviewDelta = "";
     this.workerFilteredPoints = null;
 
     this.pressure.reset();
@@ -664,7 +665,8 @@ export class StrokeBuilder {
     // Rebuilding every previous quadrilateral on every frame made long
     // calligraphy strokes approach quadratic work.
     if (this.active && this.deferSmoothing) {
-      if (this.calligraphyPreviewPointCount > points.length) {
+      let delta = "";
+      if (this.calligraphyPreviewPointCount > points.length) { this.calligraphyPreviewDelta = "";
         this.calligraphyPreviewPointCount = 0;
         this.calligraphyPreviewPath = "";
       }
@@ -684,6 +686,7 @@ export class StrokeBuilder {
           y: point.y + tangentY * halfLength
         };
         this.calligraphyPreviewPath = makeSegment(start, end, r, r);
+        delta = this.calligraphyPreviewPath;
         this.calligraphyPreviewPointCount = 1;
       }
 
@@ -705,12 +708,15 @@ export class StrokeBuilder {
           getRadius(points[i])
         );
         this.calligraphyPreviewPath += " " + segment;
+        delta += " " + segment;
       }
 
+      this.calligraphyPreviewDelta = delta.trim();
       this.calligraphyPreviewPointCount = points.length;
       return this.calligraphyPreviewPath;
     }
 
+    this.calligraphyPreviewDelta = "";
     const segments = [];
 
     if (points.length === 1) {
@@ -1408,6 +1414,7 @@ export class DrawingEngine {
     this.shapeRecognitionTimer = null;
     this.renderFrameId = null;
     this.renderFrameUsesTimeout = false;
+    this.canvasPreviewPointCount = 0;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.workerRequestId = 0;
@@ -1618,6 +1625,7 @@ export class DrawingEngine {
     this.activePointer = event.pointerId ?? null;
 
     this.points = [];
+    this.canvasPreviewPointCount = 0;
     this.lastPoint = null;
     this.changed = false;
     this.erasedIds.clear();
@@ -1878,6 +1886,46 @@ export class DrawingEngine {
       ...built,
       points: this.builder.points
     };
+
+    if (this.drawing && this.builder.deferSmoothing) {
+      const source = this.builder.points;
+      const from = Math.max(0, this.canvasPreviewPointCount - 1);
+      const canvas = this.renderer.canvasPreview;
+      const rect = canvas?.getBoundingClientRect?.();
+      const screenPoints = rect ? source.slice(from).map(point => {
+        const screen = this.coordinates.worldToScreen(point);
+        return screen ? {
+          x: screen.x - rect.left,
+          y: screen.y - rect.top,
+          pressure: point.pressure,
+          time: point.time
+        } : null;
+      }).filter(Boolean) : [];
+      if (screenPoints.length && this.renderer.appendCanvasPreview?.(
+        this.currentElement.id,
+        screenPoints,
+        this.currentElement.style,
+        {
+          calligraphy: this.currentElement.tool === "calligraphy" || String(this.builder.brushStyle?.preset || "").startsWith("cal-"),
+          calligraphyAngle: this.builder.calligraphyAngle,
+          pressureEnabled: this.builder.pressureEnabled
+        }
+      )) {
+        this.canvasPreviewPointCount = source.length;
+        return true;
+      }
+
+      if (this.currentElement.tool === "calligraphy" && this.builder.calligraphyPreviewDelta) {
+        const appended = this.renderer.appendPreviewChunk?.(
+          this.currentElement,
+          this.builder.calligraphyPreviewDelta
+        );
+        if (appended) return true;
+      }
+    }
+
+    this.renderer.clearCanvasPreview?.();
+    this.canvasPreviewPointCount = 0;
     return this.renderer.updateElement(this.currentElement);
   }
 
