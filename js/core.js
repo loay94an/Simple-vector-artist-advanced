@@ -1834,7 +1834,10 @@ export class EventManager {
     this.previousTouchAction =
       element.style.touchAction;
 
+    // Register pointer listeners in the capture phase so drawing input
+    // is received even when an SVG child handles or stops the event.
     this.listenerOptions = {
+      capture: this.options.capture,
       passive: false
     };
 
