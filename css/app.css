@@ -3763,3 +3763,13 @@ body.dark .canvas-area {
   box-sizing: border-box;
   white-space: normal;
 }
+
+
+/* RASEM_DRAWING_INPUT_SURFACE_FIX */
+#drawingCanvas {
+  pointer-events: all !important;
+}
+
+#canvasBackground {
+  pointer-events: none !important;
+}
