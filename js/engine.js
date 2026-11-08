@@ -716,12 +716,20 @@ export class StrokeBuilder {
       const previous=points[Math.max(0,index-1)], next=points[Math.min(points.length-1,index+1)];
       const direction=Math.atan2(next.y-previous.y,next.x-previous.x);
       const preset=String(this.brushStyle?.preset||"");
-      const broadNib=["cal-kufi","cal-italic","cal-oblique"].includes(preset);
-      const contrast=broadNib ? (0.12+Math.abs(Math.sin(direction-angleRad))*0.88) : 1;
+      const nibAngle=direction-angleRad;
+      const broadNib=["cal-kufi","cal-square","cal-jali","cal-sini","cal-italic","cal-oblique","cal-stub"].includes(preset);
+      const contrast=broadNib ? (0.10+Math.abs(Math.sin(nibAngle))*0.90) : 1;
+      let profile=1;
+      if (preset==="cal-ruqah") profile=0.78+0.22*Math.abs(Math.sin(nibAngle));
+      else if (preset==="cal-diwani") profile=0.88+0.12*Math.abs(Math.cos(nibAngle));
+      else if (preset==="cal-taliq") profile=0.82+0.18*Math.abs(Math.cos(nibAngle));
+      else if (preset==="cal-maghribi") profile=0.92+0.08*Math.abs(Math.sin(nibAngle));
+      else if (preset==="cal-brush") profile=0.72+0.28*pressureMultiplier;
+      else if (preset==="cal-fine" || preset==="cal-needle") profile=0.72+0.28*pressureMultiplier;
       const elapsed=Math.max(1,EngineUtils.number(next.time,point.time)-EngineUtils.number(previous.time,point.time));
       const speed=EngineUtils.distance(previous,next)/elapsed;
       const speedFactor=EngineUtils.clamp(1.12-speed*0.22,0.78,1.12);
-      return radius * pressureMultiplier * contrast * speedFactor;
+      return radius * pressureMultiplier * contrast * profile * speedFactor;
     };
 
     // كل مقطع يُرسم كمضلع مستقل داخل مسار واحد.
@@ -835,7 +843,11 @@ export class StrokeBuilder {
       x: firstPoint.x + tangentX * halfLength,
       y: firstPoint.y + tangentY * halfLength
     };
-    segments.push(makeSegment(capStart, capEnd, firstRadius, firstRadius));
+    const preset = String(this.brushStyle?.preset || "");
+    const startTaper = ["cal-fine", "cal-needle"].includes(preset) ? 0.18
+      : preset === "cal-brush" ? 0.58
+      : ["cal-diwani", "cal-taliq"].includes(preset) ? 0.72 : 1;
+    segments.push(makeSegment(capStart, capEnd, firstRadius * startTaper, firstRadius));
 
     for (let i = 1; i < points.length; i++) {
       const start = points[i - 1];
@@ -860,7 +872,10 @@ export class StrokeBuilder {
         x: lastPoint.x + tangentX * endCapLength,
         y: lastPoint.y + tangentY * endCapLength
       };
-      segments.push(makeSegment(endCapStart, endCapEnd, lastRadius, lastRadius));
+      const endTaper = ["cal-fine", "cal-needle"].includes(preset) ? 0.18
+        : preset === "cal-brush" ? 0.42
+        : ["cal-diwani", "cal-taliq"].includes(preset) ? 0.78 : 1;
+      segments.push(makeSegment(endCapStart, endCapEnd, lastRadius, lastRadius * endTaper));
     }
 
     return segments.join(" ");
