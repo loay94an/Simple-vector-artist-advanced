@@ -15,6 +15,7 @@
 ========================================================= */
 
 import { HitTesting } from "./engine.js";
+import { recognizeShape } from "./shape-recognition.js";
 
 /* =========================================================
    1. TOOL UTILITIES
@@ -1215,6 +1216,8 @@ export class Shapes extends BaseTool {
     this.strokeStyle = "solid";
     this.dashArray = "";
     this.cornerRadius = 0;
+    this.recognitionEnabled = false;
+    this.gesturePoints = [];
 
     this.startPoint = null;
     this.currentPoint = null;
@@ -1230,6 +1233,7 @@ export class Shapes extends BaseTool {
       if (saved.fillColor) this.fillColor = saved.fillColor;
       if (saved.strokeStyle) this.strokeStyle = saved.strokeStyle;
       if (Number.isFinite(saved.cornerRadius)) this.cornerRadius = saved.cornerRadius;
+      if (typeof saved.recognitionEnabled === "boolean") this.recognitionEnabled = saved.recognitionEnabled;
     } catch {}
   }
 
@@ -1264,6 +1268,7 @@ export class Shapes extends BaseTool {
     if (typeof options.strokeStyle === "string") this.strokeStyle = options.strokeStyle;
     if (typeof options.dashArray === "string") this.dashArray = options.dashArray;
     if (Number.isFinite(options.cornerRadius)) this.cornerRadius = Math.max(0, options.cornerRadius);
+    if (typeof options.recognitionEnabled === "boolean") this.recognitionEnabled = options.recognitionEnabled;
     this.saveOptions();
   }
 
@@ -1275,7 +1280,8 @@ export class Shapes extends BaseTool {
         fillEnabled: this.fillEnabled,
         fillColor: this.fillColor,
         strokeStyle: this.strokeStyle,
-        cornerRadius: this.cornerRadius
+        cornerRadius: this.cornerRadius,
+        recognitionEnabled: this.recognitionEnabled
       }));
     } catch {}
   }
@@ -1480,6 +1486,7 @@ export class Shapes extends BaseTool {
     this.currentPoint = point;
 
     this.previewId = ToolUtils.id("shape-preview");
+    this.gesturePoints = [{ x: point.x, y: point.y }];
     this.drawing = true;
 
     return true;
@@ -1496,6 +1503,10 @@ export class Shapes extends BaseTool {
     if (!point) return false;
 
     this.currentPoint = point;
+    const previous = this.gesturePoints[this.gesturePoints.length - 1];
+    if (!previous || ToolUtils.distance(previous, point) >= 1) {
+      this.gesturePoints.push({ x: point.x, y: point.y });
+    }
 
     const shape = this.createShape(
       this.startPoint,
@@ -1515,6 +1526,10 @@ export class Shapes extends BaseTool {
 
     if (point) {
       this.currentPoint = point;
+      const previous = this.gesturePoints[this.gesturePoints.length - 1];
+      if (!previous || ToolUtils.distance(previous, point) >= 0.5) {
+        this.gesturePoints.push({ x: point.x, y: point.y });
+      }
     }
 
     const layer = this.engine.activeLayer;
@@ -1534,10 +1549,17 @@ export class Shapes extends BaseTool {
       return false;
     }
 
+    const previousShape = this.shape;
+    const recognized = this.recognitionEnabled
+      ? recognizeShape(this.gesturePoints)
+      : null;
+    if (recognized) this.shape = recognized;
+
     const shape = this.createShape(
       this.startPoint,
       this.currentPoint
     );
+    this.shape = previousShape;
 
     // إزالة معرف المعاينة واستبداله بمعرف نهائي.
     shape.id = ToolUtils.id("shape");
@@ -1569,6 +1591,7 @@ export class Shapes extends BaseTool {
     this.startPoint = null;
     this.currentPoint = null;
     this.previewId = null;
+    this.gesturePoints = [];
   }
 
   cancel() {
