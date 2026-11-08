@@ -45,6 +45,18 @@
     chalk: { lineCap: "square", dashArray: "4 3", preset: "chalk" },
     ink: { lineCap: "round", dashArray: "", preset: "ink" },
     highlighter: { lineCap: "square", dashArray: "", preset: "highlighter" },
+    square: { lineCap: "square", dashArray: "" },
+    dash: { lineCap: "round", dashArray: "8 5" },
+    soft: { lineCap: "round", dashArray: "" },
+    flat: { lineCap: "square", dashArray: "" },
+    point: { lineCap: "butt", dashArray: "" },
+    oval: { lineCap: "round", dashArray: "" },
+    dry: { lineCap: "square", dashArray: "5 2 1 3" },
+    "marker-round": { lineCap: "round", dashArray: "" },
+    "cal-kufi": { lineCap: "square", dashArray: "", preset: "cal-kufi" },
+    "cal-italic": { lineCap: "square", dashArray: "", preset: "cal-italic" },
+    "cal-stub": { lineCap: "round", dashArray: "", preset: "cal-stub" },
+    "cal-oblique": { lineCap: "square", dashArray: "", preset: "cal-oblique" },
     custom: { lineCap: "round", dashArray: "" }
   };
 
@@ -60,6 +72,15 @@
     chalk: "طباشيري / جاف",
     ink: "حبر هندي G-Pen",
     highlighter: "قلم تظليل",
+    flat: "رأس مسطح عريض",
+    point: "رأس مدبب دقيق",
+    oval: "رأس بيضاوي مائل",
+    dry: "فرشاة جافة",
+    "marker-round": "ماركر مستدير",
+    "cal-kufi": "رأس كوفي",
+    "cal-italic": "إيطالي مشطوف",
+    "cal-stub": "رأس Stub",
+    "cal-oblique": "رأس مائل",
     custom: "فرشاة PNG مخصصة"
   };
 
