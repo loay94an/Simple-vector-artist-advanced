@@ -185,29 +185,68 @@ function classifyPolygon(vertices) {
 }
 
 function fitEllipse(points, box) {
-  const rx = box.width / 2, ry = box.height / 2;
+  // Estimate the ellipse orientation with the covariance matrix instead of
+  // assuming that its major/minor axes are parallel to the canvas axes.
+  const mean = points.reduce((sum, p) => ({
+    x: sum.x + p.x / points.length,
+    y: sum.y + p.y / points.length
+  }), { x: 0, y: 0 });
+  let xx = 0, xy = 0, yy = 0;
+  for (const p of points) {
+    const dx = p.x - mean.x, dy = p.y - mean.y;
+    xx += dx * dx; xy += dx * dy; yy += dy * dy;
+  }
+  xx /= points.length; xy /= points.length; yy /= points.length;
+  const angle = 0.5 * Math.atan2(2 * xy, xx - yy);
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const projected = points.map(p => {
+    const dx = p.x - mean.x, dy = p.y - mean.y;
+    return { x: dx * cos + dy * sin, y: -dx * sin + dy * cos };
+  });
+  const minX = Math.min(...projected.map(p => p.x));
+  const maxX = Math.max(...projected.map(p => p.x));
+  const minY = Math.min(...projected.map(p => p.y));
+  const maxY = Math.max(...projected.map(p => p.y));
+  let rx = (maxX - minX) / 2, ry = (maxY - minY) / 2;
   if (rx < 4 || ry < 4) return null;
-  const cx = (box.minX + box.maxX) / 2, cy = (box.minY + box.maxY) / 2;
+  const localCx = (minX + maxX) / 2, localCy = (minY + maxY) / 2;
+  const cx = mean.x + localCx * cos - localCy * sin;
+  const cy = mean.y + localCx * sin + localCy * cos;
   let error = 0;
-  for (const p of points) error += Math.abs(Math.hypot((p.x - cx) / rx, (p.y - cy) / ry) - 1);
-  error /= points.length;
+  for (const p of projected) {
+    error += Math.abs(Math.hypot((p.x - localCx) / rx, (p.y - localCy) / ry) - 1);
+  }
+  error /= projected.length;
   if (error > 0.105) return null;
+
   const aspect = Math.max(rx, ry) / Math.min(rx, ry);
   const isCircle = aspect < 1.12;
-  const radius = (rx + ry) / 2;
-  const outRx = isCircle ? radius : rx;
-  const outRy = isCircle ? radius : ry;
+  if (isCircle) {
+    const radius = (rx + ry) / 2;
+    rx = radius;
+    ry = radius;
+  }
   const output = [];
-  for (let i = 0; i < 80; i++) {
-    const angle = Math.PI * 2 * i / 80;
-    output.push({ x: cx + Math.cos(angle) * outRx, y: cy + Math.sin(angle) * outRy,
-      pressure: averagePressure(points), time: points[0].time || 0 });
+  for (let i = 0; i < 96; i++) {
+    const theta = Math.PI * 2 * i / 96;
+    const localX = Math.cos(theta) * rx;
+    const localY = Math.sin(theta) * ry;
+    output.push({
+      x: cx + localX * cos - localY * sin,
+      y: cy + localX * sin + localY * cos,
+      pressure: averagePressure(points),
+      time: points[0].time || 0
+    });
   }
   output.push({ ...output[0] });
-  return { type: isCircle ? "circle" : "ellipse", points: output,
-    confidence: clamp(1 - error * 3.2, 0.72, 0.99), corners: [] };
+  return {
+    type: isCircle ? "circle" : "ellipse",
+    points: output,
+    confidence: clamp(1 - error * 3.2, 0.72, 0.99),
+    corners: [],
+    rotation: isCircle ? 0 : angle
+  };
 }
-
 function fitArc(points) {
   const start = points[0], middle = points[Math.floor(points.length / 2)], end = points.at(-1);
   const determinant = 2 * (start.x * (middle.y - end.y) +
