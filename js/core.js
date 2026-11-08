@@ -1151,14 +1151,15 @@ export class Scene {
       }
       context.restore();this.canvasPreviewCount+=points.length;return true;
     }
-    const draw=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len,ra=radius(a,a,b),rb=radius(b,a,b);
+    const draw=(a,b,isLast=false)=>{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len,ra=radius(a,a,b);let rb=radius(b,a,b);
+      if(calligraphy&&isLast){const endStyle=String(options.calligraphyEndStyle||"none");const fixed=size*0.5*pressure(b);if(endStyle==="thin")rb=Math.max(0.12,fixed*0.10);else if(endStyle==="wide")rb=fixed*1.18;else if(endStyle==="pointed")rb=0.035;}
       if(preset==="dry"||preset==="chalk"){context.globalAlpha=opacity*0.82;for(const lane of [-2,0,2]){const off=lane*size*0.13,h=Math.max(0.35,size*0.055);context.beginPath();context.moveTo(a.x+px*(off+h),a.y+py*(off+h));context.lineTo(b.x+px*(off+h),b.y+py*(off+h));context.lineTo(b.x+px*(off-h),b.y+py*(off-h));context.lineTo(a.x+px*(off-h),a.y+py*(off-h));context.closePath();context.fill();}context.globalAlpha=opacity;return;}
       if(preset==="spray"){const steps=Math.max(1,Math.ceil(len/Math.max(3,size*0.35)));for(let q=0;q<=steps;q++){const t=q/steps,x=a.x+dx*t,y=a.y+dy*t;for(let k=0;k<5;k++){const seed=(q+1)*127+(k+3)*71,ox=Math.sin(seed)*size*0.75,oy=Math.cos(seed*1.7)*size*0.75,r=Math.max(0.35,size*(0.035+((Math.sin(seed*2.1)+1)*0.018)));context.beginPath();context.arc(x+ox,y+oy,r,0,Math.PI*2);context.fill();}}return;}
       if(calligraphy||["flat","chisel","cal-kufi","cal-italic","cal-oblique"].includes(preset)){context.beginPath();context.moveTo(a.x+nx*ra,a.y+ny*ra);context.lineTo(b.x+nx*rb,b.y+ny*rb);context.lineTo(b.x-nx*rb,b.y-ny*rb);context.lineTo(a.x-nx*ra,a.y-ny*ra);context.closePath();context.fill();return;}
       if(preset==="oval"){context.save();context.translate((a.x+b.x)/2,(a.y+b.y)/2);context.rotate(Math.atan2(dy,dx));context.scale(1,0.72);context.lineWidth=ra+rb;context.beginPath();context.moveTo(-len/2,0);context.lineTo(len/2,0);context.stroke();context.restore();return;}
       context.lineWidth=Math.max(0.5,ra+rb);context.beginPath();context.moveTo(a.x,a.y);context.lineTo(b.x,b.y);context.stroke();};
     if(points.length===1){if(!calligraphy){const p=points[0],r=radius(p,p,p);context.beginPath();context.arc(p.x,p.y,r,0,Math.PI*2);context.fill();}}
-    else for(let i=1;i<points.length;i++)draw(points[i-1],points[i]);
+    else for(let i=1;i<points.length;i++)draw(points[i-1],points[i],i===points.length-1);
     context.restore();this.canvasPreviewCount+=points.length;return true;
   }
 
