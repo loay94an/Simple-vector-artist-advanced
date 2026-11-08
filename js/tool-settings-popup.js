@@ -32,7 +32,8 @@
     featherSpread: "featherSpread",
     featherSoftness: "featherSoftness",
     featherTaper: "featherTaper",
-    featherSpacing: "featherSpacing"
+    featherSpacing: "featherSpacing",
+    calligraphyEndStyle: "calligraphyEndStyle"
   };
 
   const presets = {
@@ -151,13 +152,14 @@
 
       result[key] = el.type === "checkbox"
         ? el.checked
-        : Number(el.value);
+        : el.tagName === "SELECT" ? el.value : Number(el.value);
     }
 
     result.brush = settings[activeTool]?.brush || (activeTool === "calligraphy" ? "calligraphy" : "round");
     result.customBrush = settings[activeTool]?.customBrush || null;
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
+    result.calligraphyEndStyle = document.getElementById("calligraphyEndStyle")?.value || "thin";
     result.featherDensity = Number(document.getElementById("featherDensity")?.value ?? 10);
     result.featherGlow = Number(document.getElementById("featherGlow")?.value ?? 0);
     result.featherSpacing = Number(document.getElementById("featherSpacing")?.value ?? 1);
@@ -197,6 +199,7 @@
           lineCorrection: current.lineCorrection ?? current.smoothing ?? 0.35,
           pressureEnabled: current.pressureEnabled,
           calligraphyAngle: Number.isFinite(current.calligraphyAngle) ? current.calligraphyAngle : 45,
+          calligraphyEndStyle: current.calligraphyEndStyle || "thin",
           brushStyle: {
             preset: brush,
             lineCap: style.lineCap || "round",
@@ -294,6 +297,7 @@
         base.lineCorrection = 0.35;
         base.brush = "calligraphy";
         base.calligraphyAngle = 45;
+        base.calligraphyEndStyle = "thin";
       } else if (tool === "eraser") {
         base.size = 20;
         base.eraserMode = "partial";
@@ -350,9 +354,13 @@
     );
     const calRow = document.getElementById("calligraphyAngleRow");
     const calScale = document.getElementById("calligraphyAngleScale");
+    const calEndRow = document.getElementById("calligraphyEndStyleRow");
+    const calEndSelect = document.getElementById("calligraphyEndStyle");
     const correctionRow = document.getElementById("lineCorrectionRow");
     if (calRow) calRow.style.display = isCal ? "flex" : "none";
     if (calScale) calScale.style.display = isCal ? "block" : "none";
+    if (calEndRow) calEndRow.style.display = isCal ? "flex" : "none";
+    if (calEndSelect) { calEndSelect.style.display = isCal ? "block" : "none"; calEndSelect.value = current.calligraphyEndStyle || "thin"; }
     // إظهار شدة تنعيم الانحناءات لقلم الخط العربي أيضاً.
     if (correctionRow) correctionRow.style.display = isCal ? "flex" : "flex";
 
@@ -538,6 +546,15 @@
       settings[activeTool].calligraphyAngle = angle;
 
       updateOutputs();
+      save();
+    });
+  }
+
+  const calligraphyEndStyleInput = document.getElementById("calligraphyEndStyle");
+  if (calligraphyEndStyleInput) {
+    calligraphyEndStyleInput.addEventListener("change", () => {
+      if (!settings[activeTool]) settings[activeTool] = {};
+      settings[activeTool].calligraphyEndStyle = calligraphyEndStyleInput.value;
       save();
     });
   }
