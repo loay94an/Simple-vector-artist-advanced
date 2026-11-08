@@ -114,29 +114,51 @@ export class Smoothing {
         : [];
     }
 
-    const result = [{ ...points[0] }];
+    const result = points.map(point => ({ ...point }));
+    const strength = EngineUtils.clamp(this.strength, 0, 1);
+    if (strength <= 0) return result;
+
+    // تصحيح الانحرافات الصغيرة فقط مع الحفاظ على الزوايا والانحناءات الواضحة.
+    const minimumStraightness = Math.cos(38 * Math.PI / 180);
 
     for (let i = 1; i < points.length - 1; i++) {
       const previous = points[i - 1];
       const current = points[i];
       const next = points[i + 1];
 
-      const s = this.strength;
+      const inX = current.x - previous.x;
+      const inY = current.y - previous.y;
+      const outX = next.x - current.x;
+      const outY = next.y - current.y;
+      const inLength = Math.hypot(inX, inY);
+      const outLength = Math.hypot(outX, outY);
 
-      result.push({
-        ...current,
+      if (inLength < 0.0001 || outLength < 0.0001) continue;
 
-        x: current.x * (1 - s) +
-          ((previous.x + next.x) / 2) * s,
+      const directionDot =
+        (inX * outX + inY * outY) / (inLength * outLength);
 
-        y: current.y * (1 - s) +
-          ((previous.y + next.y) / 2) * s
-      });
+      // لا نصحح الزوايا الحادة حتى لا تتحول الرسمة أو الحروف إلى مسارات مفلطحة.
+      if (directionDot < minimumStraightness) continue;
+
+      const lineX = next.x - previous.x;
+      const lineY = next.y - previous.y;
+      const lineLengthSquared = lineX * lineX + lineY * lineY;
+      if (lineLengthSquared < 0.0001) continue;
+
+      const t = EngineUtils.clamp(
+        ((current.x - previous.x) * lineX +
+          (current.y - previous.y) * lineY) / lineLengthSquared,
+        0,
+        1
+      );
+
+      const projectedX = previous.x + t * lineX;
+      const projectedY = previous.y + t * lineY;
+
+      result[i].x = current.x + (projectedX - current.x) * strength;
+      result[i].y = current.y + (projectedY - current.y) * strength;
     }
-
-    result.push({
-      ...points[points.length - 1]
-    });
 
     return result;
   }
@@ -842,14 +864,14 @@ export class DrawingEngine {
       pressureEnabled: true,
       sensitivity: 0.8,
       minDistance: 0.08,
-      smoothing: 0.35,
+      lineCorrection: 0.35,
       eraserSize: 16,
       eraserMode: "partial",
       calligraphyAngle: 45
     };
 
     this.builder = new StrokeBuilder({
-      smoothing: this.settings.smoothing,
+      smoothing: this.settings.lineCorrection,
       minDistance: this.settings.minDistance
     });
 
@@ -951,9 +973,12 @@ export class DrawingEngine {
       );
     }
 
-    if (Number.isFinite(settings.smoothing)) {
-      this.settings.smoothing = EngineUtils.clamp(
-        settings.smoothing,
+    const correctionValue = Number.isFinite(settings.lineCorrection)
+      ? settings.lineCorrection
+      : settings.smoothing;
+    if (Number.isFinite(correctionValue)) {
+      this.settings.lineCorrection = EngineUtils.clamp(
+        correctionValue,
         0,
         1
       );
@@ -997,7 +1022,7 @@ export class DrawingEngine {
     }
 
     this.builder.smoothing.strength =
-      this.settings.smoothing;
+      this.settings.lineCorrection;
 
     this.builder.smoothing.minDistance =
       this.settings.minDistance;

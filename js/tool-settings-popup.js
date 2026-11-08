@@ -26,7 +26,7 @@
   const ids = {
     size: "brushSize",
     opacity: "brushOpacity",
-    smoothing: "smoothing",
+    lineCorrection: "lineCorrection",
     pressureEnabled: "pressureEnabled"
   };
 
@@ -77,6 +77,15 @@
     );
   } catch {}
 
+  // ترحيل إعداد النعومة القديم إلى التصحيح التلقائي دون فقدان تفضيلات المستخدم.
+  for (const toolSettings of Object.values(settings)) {
+    if (!toolSettings || typeof toolSettings !== "object") continue;
+    if (toolSettings.lineCorrection === undefined && Number.isFinite(toolSettings.smoothing)) {
+      toolSettings.lineCorrection = toolSettings.smoothing;
+    }
+    delete toolSettings.smoothing;
+  }
+
   function read() {
     const result = {};
 
@@ -123,7 +132,7 @@
         engine.setSettings({
           size: current.size,
           opacity: current.opacity,
-          smoothing: current.smoothing,
+          lineCorrection: current.lineCorrection ?? current.smoothing ?? 0.35,
           pressureEnabled: current.pressureEnabled,
           calligraphyAngle: Number.isFinite(current.calligraphyAngle) ? current.calligraphyAngle : 45,
           brushStyle: {
@@ -162,7 +171,7 @@
     for (const [id, outputId, suffix, percent] of [
       ["brushSize", "brushSizeValue", "", false],
       ["brushOpacity", "brushOpacityValue", "%", true],
-      ["smoothing", "smoothingValue", "%", true],
+      ["lineCorrection", "lineCorrectionValue", "%", true],
       ["calligraphyAngle", "calligraphyAngleValue", "°", false]
     ]) {
       const input = document.getElementById(id);
@@ -186,18 +195,18 @@
 
       if (tool === "pencil") {
         base.pressureEnabled = false;
-        base.smoothing = 0.5;
+        base.lineCorrection = 0.5;
         base.brush = "round";
       } else if (tool === "marker") {
         base.pressureEnabled = false;
         base.opacity = 0.45;
         base.size = Math.max(12, base.size || 16);
-        base.smoothing = 0.4;
+        base.lineCorrection = 0.4;
         base.brush = "chisel";
       } else if (tool === "calligraphy") {
         base.pressureEnabled = true;
         base.size = 14;
-        base.smoothing = 0.35;
+        base.lineCorrection = 0.35;
         base.brush = "calligraphy";
         base.calligraphyAngle = 45;
       } else if (tool === "eraser") {
