@@ -1106,6 +1106,41 @@ export class Scene {
     context.fillStyle=color;context.strokeStyle=color;context.lineCap=style.lineCap||"round";context.lineJoin=style.lineJoin||"round";
     if(preset==="soft"){context.shadowColor=color;context.shadowBlur=Math.max(2,size*0.24);}
     const dash=String(style.dashArray||"").trim();context.setLineDash(dash?dash.split(/[ ,]+/).map(Number).filter(v=>Number.isFinite(v)&&v>=0):[]);
+    if(options.tool==="feather"){
+      const density=Math.max(3,Math.min(32,Math.round(Number(options.featherDensity??style.featherDensity??10))));
+      const spread=Math.max(0,Math.min(1,Number(options.featherSpread??style.featherSpread??0.45)));
+      const softness=Math.max(0,Math.min(1,Number(options.featherSoftness??style.featherSoftness??0.35)));
+      const taper=Math.max(0,Math.min(1,Number(options.featherTaper??style.featherTaper??0.7)));
+      context.save();context.globalAlpha=opacity*(0.88-softness*0.22);
+      context.shadowColor=color;context.shadowBlur=softness*size*0.22;
+      const lanes=preset==="feather-fan"?density:preset==="feather-dry"?Math.max(3,Math.round(density*0.65)):preset==="feather-flat"?Math.max(3,Math.round(density*0.45)):preset==="feather-soft"?Math.max(3,Math.round(density*0.7)):1;
+      for(let lane=0;lane<lanes;lane++){
+        const ratio=lanes===1?0:lane/(lanes-1)-0.5;
+        context.beginPath();
+        for(let i=0;i<points.length;i++){
+          const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
+          const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
+          const progress=points.length<=1?0.5:i/(points.length-1);
+          const fade=Math.max(0.08,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
+          const r=radius(p,prev,next)*fade;
+          const offset=ratio*spread*r*1.65;
+          const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
+          const x=p.x+nx*offset,y=p.y+ny*offset;
+          if(i===0)context.moveTo(x+nx*laneWidth,y+ny*laneWidth);else context.lineTo(x+nx*laneWidth,y+ny*laneWidth);
+        }
+        for(let i=points.length-1;i>=0;i--){
+          const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
+          const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
+          const progress=points.length<=1?0.5:i/(points.length-1);
+          const fade=Math.max(0.08,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
+          const r=radius(p,prev,next)*fade,offset=ratio*spread*r*1.65;
+          const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
+          context.lineTo(p.x+nx*offset-nx*laneWidth,p.y+ny*offset-ny*laneWidth);
+        }
+        context.closePath();context.fill();
+      }
+      context.restore();this.canvasPreviewCount+=points.length;return true;
+    }
     const draw=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len,ra=radius(a,a,b),rb=radius(b,a,b);
       if(preset==="dry"||preset==="chalk"){context.globalAlpha=opacity*0.82;for(const lane of [-2,0,2]){const off=lane*size*0.13,h=Math.max(0.35,size*0.055);context.beginPath();context.moveTo(a.x+px*(off+h),a.y+py*(off+h));context.lineTo(b.x+px*(off+h),b.y+py*(off+h));context.lineTo(b.x+px*(off-h),b.y+py*(off-h));context.lineTo(a.x+px*(off-h),a.y+py*(off-h));context.closePath();context.fill();}context.globalAlpha=opacity;return;}
       if(preset==="spray"){const steps=Math.max(1,Math.ceil(len/Math.max(3,size*0.35)));for(let q=0;q<=steps;q++){const t=q/steps,x=a.x+dx*t,y=a.y+dy*t;for(let k=0;k<5;k++){const seed=(q+1)*127+(k+3)*71,ox=Math.sin(seed)*size*0.75,oy=Math.cos(seed*1.7)*size*0.75,r=Math.max(0.35,size*(0.035+((Math.sin(seed*2.1)+1)*0.018)));context.beginPath();context.arc(x+ox,y+oy,r,0,Math.PI*2);context.fill();}}return;}
