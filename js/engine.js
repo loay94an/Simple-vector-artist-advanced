@@ -996,11 +996,12 @@ export class DrawingEngine {
       };
     }
 
-    this.builder.smoothing.strength =
-      this.settings.smoothing;
-
-    this.builder.smoothing.minDistance =
-      this.settings.minDistance;
+    // Keep the builder baseline in sync: getFilteredPoints() restores these
+    // values before filtering, so updating only the live smoother is lost.
+    this.builder.baseSmoothingStrength = this.settings.smoothing;
+    this.builder.baseSmoothingMinDistance = this.settings.minDistance;
+    this.builder.smoothing.strength = this.settings.smoothing;
+    this.builder.smoothing.minDistance = this.settings.minDistance;
 
     return true;
   }
@@ -1441,7 +1442,8 @@ export class DrawingEngine {
         if (alpha > 12) boundary[i] = 1;
       }
 
-      // توسيع الحدود بكسلاً واحداً لإغلاق الفجوات الناتجة عن تنعيم الحواف.
+      // توسيع الحدود ببكسلين لإغلاق الفجوات الدقيقة الناتجة عن تنعيم الحواف.
+      // نستخدم مربع 5×5 لتقليل تسرب التعبئة في الخطوط المرسومة باللمس.
       const expandedBoundary = new Uint8Array(total);
 
       for (let y = 0; y < height; y++) {
@@ -1449,8 +1451,8 @@ export class DrawingEngine {
           const index = y * width + x;
           if (!boundary[index]) continue;
 
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
               const nx = x + dx;
               const ny = y + dy;
 

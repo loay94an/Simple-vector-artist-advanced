@@ -26,6 +26,7 @@
   const fillToggle = document.getElementById("shapeFillToggle");
   const fillControls = document.getElementById("shapeFillControls");
   const fillColorInput = document.getElementById("shapeFillColor");
+  const recognitionToggle = document.getElementById("shapeRecognitionToggle");
 
   const cornerRadiusInput = document.getElementById("shapeCornerRadius");
   const cornerRadiusVal = document.getElementById("shapeCornerRadiusVal");
@@ -74,6 +75,7 @@
     strokeWidth = tool.strokeWidth || 3;
     strokeStyle = tool.strokeStyle || "solid";
     fillEnabled = Boolean(tool.fillEnabled);
+    if (recognitionToggle) recognitionToggle.checked = Boolean(tool.recognitionEnabled);
     fillColor = getActiveColor();
     cornerRadius = tool.cornerRadius || 0;
 
@@ -121,7 +123,8 @@
       strokeStyle,
       fillEnabled,
       fillColor,
-      cornerRadius
+      cornerRadius,
+      recognitionEnabled: Boolean(recognitionToggle?.checked)
     });
 
     if (badge) {
@@ -329,6 +332,13 @@
     strokeWidthInput.addEventListener("input", (e) => {
       strokeWidth = Number(e.target.value);
       if (strokeWidthVal) strokeWidthVal.textContent = strokeWidth + " px";
+      syncToTool();
+    });
+  }
+
+  // Optional freehand shape recognition
+  if (recognitionToggle) {
+    recognitionToggle.addEventListener("change", () => {
       syncToTool();
     });
   }
