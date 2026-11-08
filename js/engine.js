@@ -1,6 +1,5 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
-import { recognizeShape } from "./shape-recognition.js?v=20261108-02";
 
 /* =========================================================
    RASEM 2.0
@@ -53,188 +52,17 @@ const EngineUtils = {
    1. SMOOTHING
 ========================================================= */
 
+// Preserve the sampled stroke as a straight polyline; no curve fitting.
 export class Smoothing {
-  constructor(options = {}) {
-    this.strength = EngineUtils.clamp(
-      EngineUtils.number(options.strength, 0.35),
-      0,
-      1
-    );
-
-    this.minDistance = EngineUtils.clamp(
-      EngineUtils.number(options.minDistance, 0.35),
-      0,
-      100
-    );
-  }
-
-  distance(a, b) {
-    return EngineUtils.distance(a, b);
-  }
-
-  midpoint(a, b) {
-    return {
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
-      pressure: (
-        EngineUtils.number(a.pressure, 0.5) +
-        EngineUtils.number(b.pressure, 0.5)
-      ) / 2
-    };
-  }
-
-  simplify(points) {
-    if (!Array.isArray(points) || points.length <= 2) {
-      return Array.isArray(points) ? [...points] : [];
-    }
-
-    const result = [points[0]];
-
-    for (let i = 1; i < points.length - 1; i++) {
-      if (
-        this.distance(
-          result[result.length - 1],
-          points[i]
-        ) >= this.minDistance
-      ) {
-        result.push(points[i]);
-      }
-    }
-
-    const last = points[points.length - 1];
-
-    if (result[result.length - 1] !== last) {
-      result.push(last);
-    }
-
-    return result;
-  }
-
-  filter(points) {
-    if (!Array.isArray(points) || points.length <= 2) {
-      return Array.isArray(points)
-        ? points.map(point => ({ ...point }))
-        : [];
-    }
-
-    const strength = EngineUtils.clamp(this.strength, 0, 1);
-    let result = points.map(point => ({ ...point }));
-    if (strength <= 0) return result;
-
-    // تقدير كثافة أخذ العينات وطول الضربة لاختيار عدد تمريرات مناسب.
-    let totalLength = 0;
-    for (let i = 1; i < points.length; i++) {
-      totalLength += this.distance(points[i - 1], points[i]);
-    }
-    const averageStep = totalLength / Math.max(1, points.length - 1);
-    // عند 100% نرفع تدخل التصحيح إلى 50 تمريرة لمعالجة الاهتزازات
-    // بقوة أكبر، مع إبقاء الضربات القصيرة قليلة العينات محمية من الإفراط.
-    // Keep correction bounded: large strokes must not trigger dozens of
-    // full-array passes on the UI thread.
-    const passes = points.length < 5
-      ? 1
-      : (strength >= 0.85 ? 6 : strength >= 0.72 ? 4 : strength >= 0.22 ? 2 : 1);
-
-    // الضربات الكثيفة تستفيد من تنعيم إضافي خفيف، أما النقاط المتباعدة
-    // فلا نبالغ في تحريكها حتى لا نفقد شكل المسار الأصلي.
-    const densityFactor = EngineUtils.clamp(
-      1.15 - Math.max(0, averageStep - 2) * 0.035,
-      0.78,
-      1.15
-    );
-    // استجابة تصاعدية: القيم المنخفضة تبقى قريبة من سلوكها السابق،
-    // بينما تزداد قوة التصحيح بقفزة واضحة قرب 100%.
-    const blend = EngineUtils.clamp(
-      (0.18 + strength * 0.48 + Math.pow(strength, 4) * 0.24) * densityFactor,
-      0.12,
-      0.90
-    );
-
-    const turnAt = (source, index) => {
-      if (index <= 0 || index >= source.length - 1) return 0;
-      const a = source[index - 1];
-      const b = source[index];
-      const c = source[index + 1];
-      const ax = b.x - a.x;
-      const ay = b.y - a.y;
-      const bx = c.x - b.x;
-      const by = c.y - b.y;
-      if (Math.hypot(ax, ay) < 0.0001 || Math.hypot(bx, by) < 0.0001) return 0;
-      return Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
-    };
-
-    for (let pass = 0; pass < passes; pass++) {
-      const source = result;
-      const filtered = source.map(point => ({ ...point }));
-
-      for (let i = 1; i < source.length - 1; i++) {
-        const previous = source[i - 1];
-        const current = source[i];
-        const next = source[i + 1];
-        const turn = turnAt(source, i);
-
-        // نحافظ على الزوايا المقصودة عندما يكون الانعطاف حاداً ومستقراً.
-        // أما الانحراف الحاد الذي ينعكس مباشرة في النقطة التالية فعادةً
-        // يكون اهتزازاً عابراً من اليد ويُسمح بتصحيحه.
-        if (source.length >= 5 && Math.abs(turn) > 0.96) {
-          const beforeTurn = turnAt(source, i - 1);
-          const afterTurn = turnAt(source, i + 1);
-          const isAlternatingJitter =
-            beforeTurn * turn < 0 &&
-            afterTurn * turn < 0 &&
-            Math.abs(beforeTurn) > Math.abs(turn) * 0.28 &&
-            Math.abs(afterTurn) > Math.abs(turn) * 0.28;
-
-          if (!isAlternatingJitter) continue;
-        }
-
-        // مرشح محلي منخفض التردد: يقلل التعرجات السريعة من دون
-        // تسطيح المنحنى كله أو تغيير نقطة البداية والنهاية.
-        const targetX = (previous.x + 2 * current.x + next.x) / 4;
-        const targetY = (previous.y + 2 * current.y + next.y) / 4;
-
-        filtered[i].x = current.x + (targetX - current.x) * blend;
-        filtered[i].y = current.y + (targetY - current.y) * blend;
-      }
-
-      result = filtered;
-    }
-
-    return result;
-  }
-
-  process(points) {
-    return this.filter(this.simplify(points));
-  }
-
   toPath(points) {
-    if (!Array.isArray(points) || !points.length) {
-      return "";
-    }
-
+    if (!Array.isArray(points) || !points.length) return "";
     if (points.length === 1) {
-      const p = points[0];
-      return `M ${p.x} ${p.y} l 0.01 0`;
+      const point = points[0];
+      return `M ${point.x} ${point.y} l 0.01 0`;
     }
-
-    let path = `M ${points[0].x} ${points[0].y}`;
-
-    for (let i = 1; i < points.length; i++) {
-      const current = points[i];
-      const next = points[i + 1];
-
-      if (next) {
-        const mid = this.midpoint(current, next);
-
-        path +=
-          ` Q ${current.x} ${current.y}` +
-          ` ${mid.x} ${mid.y}`;
-      } else {
-        path += ` L ${current.x} ${current.y}`;
-      }
-    }
-
-    return path;
+    return points.map((point, index) =>
+      `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
+    ).join(" ");
   }
 }
 
@@ -330,8 +158,6 @@ export class StrokeBuilder {
       strength: options.smoothing ?? 0.3,
       minDistance: options.minDistance ?? 0.35
     });
-    this.baseSmoothingStrength = this.smoothing.strength;
-    this.baseSmoothingMinDistance = this.smoothing.minDistance;
 
     this.pressure = new Pressure();
     this.reset();
@@ -391,11 +217,6 @@ export class StrokeBuilder {
 
     this.tool = settings.tool || "pen";
     this.calligraphyAngle = settings.calligraphyAngle ?? 45;
-    this.lineCorrectionStrength = EngineUtils.clamp(
-      EngineUtils.number(settings.lineCorrection, 0.35),
-      0,
-      1
-    );
     this.brushStyle = settings.brushStyle || null;
 
     this.sensitivity = EngineUtils.clamp(
@@ -1125,7 +946,6 @@ export class DrawingEngine {
       pressureEnabled: true,
       sensitivity: 0.8,
       minDistance: 0.08,
-      lineCorrection: 0.35,
       eraserSize: 16,
       eraserMode: "partial",
       calligraphyAngle: 45
@@ -1133,7 +953,6 @@ export class DrawingEngine {
 
 
     this.builder = new StrokeBuilder({
-      smoothing: this.settings.lineCorrection,
       minDistance: this.settings.minDistance
     });
 
@@ -1157,38 +976,6 @@ export class DrawingEngine {
     this.idleCorrectionApplied = false;
     this.workerRequestId = 0;
     this.smoothingWorker = null;
-    if (typeof Worker !== "undefined") {
-      try {
-        this.smoothingWorker = new Worker(
-          new URL("./smoothing-worker.js", import.meta.url),
-          { type: "module" }
-        );
-        this.smoothingWorker.onmessage = event => {
-          const result = event.data || {};
-          if (result.id !== this.workerRequestId) return;
-          if (!this.drawing || this.destroyed || this.builder.deferSmoothing) return;
-          if (!Array.isArray(result.points)) {
-            this.builder.workerFilteredPoints = null;
-            this.renderCurrent();
-            return;
-          }
-          this.builder.workerFilteredPoints = result.points;
-          this.renderCurrent();
-        };
-        this.smoothingWorker.onerror = error => {
-          console.warn("Rasem smoothing worker failed; using main-thread fallback.", error);
-          this.smoothingWorker?.terminate?.();
-          this.smoothingWorker = null;
-          if (this.drawing && !this.builder.deferSmoothing) {
-            this.builder.workerFilteredPoints = null;
-            this.renderCurrent();
-          }
-        };
-      } catch (error) {
-        console.warn("Rasem smoothing worker unavailable; using main-thread fallback.", error);
-        this.smoothingWorker = null;
-      }
-    }
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
       this.renderer,
@@ -1281,17 +1068,6 @@ export class DrawingEngine {
       );
     }
 
-    const correctionValue = Number.isFinite(settings.lineCorrection)
-      ? settings.lineCorrection
-      : settings.smoothing;
-    if (Number.isFinite(correctionValue)) {
-      this.settings.lineCorrection = EngineUtils.clamp(
-        correctionValue,
-        0,
-        1
-      );
-    }
-
     if (Number.isFinite(settings.sensitivity)) {
       this.settings.sensitivity = EngineUtils.clamp(
         settings.sensitivity,
@@ -1337,16 +1113,6 @@ export class DrawingEngine {
         featherTaper: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherTaper, 0.7), 0, 1)
       };
     }
-
-    this.builder.smoothing.strength =
-      this.settings.lineCorrection;
-    this.builder.baseSmoothingStrength =
-      this.settings.lineCorrection;
-
-    this.builder.smoothing.minDistance =
-      this.settings.minDistance;
-    this.builder.baseSmoothingMinDistance =
-      this.settings.minDistance;
 
     return true;
   }
@@ -1410,7 +1176,6 @@ export class DrawingEngine {
       sensitivity: this.settings.sensitivity,
       pressureEnabled: this.settings.pressureEnabled,
       calligraphyAngle: this.settings.calligraphyAngle,
-      lineCorrection: this.settings.lineCorrection,
       brushStyle: { ...this.brushStyle }
     });
 
@@ -1494,13 +1259,12 @@ export class DrawingEngine {
 
     const input = pointerData || event;
 
-    // إذا استأنف المستخدم الرسم بعد توقف قصير والتصحيح التلقائي،
-    // نسمح بمتابعة الضربة من آخر نقطة مصححة.
+    // Continue appending captured pointer samples without post-stroke correction.
     if (this.shapeRecognitionApplied || this.idleCorrectionApplied) {
       this.shapeRecognitionApplied = false;
       this.idleCorrectionApplied = false;
       this.clearShapeRecognitionTimer();
-      // استئناف الحركة يعيد المسار إلى العرض الخام ويعيد انتظار السكون.
+      // Resume directly from the captured samples.
       this.builder.deferSmoothing = true;
       this.builder.workerFilteredPoints = null;
       this.workerRequestId++;
@@ -1514,10 +1278,6 @@ export class DrawingEngine {
       this.scheduleRenderCurrent();
     }
 
-    // أعد تشغيل مؤقت السكون عند كل حدث حركة، حتى لو كانت الحركة
-    // أصغر من minDistance ولم تُضف عينة جديدة إلى المسار.
-    // بذلك لا يبدأ التصحيح ما دام المستخدم يحرك القلم.
-    this.scheduleShapeRecognition();
 
     return added;
   }
@@ -1535,27 +1295,8 @@ export class DrawingEngine {
     return false;
   }
 
-  requestWorkerSmoothing() {
-    if (!this.smoothingWorker || !this.drawing || this.builder.points.length < 3) return false;
-    const id = ++this.workerRequestId;
-    const points = this.builder.points.map(point => ({ ...point }));
-    try {
-      this.smoothingWorker.postMessage({
-        id,
-        points,
-        strength: this.settings.lineCorrection
-      });
-      return true;
-    } catch (error) {
-      console.warn("Rasem smoothing worker request failed; using main-thread fallback.", error);
-      return false;
-    }
-  }
-
   buildPath(points) {
-    return this.builder.smoothing.toPath(
-      this.builder.smoothing.process(points)
-    );
+    return this.builder.smoothing.toPath(points);
   }
 
   scheduleRenderCurrent() {
@@ -1772,11 +1513,7 @@ export class DrawingEngine {
         this.addPoint(finalPoint, finalEvent, true);
       }
 
-      // لا ننفذ أي تصحيح عند رفع الإصبع.
-      // التصحيح لا يحدث إلا إذا اكتملت مهلة السكون الطويل أثناء بقاء
-      // المؤشر مضغوطاً على الشاشة.
-
-      // بناء النسخة المصححة وعرضها بعد رفع الإصبع مباشرة.
+      // Commit the captured points without post-stroke smoothing or correction.
       finalizedElement = this.builder.build();
       if (finalizedElement) {
         this.currentElement = {
@@ -2248,7 +1985,6 @@ export class DrawingEngine {
 
     this.arabicWriting?.destroy();
     this.arabicWriting = null;
-    this.smoothingWorker?.terminate?.();
     this.smoothingWorker = null;
 
     this.document = null;
