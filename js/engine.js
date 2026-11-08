@@ -599,6 +599,74 @@ export class StrokeBuilder {
     ).join(" ") + " Z";
   }
 
+  getPresetBrushOutline() {
+    const points = this.getFilteredPoints();
+    if (!points.length) return "";
+    const preset = String(this.brushStyle?.preset || "round");
+    const angle = (Number.isFinite(this.calligraphyAngle) ? this.calligraphyAngle : 45) * Math.PI / 180;
+    const nibX = Math.cos(angle), nibY = Math.sin(angle);
+    const profiles = {
+      flat:"flat", chisel:"flat", "cal-kufi":"flat", "cal-italic":"flat", "cal-oblique":"flat",
+      square:"square", point:"point", oval:"oval", soft:"soft", dry:"dry", chalk:"dry",
+      watercolor:"watercolor", spray:"spray", ink:"ink", highlighter:"highlighter",
+      "marker-round":"marker", round:"round"
+    };
+    const kind = profiles[preset];
+    if (!kind || preset === "dash" || preset === "custom") return "";
+    const pressureAt = p => this.pressureEnabled ? EngineUtils.clamp(0.35 + EngineUtils.number(p.pressure, 0.5) * 0.65, 0.25, 1.15) : 1;
+    const radiusAt = (p, i) => {
+      let r = this.baseSize * 0.5 * pressureAt(p);
+      if (kind === "point") r *= 0.22 + pressureAt(p) * 0.78;
+      if (kind === "oval") r *= 0.72;
+      if (kind === "soft" || kind === "watercolor") r *= 1.12;
+      if (kind === "highlighter") r *= 0.92;
+      if (kind === "flat") {
+        const a=points[Math.max(0,i-1)], b=points[Math.min(points.length-1,i+1)];
+        r *= 0.12 + Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
+      }
+      return Math.max(0.35,r);
+    };
+    const poly = pts => pts.map((p,i)=>`${i?"L":"M"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ")+" Z";
+    if (points.length === 1) {
+      const p=points[0],r=radiusAt(p,0);
+      if(kind==="flat"){const tx=-nibY,ty=nibX,h=Math.max(1,r*0.7);return poly([
+        {x:p.x-tx*h+nibX*r,y:p.y-ty*h+nibY*r},{x:p.x+tx*h+nibX*r,y:p.y+ty*h+nibY*r},
+        {x:p.x+tx*h-nibX*r,y:p.y+ty*h-nibY*r},{x:p.x-tx*h-nibX*r,y:p.y-ty*h-nibY*r}]);}
+      return `M ${p.x-r} ${p.y} a ${r} ${r} 0 1 0 ${r*2} 0 a ${r} ${r} 0 1 0 ${-r*2} 0`;
+    }
+    const left=[],right=[];
+    for(let i=0;i<points.length;i++){
+      const p=points[i],a=points[Math.max(0,i-1)],b=points[Math.min(points.length-1,i+1)];
+      const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
+      let r=radiusAt(p,i);
+      if(kind==="oval")r*=0.72+0.28*Math.abs(Math.cos(Math.atan2(dy,dx)-angle));
+      left.push({x:p.x+nx*r,y:p.y+ny*r});right.push({x:p.x-nx*r,y:p.y-ny*r});
+    }
+    if(kind==="dry"){
+      const lanes=[];
+      for(const lane of [-2,0,2]){
+        const l=[],r=[],off=lane*this.baseSize*0.13,half=Math.max(0.35,this.baseSize*0.055);
+        for(let i=0;i<points.length;i++){
+          const p=points[i],a=points[Math.max(0,i-1)],b=points[Math.min(points.length-1,i+1)];
+          const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
+          l.push({x:p.x+nx*(off+half),y:p.y+ny*(off+half)});r.push({x:p.x+nx*(off-half),y:p.y+ny*(off-half)});
+        }
+        lanes.push(poly([...l,...r.reverse()]));
+      }
+      return lanes.join(" ");
+    }
+    if(kind==="spray"){
+      const dots=[];
+      for(let i=0;i<points.length;i+=2){const p=points[i];for(let k=0;k<5;k++){
+        const seed=(i+1)*127+(k+3)*71,ox=Math.sin(seed)*this.baseSize*0.75,oy=Math.cos(seed*1.7)*this.baseSize*0.75;
+        const r=Math.max(0.35,this.baseSize*(0.035+((Math.sin(seed*2.1)+1)*0.018)));
+        dots.push(`M ${p.x+ox-r} ${p.y+oy} a ${r} ${r} 0 1 0 ${r*2} 0 a ${r} ${r} 0 1 0 ${-r*2} 0`);
+      }}
+      return dots.join(" ");
+    }
+    return poly([...left,...right.reverse()]);
+  }
+
   getCalligraphyOutline() {
     const points = this.getFilteredPoints();
     if (!points.length) return "";
@@ -763,20 +831,14 @@ export class StrokeBuilder {
 
     const isCalligraphy = this.tool === "calligraphy" || this.brushStyle?.preset === "calligraphy" || String(this.brushStyle?.preset || "").startsWith("cal-");
 
-    const variableWidth = isCalligraphy || (
-      pressureEnabled &&
-      this.tool !== "marker" &&
-      this.tool !== "pencil"
-    );
-
+    const preset = String(this.brushStyle?.preset || "round");
+    const presetOutline = !isCalligraphy && !["round", "dash", "custom"].includes(preset);
+    const variableWidth = isCalligraphy || presetOutline || (pressureEnabled && this.tool !== "marker" && this.tool !== "pencil");
     let path = "";
-    if (isCalligraphy) {
-      path = this.getCalligraphyOutline();
-    } else if (variableWidth) {
-      path = this.getVariableWidthOutline();
-    } else {
-      path = this.getCenterPath();
-    }
+    if (isCalligraphy) path = this.getCalligraphyOutline();
+    else if (presetOutline) path = this.getPresetBrushOutline();
+    else if (variableWidth) path = this.getVariableWidthOutline();
+    else path = this.getCenterPath();
 
     if (!path) return null;
 
@@ -807,7 +869,10 @@ export class StrokeBuilder {
         lineJoin: brushStyle.lineJoin || "round",
         dashArray: brushStyle.dashArray || "",
         customBrush: brushStyle.image || null,
-        calligraphyClean: isCalligraphy
+        calligraphyClean: isCalligraphy,
+        brushPreset: preset,
+        brushAngle: this.calligraphyAngle,
+        brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity
       }
     };
   }
@@ -1612,7 +1677,9 @@ export class DrawingEngine {
         lineJoin: brushStyle.lineJoin || "round",
         dashArray: brushStyle.dashArray || "",
         customBrush: brushStyle.image || null,
-        calligraphyClean: isCalligraphy
+        calligraphyClean: isCalligraphy,
+        brushPreset: brushStyle.preset || "round",
+        brushAngle: this.builder.calligraphyAngle
       };
 
       if (screenPoints.length && this.renderer.appendCanvasPreview?.(
@@ -1623,8 +1690,8 @@ export class DrawingEngine {
           tool: this.builder.tool,
           calligraphy: isCalligraphy,
           calligraphyAngle: this.builder.calligraphyAngle,
-          pressureEnabled: isCalligraphy || this.builder.tool === "pen"
-            ? this.builder.pressureEnabled : false
+          brushPreset: brushStyle.preset || "round",
+          pressureEnabled: this.builder.pressureEnabled
         }
       )) {
         this.canvasPreviewPointCount = source.length;
