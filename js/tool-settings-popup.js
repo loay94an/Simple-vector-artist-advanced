@@ -25,7 +25,6 @@
   const ids = {
     size: "brushSize",
     opacity: "brushOpacity",
-    lineCorrection: "lineCorrection",
     pressureEnabled: "pressureEnabled",
     featherDensity: "featherDensity",
     featherGlow: "featherGlow",
@@ -134,15 +133,6 @@
     );
   } catch {}
 
-  // ترحيل إعداد النعومة القديم إلى التصحيح التلقائي دون فقدان تفضيلات المستخدم.
-  for (const toolSettings of Object.values(settings)) {
-    if (!toolSettings || typeof toolSettings !== "object") continue;
-    if (toolSettings.lineCorrection === undefined && Number.isFinite(toolSettings.smoothing)) {
-      toolSettings.lineCorrection = toolSettings.smoothing;
-    }
-    delete toolSettings.smoothing;
-  }
-
   function read() {
     const result = {};
 
@@ -197,7 +187,6 @@
         engine.setSettings({
           size: current.size,
           opacity: current.opacity,
-          lineCorrection: current.lineCorrection ?? current.smoothing ?? 0.35,
           pressureEnabled: current.pressureEnabled,
           calligraphyAngle: Number.isFinite(current.calligraphyAngle) ? current.calligraphyAngle : 45,
           calligraphyEndStyle: current.calligraphyEndStyle || "none",
@@ -243,7 +232,6 @@
     for (const [id, outputId, suffix, percent] of [
       ["brushSize", "brushSizeValue", "", false],
       ["brushOpacity", "brushOpacityValue", "%", true],
-      ["lineCorrection", "lineCorrectionValue", "%", true],
       ["calligraphyAngle", "calligraphyAngleValue", "°", false],
       ["featherDensity", "featherDensityValue", "", false],
       ["featherGlow", "featherGlowValue", "%", true],
@@ -421,13 +409,11 @@
 
       if (tool === "pencil") {
         base.pressureEnabled = false;
-        base.lineCorrection = 0.5;
         base.brush = "round";
       } else if (tool === "feather") {
         base.pressureEnabled = true;
         base.opacity = 0.9;
         base.size = 16;
-        base.lineCorrection = 0.25;
         base.brush = "feather-pointed";
         base.featherDensity = 10;
         base.featherGlow = 0;
@@ -439,12 +425,10 @@
         base.pressureEnabled = false;
         base.opacity = 0.45;
         base.size = Math.max(12, base.size || 16);
-        base.lineCorrection = 0.4;
         base.brush = "chisel";
       } else if (tool === "calligraphy") {
         base.pressureEnabled = true;
         base.size = 14;
-        base.lineCorrection = 0.35;
         base.brush = "calligraphy";
         base.calligraphyAngle = 45;
         base.calligraphyEndStyle = "none";
@@ -462,7 +446,6 @@
     const brushSettings = [
       ["brushSize", "brushSizeValue"],
       ["brushOpacity", "brushOpacityValue"],
-      ["lineCorrection", "lineCorrectionValue"],
       ["pressureEnabled", null]
     ];
     for (const [id, outputId] of brushSettings) {
@@ -505,13 +488,10 @@
     const calScale = document.getElementById("calligraphyAngleScale");
     const calEndRow = document.getElementById("calligraphyEndStyleRow");
     const calEndSelect = document.getElementById("calligraphyEndStyle");
-    const correctionRow = document.getElementById("lineCorrectionRow");
     if (calRow) calRow.style.display = isCal ? "flex" : "none";
     if (calScale) calScale.style.display = isCal ? "block" : "none";
     if (calEndRow) calEndRow.style.display = isCal ? "flex" : "none";
     if (calEndSelect) { calEndSelect.style.display = isCal ? "block" : "none"; calEndSelect.value = current.calligraphyEndStyle || "none"; }
-    // إظهار شدة تنعيم الانحناءات لقلم الخط العربي أيضاً.
-    if (correctionRow) correctionRow.style.display = isCal ? "flex" : "flex";
 
     // Eraser mode row visibility
     const eraserRow = document.getElementById("eraserModeRow");
