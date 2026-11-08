@@ -442,85 +442,9 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
-    const preset = String(this.brushStyle?.preset || "");
-    const isCalligraphy =
-      this.tool === "calligraphy" ||
-      preset === "calligraphy" ||
-      preset.startsWith("cal-");
-
-    // لا نمرر الخط العربي إلى عامل التنعيم العام؛ له مرشح محافظ يحافظ
-    // على زوايا الحروف وتغيّر الضغط ويعمل فقط بعد مهلة السكون والضغط.
-    if (!isCalligraphy && !this.deferSmoothing && Array.isArray(this.workerFilteredPoints)) {
-      return this.workerFilteredPoints;
-    }
-
-    // لا يُصحح مسار الخط العربي أثناء الكتابة أو الرسم أو حركة القلم.
-    // تبقى العينات الأصلية كما هي حتى يثبت القلم ويستمر الضغط طوال مهلة السكون.
-    if (isCalligraphy) {
-      if (this.deferSmoothing) {
-        // Raw input samples are immutable during live drawing. Reuse the
-        // array instead of cloning every old point on every animation frame.
-        return this.points;
-      }
-
-      // مرشح خفيف خاص بالخط العربي: تمريرة واحدة ثابتة الكلفة.
-      // لا نستخدم مرشح الأقلام العام لأنه قد ينفذ عشرات التمريرات
-      // على آلاف العينات ويجمّد واجهة الرسم أثناء الكتابة الطويلة.
-      const strength = EngineUtils.clamp(this.lineCorrectionStrength, 0, 1);
-      if (strength <= 0 || this.points.length < 3) {
-        return this.points.map(point => ({ ...point }));
-      }
-
-      const blend = 0.10 + strength * 0.30;
-      const source = this.points;
-      let filtered = source.map(point => ({ ...point }));
-
-      // تمريرتان خفيفتان لتقليل رجفة اليد في المنحنيات القصيرة والطويلة،
-      // مع تثبيت أول وآخر نقطة وحماية الزوايا الحادة ونقاط الضغط.
-      for (let pass = 0; pass < 2; pass++) {
-        const input = filtered;
-        const output = input.map(point => ({ ...point }));
-        for (let i = 1; i < input.length - 1; i++) {
-          const previous = input[i - 1];
-          const current = input[i];
-          const next = input[i + 1];
-          const ax = current.x - previous.x;
-          const ay = current.y - previous.y;
-          const bx = next.x - current.x;
-          const by = next.y - current.y;
-          const aLength = Math.hypot(ax, ay);
-          const bLength = Math.hypot(bx, by);
-          if (aLength < 0.0001 || bLength < 0.0001) continue;
-
-          const turn = Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
-          if (Math.abs(turn) > 0.92) continue;
-
-          const targetX = (previous.x + 2 * current.x + next.x) / 4;
-          const targetY = (previous.y + 2 * current.y + next.y) / 4;
-          const segmentScale = EngineUtils.clamp(
-            Math.min(aLength, bLength) / Math.max(1, this.baseSize * 0.7),
-            0.25,
-            1
-          );
-          const localBlend = blend * segmentScale;
-          output[i].x = current.x + (targetX - current.x) * localBlend;
-          output[i].y = current.y + (targetY - current.y) * localBlend;
-        }
-        filtered = output;
-      }
-
-      return filtered;
-    }
-
-    this.smoothing.strength = this.baseSmoothingStrength;
-    this.smoothing.minDistance = this.baseSmoothingMinDistance;
-
-    // بقية الأقلام فقط تخضع للتصحيح المؤجل بعد السكون.
-    if (this.deferSmoothing) {
-      return this.points.map(point => ({ ...point }));
-    }
-
-    return this.smoothing.process(this.points);
+    // Preserve every captured sample exactly: automatic stroke correction,
+    // smoothing and shape substitution are disabled for all drawing tools.
+    return this.points;
   }
 
   getCenterPath() {
@@ -1609,64 +1533,9 @@ export class DrawingEngine {
   }
 
   scheduleShapeRecognition() {
+    // Automatic correction and geometric recognition are intentionally off.
     this.clearShapeRecognitionTimer();
-
-    // لا يجري أي تصحيح مؤجل أثناء تحرك الإصبع.
-    // ننتظر ثباته عند نهاية الضربة مع بقائه مضغوطاً،
-    // وهذا يشمل قلم الخط العربي وبقية أقلام الرسم.
-    if (
-      !this.drawing ||
-      this.settings.tool === "eraser" ||
-      this.settings.lineCorrection <= 0 ||
-      this.builder.points.length < 2
-    ) return;
-
-    this.shapeRecognitionTimer = setTimeout(() => {
-      this.shapeRecognitionTimer = null;
-      if (!this.drawing || this.destroyed) return;
-
-      // بعد ثبات الإصبع مع استمرار الضغط، نعرض المسار المنعّم.
-      // هذا التنعيم محافظ ويخص الانحناءات؛ لا يشغّل التعرف الهندسي.
-      this.idleCorrectionApplied = true;
-      this.builder.deferSmoothing = false;
-      if (!this.requestWorkerSmoothing()) this.renderCurrent();
-
-      // لا نحوّل ضربات الخط العربي إلى أشكال هندسية؛
-      // نكتفي بتنعيم مسارها بعد انتهاء الكتابة والتوقف عند نهايته.
-      const brushPreset = String(this.builder.brushStyle?.preset || "");
-      const isCalligraphy =
-        this.builder.tool === "calligraphy" ||
-        brushPreset === "calligraphy" ||
-        brushPreset.startsWith("cal-");
-      if (
-        isCalligraphy ||
-        this.shapeRecognitionApplied ||
-        !["pen", "pencil", "marker"].includes(this.settings.tool) ||
-        this.builder.points.length < 8
-      ) return;
-
-      const confirmed = recognizeShape(this.builder.points, {
-        strength: this.settings.lineCorrection
-      });
-      // لا نعتمد أي تحويل هندسي إلا عندما تتجاوز الثقة الحد المحافظ.
-      if (!confirmed?.points?.length || confirmed.confidence < 0.72) return;
-
-      // إبطال نتيجة التنعيم السابقة لأن هندسة الضربة تغيرت بالتعرف.
-      this.workerRequestId++;
-      this.builder.workerFilteredPoints = null;
-      this.builder.points = confirmed.points.map(point => ({ ...point }));
-      this.points = this.builder.points;
-      this.lastPoint = this.builder.points.at(-1) || null;
-      this.shapeRecognitionApplied = true;
-      this.currentElement.recognition = {
-        type: confirmed.type,
-        confidence: confirmed.confidence,
-        corners: Array.isArray(confirmed.corners) ? confirmed.corners.length : 0,
-        angles: confirmed.angles || [],
-        angleTypes: confirmed.angleTypes || []
-      };
-      this.renderCurrent();
-    }, 400);
+    return false;
   }
 
   requestWorkerSmoothing() {
