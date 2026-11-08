@@ -2345,9 +2345,14 @@ svg#drawingCanvas {
 
 /* RASEM - Bottom toolbar color button */
 #toolbar #colorMenuBtn {
+  position: sticky;
+  bottom: 4px;
+  z-index: 12;
   flex-shrink: 0;
   margin-top: auto;
   margin-bottom: 4px;
+  align-self: center;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
 }
 
 #toolbar #colorMenuBtn #colorMenuPreview {
@@ -2366,7 +2371,9 @@ svg#drawingCanvas {
 
 @media (max-width: 600px) {
   #toolbar #colorMenuBtn {
-    margin-top: 0 !important;
+    position: sticky !important;
+    bottom: 4px !important;
+    margin-top: auto !important;
     margin-bottom: 0 !important;
     margin-inline-start: auto !important;
     margin-inline-end: 4px !important;
@@ -3776,4 +3783,32 @@ body.dark .canvas-area {
 
 #canvasBackground {
   pointer-events: none !important;
+}
+
+
+/* RASEM FIX: keep the color control pinned while the mobile tool row scrolls */
+@media (max-width: 600px) {
+  #toolbar {
+    padding-left: 54px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-padding-left: 54px;
+  }
+
+  #toolbar #colorMenuBtn {
+    position: fixed !important;
+    left: 16px !important;
+    right: auto !important;
+    bottom: calc(38px + env(safe-area-inset-bottom) + 6px) !important;
+    z-index: 45 !important;
+    flex: 0 0 42px !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    height: 42px !important;
+    margin: 0 !important;
+    align-self: auto !important;
+    background: var(--surface, #fff) !important;
+    border: 1px solid var(--border, #d1d5db) !important;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.2) !important;
+  }
 }

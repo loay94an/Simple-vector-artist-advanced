@@ -1,7 +1,7 @@
 /* =========================================================
    RASEM 3.0 - TOOL SETTINGS POPUP MODULE
    js/tool-settings-popup.js
-   Supports Pen, Calligraphy, Pencil, Marker, Eraser, and Custom PNG Brushes.
+   Supports Calligraphy, Pencil, Marker, Eraser, and Custom PNG Brushes.
 ========================================================= */
 
 (() => {
@@ -16,7 +16,6 @@
   if (!popup || !toolbar || !close) return;
 
   const names = {
-    pen: "إعدادات قلم الحبر",
     calligraphy: "إعدادات قلم الخط العربي",
     pencil: "إعدادات قلم الرصاص",
     marker: "إعدادات ماركر التظليل",
@@ -67,7 +66,7 @@
   const STORAGE = "rasem-per-tool-settings-v2";
 
   let settings = {};
-  let activeTool = "pen";
+  let activeTool = "pencil";
   let opened = false;
 
   try {
@@ -221,6 +220,22 @@
 
     const current = settings[tool];
 
+    const brushSettings = [
+      ["brushSize", "brushSizeValue"],
+      ["brushOpacity", "brushOpacityValue"],
+      ["lineCorrection", "lineCorrectionValue"],
+      ["pressureEnabled", null]
+    ];
+    for (const [id, outputId] of brushSettings) {
+      const input = document.getElementById(id);
+      const row = input?.previousElementSibling;
+      if (input) input.style.display = "";
+      if (row?.classList.contains("tool-setting-row")) row.style.display = "";
+      if (outputId) {
+        const output = document.getElementById(outputId);
+        if (output) output.style.display = "";
+      }
+    }
     for (const [key, id] of Object.entries(ids)) {
       const el = document.getElementById(id);
       if (!el || !(key in current)) continue;
@@ -503,6 +518,8 @@
   toolbar.addEventListener("pointerdown", event => {
     const button = event.target.closest("#toolbar [data-tool]");
     if (!button) return;
+    // Apply the remembered settings immediately when a drawing tool is selected.
+    if (names[button.dataset.tool]) restore(button.dataset.tool);
 
     pressedButton = button;
     pressStartX = event.clientX;

@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feature/handwriting-performance-pipeline
 
 jobs:
   build:
@@ -24,6 +25,8 @@ jobs:
           java-version: 21
       - name: Install dependencies
         run: npm ci
+      - name: Test shape recognition
+        run: npm test
       - name: Build web application
         run: npm run build
       - name: Sync Android

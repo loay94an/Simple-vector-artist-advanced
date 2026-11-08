@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
-  <link rel="stylesheet" href="./css/app.css?v=20261108-01">
+  <link rel="stylesheet" href="./css/app.css?v=20261108-03">
   <style>
     /* Bulletproof Flexbox Centering Overlay for All Dialogs & Modals */
     .modal-overlay-wrapper {
@@ -75,7 +75,7 @@
       display: none !important;
     }
   </style>
-  <script type="module" src="./js/app.js?v=20261105-04"></script>
+  <script type="module" src="./js/app.js?v=20261108-04"></script>
 </head>
 
 <body class="light">
@@ -209,6 +209,19 @@
               <span class="toggle-switch-slider"></span>
             </label>
           </div>
+          <div class="settings-menu-item" style="border:1px solid var(--border); background:var(--surface-2);">
+            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+              <div style="text-align:right;">
+                <strong style="display:block; font-size:13px;">شبكة لوحة الرسم</strong>
+                <span style="font-size:11px; color:var(--text-muted);">إظهار شبكة خفيفة لمساعدة المحاذاة والرسم</span>
+              </div>
+            </div>
+            <label class="toggle-switch-wrapper" title="إظهار أو إخفاء شبكة لوحة الرسم">
+              <input type="checkbox" id="canvasGridCheckbox">
+              <span class="toggle-switch-slider"></span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -272,18 +285,13 @@
       <!-- TOOLBAR -->
       <aside id="toolbar" class="toolbar">
 
-        <!-- Pen (قلم حبر) -->
-        <button class="tool active" data-tool="pen" title="قلم حبر (ضغطة طويلة للإعدادات)">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
-        </button>
-
         <!-- Calligraphy (قلم خط عربي) -->
         <button class="tool" data-tool="calligraphy" title="قلم الخط العربي المشطوف (ضغطة طويلة للإعدادات)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
         </button>
 
         <!-- Pencil (قلم رصاص) -->
-        <button class="tool" data-tool="pencil" title="قلم رصاص (ضغطة طويلة للإعدادات)">
+        <button class="tool active" data-tool="pencil" title="قلم رصاص (ضغطة طويلة للإعدادات)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
         </button>
 
@@ -292,15 +300,6 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 2-8 8 4 4 8-8-4-4Z"/><path d="m6 10-4 4 4 4 4-4"/><path d="m2 18 4 4"/></svg>
         </button>
 
-        <!-- Bucket Fill -->
-        <button class="tool" data-tool="bucket" id="bucketToolBtn" title="دلو التعبئة: تعبئة المنطقة المغلقة باللون الحالي">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m7 8 9 9a2 2 0 0 1-3 3l-9-9a2 2 0 0 1 3-3Z"/>
-            <path d="m6 7 3-3 10 10-3 3"/>
-            <path d="m14 4 2-2 6 6-2 2"/>
-            <path d="M19 19c0-1.2 1-2.2 1-3.2 0 1 1 2 1 3.2a1 1 0 0 1-2 0Z"/>
-          </svg>
-        </button>
         <!-- Smart Dual Eraser (ممحاة ذكية مزدوجة) -->
         <button class="tool" data-tool="eraser" id="eraserToolBtn" title="الممحاة (نقرة: تبديل النمط بين جزئي وخط / ضغطة طويلة: الإعدادات)">
           <svg id="eraserToolIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
@@ -429,7 +428,18 @@
           <svg id="drawingCanvas" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet">
             <rect id="canvasBackground" x="0" y="0" width="1600" height="1000" fill="#ffffff"/>
             <g id="viewport">
-              <g id="gridLayer"></g>
+              <defs>
+                <pattern id="canvasGridSmall" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#94a3b8" stroke-opacity="0.22" stroke-width="1"/>
+                </pattern>
+                <pattern id="canvasGridPattern" width="100" height="100" patternUnits="userSpaceOnUse">
+                  <rect width="100" height="100" fill="url(#canvasGridSmall)"/>
+                  <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#64748b" stroke-opacity="0.38" stroke-width="1.2"/>
+                </pattern>
+              </defs>
+              <g id="gridLayer" style="display:none" pointer-events="none">
+                <rect x="0" y="0" width="1600" height="1000" fill="url(#canvasGridPattern)"/>
+              </g>
               <g id="drawingLayer"></g>
               <g id="guideLayer"></g>
               <g id="selectionLayer"></g>
@@ -1098,9 +1108,9 @@
 
 
   <!-- MODULE SCRIPTS -->
-  <script type="module" src="./js/color-ui.js"></script>
+  <script type="module" src="./js/color-ui.js?v=20261108-02"></script>
   <script type="module" src="./js/shapes-ui.js"></script>
-  <script type="module" src="./js/tool-settings-popup.js"></script>
+  <script type="module" src="./js/tool-settings-popup.js?v=20261108-04"></script>
   <script type="module" src="./js/brush-library.js"></script>
 
   <!-- PWA REGISTRATION & CACHE PURGE -->

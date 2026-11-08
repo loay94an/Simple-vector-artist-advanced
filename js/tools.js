@@ -167,58 +167,7 @@ export class BaseTool {
 }
 
 /* =========================================================
-   3. PEN
-========================================================= */
-
-
-/* =========================================================
-   BUCKET FILL TOOL
-========================================================= */
-export class Bucket extends BaseTool {
-  constructor(engine, camera) {
-    super(engine, camera);
-    this.name = "bucket";
-  }
-
-  down(event) {
-    if (!this.active || !this.engine) return false;
-    this.engine.fillAt(event);
-    return true;
-  }
-}
-
-export class Pen extends BaseTool {
-  constructor(engine, camera) {
-    super(engine, camera);
-    this.name = "pen";
-  }
-
-activate() {
-    super.activate();
-    this.engine.setSettings({
-      tool: "pen"
-    });
-  }
-
-  down(event) {
-    return this.engine.start(event);
-  }
-
-  move(event) {
-    return this.engine.move(event);
-  }
-
-  up(event) {
-    return this.engine.end(event);
-  }
-
-  cancel() {
-    return this.engine.cancel();
-  }
-}
-
-/* =========================================================
-   4. PENCIL
+   3. PENCIL
 ========================================================= */
 
 export class Pencil extends BaseTool {
@@ -1781,15 +1730,13 @@ export class ToolManager {
 
     this.registerDefaults();
 
-    this.activate("pen");
+    this.activate("pencil");
   }
 
   registerDefaults() {
-    this.register("pen", new Pen(this.engine, this.camera));
     this.register("calligraphy", new Calligraphy(this.engine, this.camera));
     this.register("pencil", new Pencil(this.engine, this.camera));
     this.register("marker", new Marker(this.engine, this.camera));
-    this.register("bucket", new Bucket(this.engine, this.camera));
     this.register("eraser", new Eraser(this.engine, this.camera));
     this.register("text", new TextTool(this.engine, this.camera));
 

@@ -1,5 +1,6 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
+import { recognizeShape } from "./shape-recognition.js";
 
 /* =========================================================
    RASEM 2.0
@@ -359,6 +360,8 @@ export class StrokeBuilder {
     // Incremental live calligraphy outline cache. It is reset with each stroke.
     this.calligraphyPreviewPointCount = 0;
     this.calligraphyPreviewPath = "";
+    this.calligraphyPreviewDelta = "";
+    this.workerFilteredPoints = null;
 
     this.pressure.reset();
   }
@@ -439,6 +442,10 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
+    if (!this.deferSmoothing && Array.isArray(this.workerFilteredPoints)) {
+      return this.workerFilteredPoints;
+    }
+
     // لا يُصحح مسار الخط العربي أثناء الكتابة أو الرسم أو حركة القلم.
     // تبقى العينات الأصلية كما هي حتى يثبت القلم ويستمر الضغط طوال مهلة السكون.
     const preset = String(this.brushStyle?.preset || "");
@@ -659,7 +666,8 @@ export class StrokeBuilder {
     // Rebuilding every previous quadrilateral on every frame made long
     // calligraphy strokes approach quadratic work.
     if (this.active && this.deferSmoothing) {
-      if (this.calligraphyPreviewPointCount > points.length) {
+      let delta = "";
+      if (this.calligraphyPreviewPointCount > points.length) { this.calligraphyPreviewDelta = "";
         this.calligraphyPreviewPointCount = 0;
         this.calligraphyPreviewPath = "";
       }
@@ -679,6 +687,7 @@ export class StrokeBuilder {
           y: point.y + tangentY * halfLength
         };
         this.calligraphyPreviewPath = makeSegment(start, end, r, r);
+        delta = this.calligraphyPreviewPath;
         this.calligraphyPreviewPointCount = 1;
       }
 
@@ -700,12 +709,15 @@ export class StrokeBuilder {
           getRadius(points[i])
         );
         this.calligraphyPreviewPath += " " + segment;
+        delta += " " + segment;
       }
 
+      this.calligraphyPreviewDelta = delta.trim();
       this.calligraphyPreviewPointCount = points.length;
       return this.calligraphyPreviewPath;
     }
 
+    this.calligraphyPreviewDelta = "";
     const segments = [];
 
     if (points.length === 1) {
@@ -1003,357 +1015,6 @@ export class HitTesting {
 }
 
 /* =========================================================
-   AUTO SHAPE RECOGNITION
-   Converts a held, completed hand-drawn shape into clean geometry.
-========================================================= */
-
-function shapePointDistance(a, b) {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function simplifyShapePath(points, tolerance) {
-  if (points.length <= 2) return points.slice();
-
-  let farthestIndex = 0;
-  let farthestDistance = 0;
-  const first = points[0];
-  const last = points[points.length - 1];
-  const dx = last.x - first.x;
-  const dy = last.y - first.y;
-  const lengthSquared = dx * dx + dy * dy;
-
-  for (let i = 1; i < points.length - 1; i++) {
-    let distance;
-    if (lengthSquared < 0.0001) {
-      distance = shapePointDistance(first, points[i]);
-    } else {
-      const t = EngineUtils.clamp(
-        ((points[i].x - first.x) * dx + (points[i].y - first.y) * dy) /
-          lengthSquared,
-        0,
-        1
-      );
-      distance = Math.hypot(
-        points[i].x - (first.x + t * dx),
-        points[i].y - (first.y + t * dy)
-      );
-    }
-    if (distance > farthestDistance) {
-      farthestDistance = distance;
-      farthestIndex = i;
-    }
-  }
-
-  if (farthestDistance <= tolerance) return [first, last];
-
-  const left = simplifyShapePath(points.slice(0, farthestIndex + 1), tolerance);
-  const right = simplifyShapePath(points.slice(farthestIndex), tolerance);
-  return [...left.slice(0, -1), ...right];
-}
-
-function interpolateShapeEdges(vertices, pressure, stepsPerEdge = 5) {
-  const result = [];
-  for (let i = 0; i < vertices.length; i++) {
-    const a = vertices[i];
-    const b = vertices[(i + 1) % vertices.length];
-    for (let step = 0; step < stepsPerEdge; step++) {
-      const t = step / stepsPerEdge;
-      result.push({
-        x: a.x + (b.x - a.x) * t,
-        y: a.y + (b.y - a.y) * t,
-        pressure,
-        time: Date.now()
-      });
-    }
-  }
-  return result;
-}
-
-function recognizeHeldShape(sourcePoints, strength = 0.35) {
-  if (!Array.isArray(sourcePoints) || sourcePoints.length < 8) return null;
-
-  const points = sourcePoints.filter(EngineUtils.validPoint);
-  if (points.length < 8) return null;
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  let pressureTotal = 0;
-  for (const point of points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
-    pressureTotal += EngineUtils.number(point.pressure, 1);
-  }
-
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const diagonal = Math.hypot(width, height);
-  if (diagonal < 24 || (width < 8 && height < 8)) return null;
-
-  const averagePressure = pressureTotal / points.length;
-  const first = points[0];
-  const last = points[points.length - 1];
-  const endGap = shapePointDistance(first, last);
-  const isClosed = endGap <= Math.max(12, diagonal * 0.22);
-  const tolerance = Math.max(2, diagonal * (0.025 + strength * 0.025));
-
-  if (isClosed) {
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const rx = width / 2;
-    const ry = height / 2;
-    const aspect = width / height;
-
-    // دائرة أو بيضاوي: نقيس انتظام نصف القطر بعد تطبيع حدود الرسم.
-    if (aspect >= 0.55 && aspect <= 1.8) {
-      let radialError = 0;
-      for (const point of points) {
-        const nx = (point.x - centerX) / rx;
-        const ny = (point.y - centerY) / ry;
-        radialError += Math.abs(Math.hypot(nx, ny) - 1);
-      }
-      radialError /= points.length;
-
-      if (radialError < 0.24 + strength * 0.12) {
-        const makeCircle = aspect >= 0.82 && aspect <= 1.22;
-        const radiusX = makeCircle ? (rx + ry) / 2 : rx;
-        const radiusY = makeCircle ? radiusX : ry;
-        const circlePoints = [];
-        for (let i = 0; i < 64; i++) {
-          const angle = (Math.PI * 2 * i) / 64;
-          circlePoints.push({
-            x: centerX + Math.cos(angle) * radiusX,
-            y: centerY + Math.sin(angle) * radiusY,
-            pressure: averagePressure,
-            time: Date.now()
-          });
-        }
-        circlePoints.push({ ...circlePoints[0], time: Date.now() });
-        return { type: makeCircle ? "circle" : "ellipse", points: circlePoints };
-      }
-    }
-
-    // تبسيط المسار المغلق إلى زواياه الرئيسية لاكتشاف المثلث والمستطيل.
-    const ring = points.slice();
-    if (endGap < diagonal * 0.18) ring.pop();
-    if (ring.length >= 6) {
-      let splitIndex = 1;
-      let splitDistance = 0;
-      for (let i = 1; i < ring.length; i++) {
-        const distance = shapePointDistance(ring[0], ring[i]);
-        if (distance > splitDistance) {
-          splitDistance = distance;
-          splitIndex = i;
-        }
-      }
-
-      const firstArc = simplifyShapePath(ring.slice(0, splitIndex + 1), tolerance);
-      const secondArc = simplifyShapePath(
-        [...ring.slice(splitIndex), ring[0]],
-        tolerance
-      );
-      let vertices = [...firstArc.slice(0, -1), ...secondArc.slice(0, -1)];
-
-      // إزالة الرؤوس المتقاربة الناتجة عن الاهتزاز حول الزاوية نفسها.
-      const compact = [];
-      for (const vertex of vertices) {
-        if (!compact.length || shapePointDistance(compact[compact.length - 1], vertex) > diagonal * 0.12) {
-          compact.push(vertex);
-        }
-      }
-      if (compact.length > 2 && shapePointDistance(compact[0], compact.at(-1)) < diagonal * 0.12) compact.pop();
-      vertices = compact;
-
-      if (vertices.length >= 3 && vertices.length <= 12) {
-        let rightAngles = 0;
-        for (let i = 0; i < vertices.length; i++) {
-          const previous = vertices[(i + vertices.length - 1) % vertices.length];
-          const current = vertices[i];
-          const next = vertices[(i + 1) % vertices.length];
-          const ax = previous.x - current.x;
-          const ay = previous.y - current.y;
-          const bx = next.x - current.x;
-          const by = next.y - current.y;
-          const denominator = Math.hypot(ax, ay) * Math.hypot(bx, by);
-          if (denominator > 0 && Math.abs((ax * bx + ay * by) / denominator) < 0.38) {
-            rightAngles++;
-          }
-        }
-
-        if (vertices.length === 3) {
-          return {
-            type: "triangle",
-            points: interpolateShapeEdges(vertices, averagePressure, 8)
-          };
-        }
-
-        if (rightAngles >= 3) {
-          return {
-            type: Math.abs(width - height) / Math.max(width, height) < 0.16
-              ? "square"
-              : "rectangle",
-            points: interpolateShapeEdges(vertices, averagePressure, 8)
-          };
-        }
-
-        if (vertices.length === 4) {
-          const sides = vertices.map((p, i) =>
-            shapePointDistance(p, vertices[(i + 1) % 4]));
-          const oppositeParallel = (a, b) => {
-            const cross = a.x * b.y - a.y * b.x;
-            return Math.abs(cross) / Math.max(1, Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y));
-          };
-          const edgeA = { x: vertices[1].x - vertices[0].x, y: vertices[1].y - vertices[0].y };
-          const edgeB = { x: vertices[3].x - vertices[2].x, y: vertices[3].y - vertices[2].y };
-          const edgeC = { x: vertices[2].x - vertices[1].x, y: vertices[2].y - vertices[1].y };
-          const edgeD = { x: vertices[0].x - vertices[3].x, y: vertices[0].y - vertices[3].y };
-          const parallelA = oppositeParallel(edgeA, edgeB) < 0.16;
-          const parallelB = oppositeParallel(edgeC, edgeD) < 0.16;
-          const equalSides = sides.every(side =>
-            Math.abs(side - sides[0]) / Math.max(1, sides[0]) < 0.18);
-          const type = parallelA && parallelB
-            ? (equalSides ? "rhombus" : "parallelogram")
-            : (parallelA || parallelB ? "trapezoid" : "quadrilateral");
-          return { type, points: interpolateShapeEdges(vertices, averagePressure, 8) };
-        }
-
-        if (vertices.length >= 5) {
-          const center = {
-            x: vertices.reduce((sum, p) => sum + p.x, 0) / vertices.length,
-            y: vertices.reduce((sum, p) => sum + p.y, 0) / vertices.length
-          };
-          const radii = vertices.map(p => shapePointDistance(center, p));
-          const high = Math.max(...radii);
-          const low = Math.min(...radii);
-          const alternating = vertices.length >= 8 &&
-            radii.every((r, i) =>
-              i % 2 === 0 ? r >= (high + low) / 2 : r <= (high + low) / 2);
-          if (alternating && low / Math.max(1, high) < 0.78) {
-            return { type: "star", points: interpolateShapeEdges(vertices, averagePressure, 8) };
-          }
-          const names = {
-            5: "pentagon", 6: "hexagon", 7: "heptagon", 8: "octagon",
-            9: "nonagon", 10: "decagon", 11: "hendecagon", 12: "dodecagon"
-          };
-          return {
-            type: names[vertices.length] || "polygon",
-            points: interpolateShapeEdges(vertices, averagePressure, 8)
-          };
-        }
-      }
-    }
-  }
-
-  // الخط المستقيم: يجب أن يكون طويلاً ومنخفض الانحراف عن المحور بين طرفيه.
-  const lineLength = shapePointDistance(first, last);
-  if (lineLength >= 30 && !isClosed) {
-    let maximumDeviation = 0;
-    for (const point of points) {
-      const deviation = Math.abs(
-        (last.x - first.x) * (first.y - point.y) -
-        (first.x - point.x) * (last.y - first.y)
-      ) / lineLength;
-      maximumDeviation = Math.max(maximumDeviation, deviation);
-    }
-    if (maximumDeviation / lineLength < 0.035 + strength * 0.025) {
-      return {
-        type: "line",
-        points: [
-          { ...first, pressure: averagePressure },
-          { ...last, pressure: averagePressure }
-        ]
-      };
-    }
-  }
-
-  // المنحنيات المفتوحة: قوس دائري أو منحنى حر ناعم.
-  if (!isClosed && points.length >= 8) {
-    const start = points[0];
-    const middle = points[Math.floor(points.length / 2)];
-    const finish = points[points.length - 1];
-    const determinant = 2 * (
-      start.x * (middle.y - finish.y) +
-      middle.x * (finish.y - start.y) +
-      finish.x * (start.y - middle.y)
-    );
-
-    if (Math.abs(determinant) > 0.001) {
-      const a2 = start.x * start.x + start.y * start.y;
-      const b2 = middle.x * middle.x + middle.y * middle.y;
-      const c2 = finish.x * finish.x + finish.y * finish.y;
-      const cx = (a2 * (middle.y - finish.y) +
-        b2 * (finish.y - start.y) + c2 * (start.y - middle.y)) / determinant;
-      const cy = (a2 * (finish.x - middle.x) +
-        b2 * (start.x - finish.x) + c2 * (middle.x - start.x)) / determinant;
-      const radius = shapePointDistance({ x: cx, y: cy }, start);
-      if (Number.isFinite(radius) && radius >= 8) {
-        const angles = points.map(p => Math.atan2(p.y - cy, p.x - cx));
-        let sweep = 0;
-        for (let i = 1; i < angles.length; i++) {
-          let delta = angles[i] - angles[i - 1];
-          while (delta > Math.PI) delta -= Math.PI * 2;
-          while (delta < -Math.PI) delta += Math.PI * 2;
-          sweep += delta;
-        }
-        let radialError = 0;
-        for (const p of points) {
-          radialError += Math.abs(shapePointDistance({ x: cx, y: cy }, p) - radius);
-        }
-        radialError /= points.length * radius;
-        if (Math.abs(sweep) > 0.25 && Math.abs(sweep) < Math.PI * 2.1 && radialError < 0.075) {
-          const arcPoints = [];
-          const steps = Math.max(24, Math.ceil(Math.abs(sweep) * 20));
-          for (let i = 0; i <= steps; i++) {
-            const angle = angles[0] + sweep * i / steps;
-            arcPoints.push({
-              x: cx + Math.cos(angle) * radius,
-              y: cy + Math.sin(angle) * radius,
-              pressure: averagePressure,
-              time: Date.now()
-            });
-          }
-          return { type: "arc", points: arcPoints };
-        }
-      }
-    }
-
-    // منحنى حر: نعيد أخذ العينات على المسار لتقليل الاهتزاز دون تغيير اتجاهه.
-    let pathLength = 0;
-    for (let i = 1; i < points.length; i++) {
-      pathLength += shapePointDistance(points[i - 1], points[i]);
-    }
-    const chordLength = shapePointDistance(start, finish);
-    if (pathLength > chordLength * 1.08 && pathLength < chordLength * 3.8) {
-      const sampled = [];
-      const count = Math.max(48, Math.min(120, points.length * 3));
-      const cumulative = [0];
-      for (let i = 1; i < points.length; i++) {
-        cumulative.push(cumulative[i - 1] + shapePointDistance(points[i - 1], points[i]));
-      }
-      const total = cumulative[cumulative.length - 1];
-      let segment = 1;
-      for (let i = 0; i < count; i++) {
-        const target = total * i / (count - 1);
-        while (segment < cumulative.length - 1 && cumulative[segment] < target) segment++;
-        const a = points[segment - 1];
-        const b = points[segment];
-        const span = cumulative[segment] - cumulative[segment - 1];
-        const t = span > 0 ? (target - cumulative[segment - 1]) / span : 0;
-        sampled.push({
-          x: a.x + (b.x - a.x) * t,
-          y: a.y + (b.y - a.y) * t,
-          pressure: averagePressure,
-          time: Date.now()
-        });
-      }
-      return { type: "freeform-curve", points: sampled };
-    }
-  }
-
-  return null;
-}
-
-/* =========================================================
    5. DRAWING ENGINE
 ========================================================= */
 
@@ -1371,7 +1032,7 @@ export class DrawingEngine {
     this.coordinates = coordinates;
 
     this.settings = {
-      tool: "pen",
+      tool: "pencil",
       color: "#111111",
       size: 3,
       opacity: 1,
@@ -1383,6 +1044,7 @@ export class DrawingEngine {
       eraserMode: "partial",
       calligraphyAngle: 45
     };
+
 
     this.builder = new StrokeBuilder({
       smoothing: this.settings.lineCorrection,
@@ -1403,8 +1065,44 @@ export class DrawingEngine {
     this.shapeRecognitionTimer = null;
     this.renderFrameId = null;
     this.renderFrameUsesTimeout = false;
+    this.canvasPreviewPointCount = 0;
+    this.canvasPreviewTransform = null;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
+    this.workerRequestId = 0;
+    this.smoothingWorker = null;
+    if (typeof Worker !== "undefined") {
+      try {
+        this.smoothingWorker = new Worker(
+          new URL("./smoothing-worker.js", import.meta.url),
+          { type: "module" }
+        );
+        this.smoothingWorker.onmessage = event => {
+          const result = event.data || {};
+          if (result.id !== this.workerRequestId) return;
+          if (!this.drawing || this.destroyed || this.builder.deferSmoothing) return;
+          if (!Array.isArray(result.points)) {
+            this.builder.workerFilteredPoints = null;
+            this.renderCurrent();
+            return;
+          }
+          this.builder.workerFilteredPoints = result.points;
+          this.renderCurrent();
+        };
+        this.smoothingWorker.onerror = error => {
+          console.warn("Rasem smoothing worker failed; using main-thread fallback.", error);
+          this.smoothingWorker?.terminate?.();
+          this.smoothingWorker = null;
+          if (this.drawing && !this.builder.deferSmoothing) {
+            this.builder.workerFilteredPoints = null;
+            this.renderCurrent();
+          }
+        };
+      } catch (error) {
+        console.warn("Rasem smoothing worker unavailable; using main-thread fallback.", error);
+        this.smoothingWorker = null;
+      }
+    }
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
       this.renderer,
@@ -1593,6 +1291,7 @@ export class DrawingEngine {
     this.activePointer = event.pointerId ?? null;
 
     this.points = [];
+    this.canvasPreviewPointCount = 0;
     this.lastPoint = null;
     this.changed = false;
     this.erasedIds.clear();
@@ -1708,6 +1407,8 @@ export class DrawingEngine {
       this.clearShapeRecognitionTimer();
       // استئناف الحركة يعيد المسار إلى العرض الخام ويعيد انتظار السكون.
       this.builder.deferSmoothing = true;
+      this.builder.workerFilteredPoints = null;
+      this.workerRequestId++;
     }
 
     const added = this.addPoint(point, input);
@@ -1754,7 +1455,7 @@ export class DrawingEngine {
       // هذا التنعيم محافظ ويخص الانحناءات؛ لا يشغّل التعرف الهندسي.
       this.idleCorrectionApplied = true;
       this.builder.deferSmoothing = false;
-      this.renderCurrent();
+      if (!this.requestWorkerSmoothing()) this.renderCurrent();
 
       // لا نحوّل ضربات الخط العربي إلى أشكال هندسية؛
       // نكتفي بتنعيم مسارها بعد انتهاء الكتابة والتوقف عند نهايته.
@@ -1770,18 +1471,45 @@ export class DrawingEngine {
         this.builder.points.length < 8
       ) return;
 
-      const confirmed = recognizeHeldShape(
-        this.builder.points,
-        this.settings.lineCorrection
-      );
-      if (!confirmed?.points?.length) return;
+      const confirmed = recognizeShape(this.builder.points, {
+        strength: this.settings.lineCorrection
+      });
+      // لا نعتمد أي تحويل هندسي إلا عندما تتجاوز الثقة الحد المحافظ.
+      if (!confirmed?.points?.length || confirmed.confidence < 0.72) return;
 
+      // إبطال نتيجة التنعيم السابقة لأن هندسة الضربة تغيرت بالتعرف.
+      this.workerRequestId++;
+      this.builder.workerFilteredPoints = null;
       this.builder.points = confirmed.points.map(point => ({ ...point }));
       this.points = this.builder.points;
       this.lastPoint = this.builder.points.at(-1) || null;
       this.shapeRecognitionApplied = true;
+      this.currentElement.recognition = {
+        type: confirmed.type,
+        confidence: confirmed.confidence,
+        corners: Array.isArray(confirmed.corners) ? confirmed.corners.length : 0,
+        angles: confirmed.angles || [],
+        angleTypes: confirmed.angleTypes || []
+      };
       this.renderCurrent();
-    }, 1300);
+    }, 400);
+  }
+
+  requestWorkerSmoothing() {
+    if (!this.smoothingWorker || !this.drawing || this.builder.points.length < 3) return false;
+    const id = ++this.workerRequestId;
+    const points = this.builder.points.map(point => ({ ...point }));
+    try {
+      this.smoothingWorker.postMessage({
+        id,
+        points,
+        strength: this.settings.lineCorrection
+      });
+      return true;
+    } catch (error) {
+      console.warn("Rasem smoothing worker request failed; using main-thread fallback.", error);
+      return false;
+    }
   }
 
   buildPath(points) {
@@ -1824,6 +1552,102 @@ export class DrawingEngine {
   renderCurrent() {
     if (!this.currentElement) return false;
 
+    // Live preview for every drawing pen: avoid building a complete SVG
+    // outline on each pointer event. Canvas receives only the new samples.
+    if (this.drawing && this.builder.deferSmoothing) {
+      const source = this.builder.points;
+      this.renderer.resizeCanvasPreview?.();
+      const canvas = this.renderer.canvasPreview;
+      const rect = canvas?.getBoundingClientRect?.();
+      const screenOrigin = this.coordinates.worldToScreen(0, 0);
+      const screenUnit = this.coordinates.worldToScreen(1, 0);
+      const screenScale = screenOrigin && screenUnit
+        ? Math.hypot(screenUnit.x - screenOrigin.x, screenUnit.y - screenOrigin.y)
+        : 1;
+      const transform = screenOrigin ? {
+        x: screenOrigin.x,
+        y: screenOrigin.y,
+        scale: screenScale
+      } : null;
+      const previousTransform = this.canvasPreviewTransform;
+      const transformChanged = transform && previousTransform && (
+        Math.abs(transform.x - previousTransform.x) > 0.25 ||
+        Math.abs(transform.y - previousTransform.y) > 0.25 ||
+        Math.abs(transform.scale - previousTransform.scale) > 0.001
+      );
+      if (transformChanged) {
+        this.renderer.clearCanvasPreview?.();
+        this.canvasPreviewPointCount = 0;
+      }
+      this.canvasPreviewTransform = transform;
+      const canvasNeedsReset = this.renderer.canvasPreviewId !== this.currentElement.id;
+      const from = canvasNeedsReset ? 0 : Math.max(0, this.canvasPreviewPointCount - 1);
+      const screenPoints = rect ? source.slice(from).map(point => {
+        const screen = this.coordinates.worldToScreen(point);
+        return screen ? {
+          x: screen.x - rect.left,
+          y: screen.y - rect.top,
+          pressure: point.pressure,
+          time: point.time
+        } : null;
+      }).filter(Boolean) : [];
+
+      const preset = String(this.builder.brushStyle?.preset || "");
+      const isCalligraphy = this.builder.tool === "calligraphy" ||
+        preset === "calligraphy" || preset.startsWith("cal-");
+      const brushStyle = this.builder.brushStyle || {};
+      this.currentElement.points = source;
+      this.currentElement.renderMode = (isCalligraphy ||
+        (this.builder.pressureEnabled && !["marker", "pencil"].includes(this.builder.tool)))
+        ? "fill" : "stroke";
+      this.currentElement.style = {
+        ...(this.currentElement.style || {}),
+        color: this.builder.color,
+        size: this.builder.baseSize,
+        opacity: this.builder.opacity,
+        fill: isCalligraphy ? this.builder.color : "none",
+        lineCap: brushStyle.lineCap || "round",
+        lineJoin: brushStyle.lineJoin || "round",
+        dashArray: brushStyle.dashArray || "",
+        customBrush: brushStyle.image || null,
+        calligraphyClean: isCalligraphy
+      };
+
+      if (screenPoints.length && this.renderer.appendCanvasPreview?.(
+        this.currentElement.id,
+        screenPoints,
+        { ...this.currentElement.style, size: this.builder.baseSize * screenScale },
+        {
+          tool: this.builder.tool,
+          calligraphy: isCalligraphy,
+          calligraphyAngle: this.builder.calligraphyAngle,
+          pressureEnabled: isCalligraphy || this.builder.tool === "pen"
+            ? this.builder.pressureEnabled : false
+        }
+      )) {
+        this.canvasPreviewPointCount = source.length;
+        return true;
+      }
+
+      // Fallback: retain incremental SVG chunks for calligraphy. Other tools
+      // use the regular SVG renderer only when Canvas is unavailable.
+      const builtPreview = this.builder.build();
+      if (!builtPreview) return false;
+      this.currentElement = {
+        ...this.currentElement,
+        ...builtPreview,
+        points: source
+      };
+      if (isCalligraphy && source.length > 1 && this.builder.calligraphyPreviewDelta) {
+        const appended = this.renderer.appendPreviewChunk?.(
+          this.currentElement,
+          this.builder.calligraphyPreviewDelta
+        );
+        if (appended) return true;
+      }
+      return this.renderer.updateElement(this.currentElement);
+    }
+
     const built = this.builder.build();
     if (!built) return false;
 
@@ -1832,6 +1656,9 @@ export class DrawingEngine {
       ...built,
       points: this.builder.points
     };
+
+    this.renderer.clearCanvasPreview?.();
+    this.canvasPreviewPointCount = 0;
     return this.renderer.updateElement(this.currentElement);
   }
 
@@ -2021,338 +1848,6 @@ export class DrawingEngine {
       Math.max(0.01, zoom);
   }
 
-
-  async fillAt(event) {
-    const layer = this.activeLayer;
-    if (!this.canDraw() || !event) return false;
-
-    const color = this.settings.color;
-    if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) {
-      return false;
-    }
-
-    const svg = this.renderer?.svg;
-    if (!svg || typeof XMLSerializer === "undefined") return false;
-
-    const rect = svg.getBoundingClientRect();
-    if (!(rect.width > 0 && rect.height > 0)) return false;
-
-    // تحديد دقة مناسبة للهاتف لتقليل استهلاك الذاكرة.
-    const scale = Math.min(1, 1100 / rect.width, 1100 / rect.height);
-    const width = Math.max(1, Math.round(rect.width * scale));
-    const height = Math.max(1, Math.round(rect.height * scale));
-    const total = width * height;
-
-    if (total > 1300000) return false;
-
-    // ربط نقطة الضغط بإحداثيات SVG الفعلية، مع مراعاة viewBox والتحويلات.
-    const svgMatrix = svg.getScreenCTM();
-    if (!svgMatrix) return false;
-
-    let viewBox = svg.viewBox?.baseVal;
-    if (!viewBox || !(viewBox.width > 0 && viewBox.height > 0)) {
-      viewBox = {
-        x: 0,
-        y: 0,
-        width: rect.width,
-        height: rect.height
-      };
-    }
-
-    const pointer = svg.createSVGPoint();
-    pointer.x = event.clientX;
-    pointer.y = event.clientY;
-
-    let svgPointer;
-    try {
-      svgPointer = pointer.matrixTransform(svgMatrix.inverse());
-    } catch {
-      return false;
-    }
-
-    const seedX = Math.floor(
-      (svgPointer.x - viewBox.x) * width / viewBox.width
-    );
-    const seedY = Math.floor(
-      (svgPointer.y - viewBox.y) * height / viewBox.height
-    );
-
-    if (seedX < 0 || seedY < 0 || seedX >= width || seedY >= height) {
-      return false;
-    }
-
-    const clone = svg.cloneNode(true);
-    clone.setAttribute("width", String(width));
-    clone.setAttribute("height", String(height));
-
-    clone.setAttribute("width", String(width));
-    clone.setAttribute("height", String(height));
-
-    // تضمين التنسيقات المحسوبة حتى تظهر الخطوط كما يراها المستخدم.
-    try {
-      const originals = [svg, ...svg.querySelectorAll("*")];
-      const copies = [clone, ...clone.querySelectorAll("*")];
-      const properties = [
-        "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
-        "stroke-dasharray", "fill", "fill-opacity", "stroke-opacity",
-        "opacity", "display", "visibility", "font-family", "font-size",
-        "font-weight"
-      ];
-
-      for (let i = 0; i < Math.min(originals.length, copies.length); i++) {
-        const computed = getComputedStyle(originals[i]);
-        const inline = properties
-          .map(key => `${key}:${computed.getPropertyValue(key)}`)
-          .join(";");
-        const previous = copies[i].getAttribute("style") || "";
-        copies[i].setAttribute("style", previous + ";" + inline);
-      }
-    } catch {
-      // يستمر باستخدام التنسيقات الموجودة في SVG عند تعذر قراءة computed style.
-    }
-
-    // نسخة الفحص تعرض حدود العناصر فقط، وليس تعبئاتها الأصلية.
-    const outlineTags = new Set([
-      "path", "rect", "circle", "ellipse",
-      "polygon", "polyline", "line"
-    ]);
-
-    for (const node of clone.querySelectorAll("*")) {
-      if (outlineTags.has(node.localName)) {
-        // !important يمنع قيمة fill المنسوخة داخل style من إظهار التعبئة الأصلية.
-        node.style?.setProperty("fill", "none", "important");
-        node.style?.setProperty("fill-opacity", "1", "important");
-        node.setAttribute("fill", "none");
-        node.setAttribute("fill-opacity", "1");
-      }
-    }
-
-    // جعل صورة الفحص تغطي كامل viewBox دون هوامش letterbox.
-    clone.setAttribute("preserveAspectRatio", "none");
-
-    let objectUrl = null;
-
-    try {
-      const source = new XMLSerializer().serializeToString(clone);
-      const blob = new Blob([source], {
-        type: "image/svg+xml;charset=utf-8"
-      });
-      objectUrl = URL.createObjectURL(blob);
-
-      const image = new Image();
-      await new Promise((resolve, reject) => {
-        image.onload = resolve;
-        image.onerror = reject;
-        image.src = objectUrl;
-      });
-
-      // تحويل نسخة SVG إلى صورة نقطية لفحص الحدود.
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-
-      const context = canvas.getContext("2d", {
-        willReadFrequently: true
-      });
-
-      if (!context) return false;
-
-      context.clearRect(0, 0, width, height);
-      context.drawImage(image, 0, 0, width, height);
-
-      const pixels = context.getImageData(0, 0, width, height).data;
-      const seed = seedY * width + seedX;
-
-      // كل بكسل مرئي من الخطوط الملونة أو الداكنة يمثل جزءاً من الحدود.
-      const boundary = new Uint8Array(total);
-
-      for (let i = 0; i < total; i++) {
-        const alpha = pixels[i * 4 + 3];
-        if (alpha > 12) boundary[i] = 1;
-      }
-
-      // توسيع الحدود بكسلاً واحداً لإغلاق الفجوات الناتجة عن تنعيم الحواف.
-      const expandedBoundary = new Uint8Array(total);
-
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const index = y * width + x;
-          if (!boundary[index]) continue;
-
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              const nx = x + dx;
-              const ny = y + dy;
-
-              if (
-                nx >= 0 && nx < width &&
-                ny >= 0 && ny < height
-              ) {
-                expandedBoundary[ny * width + nx] = 1;
-              }
-            }
-          }
-        }
-      }
-
-      const isBoundary = index => expandedBoundary[index] === 1;
-
-      if (isBoundary(seed)) return false;
-
-      const visited = new Uint8Array(total);
-      const queue = new Int32Array(total);
-      let head = 0;
-      let tail = 0;
-      queue[tail++] = seed;
-      visited[seed] = 1;
-
-      let touchesEdge = false;
-      while (head < tail) {
-        const index = queue[head++];
-        const x = index % width;
-        const y = Math.floor(index / width);
-
-        if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
-          touchesEdge = true;
-        }
-
-        const neighbors = [
-          x > 0 ? index - 1 : -1,
-          x + 1 < width ? index + 1 : -1,
-          y > 0 ? index - width : -1,
-          y + 1 < height ? index + width : -1
-        ];
-
-        for (const next of neighbors) {
-          if (next < 0 || visited[next] || isBoundary(next)) continue;
-          visited[next] = 1;
-          queue[tail++] = next;
-        }
-
-        if (tail >= total) break;
-      }
-
-      // منع تعبئة المساحة الخارجية المفتوحة بالخطأ.
-      if (touchesEdge || tail < 2) return false;
-
-      // ضم حافة الخط إلى التعبئة عندما يكون لونها مطابقاً للون المختار.
-      const fillMask = visited.slice();
-      const targetR = parseInt(color.slice(1, 3), 16);
-      const targetG = parseInt(color.slice(3, 5), 16);
-      const targetB = parseInt(color.slice(5, 7), 16);
-
-      for (let index = 0; index < total; index++) {
-        if (!visited[index]) continue;
-
-        const x = index % width;
-        const y = Math.floor(index / width);
-
-        const neighbors = [
-          x > 0 ? index - 1 : -1,
-          x + 1 < width ? index + 1 : -1,
-          y > 0 ? index - width : -1,
-          y + 1 < height ? index + width : -1
-        ];
-
-        for (const next of neighbors) {
-          if (next < 0 || !boundary[next]) continue;
-
-          const p = next * 4;
-          if (
-            pixels[p + 3] > 12 &&
-            Math.abs(pixels[p] - targetR) <= 45 &&
-            Math.abs(pixels[p + 1] - targetG) <= 45 &&
-            Math.abs(pixels[p + 2] - targetB) <= 45
-          ) {
-            fillMask[next] = 1;
-          }
-        }
-      }
-
-      // تحويل المنطقة إلى مسارات مستطيلة متصلة، وليس صورة نقطية.
-      const parts = [];
-
-      // تحويل كل بكسل من صورة الفحص إلى إحداثيات SVG ثم إلى العالم.
-      const screenToWorld = (px, py) => {
-        const svgPoint = svg.createSVGPoint();
-        svgPoint.x = viewBox.x + px * viewBox.width / width;
-        svgPoint.y = viewBox.y + py * viewBox.height / height;
-
-        const screenPoint = svgPoint.matrixTransform(svgMatrix);
-
-        return this.coordinates.screenToWorld(
-          screenPoint.x,
-          screenPoint.y
-        );
-      };
-
-      for (let y = 0; y < height; y++) {
-        let x = 0;
-        while (x < width) {
-          while (x < width && !fillMask[y * width + x]) x++;
-          if (x >= width) break;
-
-          const start = x;
-          while (x < width && fillMask[y * width + x]) x++;
-          const end = x;
-
-          const a = screenToWorld(start, y);
-          const b = screenToWorld(end, y);
-          const c = screenToWorld(end, y + 1);
-          const d = screenToWorld(start, y + 1);
-
-          if (![a, b, c, d].every(p =>
-            p && Number.isFinite(p.x) && Number.isFinite(p.y)
-          )) return false;
-
-          parts.push(
-            `M${a.x} ${a.y}L${b.x} ${b.y}L${c.x} ${c.y}L${d.x} ${d.y}Z`
-          );
-
-          if (parts.length > 30000) return false;
-        }
-      }
-
-      if (!parts.length || this.activeLayer !== layer || !this.canDraw()) {
-        return false;
-      }
-
-      const element = {
-        id: globalThis.crypto?.randomUUID
-          ? `bucket-${globalThis.crypto.randomUUID()}`
-          : `bucket-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        type: "path",
-        path: parts.join(""),
-        tool: "bucket",
-        style: {
-          fill: color,
-          color,
-          size: 0,
-          opacity: 1
-        }
-      };
-
-      let committed = false;
-      if (typeof this.document.addElement === "function") {
-        committed = this.document.addElement(element);
-      } else {
-        layer.elements.push(element);
-        this.document.touch?.();
-        committed = true;
-      }
-
-      if (committed) {
-        this.commitHistory();
-        this.renderer.render(this.document);
-      }
-      return committed;
-    } catch (error) {
-      console.error("Bucket fill failed:", error);
-      return false;
-    } finally {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    }
-  }
 
   eraseAt(point) {
     const layer = this.activeLayer;
@@ -2663,6 +2158,10 @@ export class DrawingEngine {
   reset() {
     this.cancelScheduledRender();
     this.clearShapeRecognitionTimer();
+    this.workerRequestId++;
+    this.renderer?.clearCanvasPreview?.();
+    this.canvasPreviewPointCount = 0;
+    this.canvasPreviewTransform = null;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.drawing = false;
@@ -2689,6 +2188,8 @@ export class DrawingEngine {
 
     this.arabicWriting?.destroy();
     this.arabicWriting = null;
+    this.smoothingWorker?.terminate?.();
+    this.smoothingWorker = null;
 
     this.document = null;
     this.renderer = null;

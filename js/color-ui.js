@@ -425,6 +425,7 @@
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
+    window.rasem?.setSettings?.({ color: currentColor });
 
     if (openBtn) {
       openBtn.style.setProperty("--selected-color", currentColor);
