@@ -616,7 +616,7 @@ export class StrokeBuilder {
       flat:"flat", chisel:"flat", "cal-kufi":"flat", "cal-italic":"flat", "cal-oblique":"flat",
       square:"square", point:"point", oval:"oval", soft:"soft", dry:"dry", chalk:"dry",
       watercolor:"watercolor", spray:"spray", ink:"ink", highlighter:"highlighter",
-      "marker-round":"marker", round:"round"
+      "marker-round":"marker", "feather-pointed":"point", "feather-flat":"flat", "feather-round":"round", "feather-fan":"soft", "feather-soft":"soft", "feather-dry":"dry", "feather-quill":"ink", "feather-script":"flat", round:"round"
     };
     const kind = profiles[preset];
     if (!kind || preset === "dash" || preset === "custom") return "";
@@ -893,7 +893,7 @@ export class StrokeBuilder {
 
     const preset = String(this.brushStyle?.preset || "round");
     const presetOutline = !isCalligraphy && !["round", "dash", "custom"].includes(preset);
-    const variableWidth = isCalligraphy || presetOutline || (pressureEnabled && this.tool !== "marker" && this.tool !== "pencil");
+    const variableWidth = isCalligraphy || this.tool === "feather" || presetOutline || (pressureEnabled && this.tool !== "marker" && this.tool !== "pencil");
     let path = "";
     if (isCalligraphy) path = this.getCalligraphyOutline();
     else if (presetOutline) path = this.getPresetBrushOutline();
@@ -1725,14 +1725,14 @@ export class DrawingEngine {
       const brushStyle = this.builder.brushStyle || {};
       this.currentElement.points = source;
       this.currentElement.renderMode = (isCalligraphy ||
-        (this.builder.pressureEnabled && !["marker", "pencil"].includes(this.builder.tool)))
+        (this.builder.tool === "feather" || (this.builder.pressureEnabled && !["marker", "pencil"].includes(this.builder.tool))))
         ? "fill" : "stroke";
       this.currentElement.style = {
         ...(this.currentElement.style || {}),
         color: this.builder.color,
         size: this.builder.baseSize,
         opacity: preset === "watercolor" ? this.builder.opacity * 0.72 : preset === "soft" ? this.builder.opacity * 0.82 : this.builder.opacity,
-        fill: isCalligraphy ? this.builder.color : "none",
+        fill: (isCalligraphy || this.builder.tool === "feather") ? this.builder.color : "none",
         lineCap: brushStyle.lineCap || "round",
         lineJoin: brushStyle.lineJoin || "round",
         dashArray: brushStyle.dashArray || "",
