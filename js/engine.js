@@ -1913,6 +1913,11 @@ export class DrawingEngine {
       const isCalligraphy = this.builder.tool === "calligraphy" ||
         preset === "calligraphy" || preset.startsWith("cal-");
       const brushStyle = this.builder.brushStyle || {};
+      const screenOrigin = this.coordinates.worldToScreen(0, 0);
+      const screenUnit = this.coordinates.worldToScreen(1, 0);
+      const screenScale = screenOrigin && screenUnit
+        ? Math.hypot(screenUnit.x - screenOrigin.x, screenUnit.y - screenOrigin.y)
+        : 1;
       this.currentElement.points = source;
       this.currentElement.renderMode = (isCalligraphy ||
         (this.builder.pressureEnabled && !["marker", "pencil"].includes(this.builder.tool)))
@@ -1933,7 +1938,7 @@ export class DrawingEngine {
       if (screenPoints.length && this.renderer.appendCanvasPreview?.(
         this.currentElement.id,
         screenPoints,
-        this.currentElement.style,
+        { ...this.currentElement.style, size: this.builder.baseSize * screenScale },
         {
           tool: this.builder.tool,
           calligraphy: isCalligraphy,
