@@ -24,7 +24,7 @@ import {
   Scene,
   Coordinates,
   EventManager
-} from "./core.js";
+} from "./core.js?v=20261108-02";
 
 import {
   DrawingEngine
