@@ -3763,3 +3763,17 @@ body.dark .canvas-area {
   box-sizing: border-box;
   white-space: normal;
 }
+
+
+/* RASEM_DRAWING_INPUT_SURFACE_FIX
+   Ensure the SVG root receives pointer input even when the touched
+   area is transparent or outside a painted child shape. EventManager
+   is attached to #drawingCanvas and relies on bubbling pointer events.
+*/
+#drawingCanvas {
+  pointer-events: all !important;
+}
+
+#canvasBackground {
+  pointer-events: none !important;
+}
