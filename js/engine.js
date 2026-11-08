@@ -1032,7 +1032,7 @@ export class DrawingEngine {
     this.coordinates = coordinates;
 
     this.settings = {
-      tool: "pen",
+      tool: "pencil",
       color: "#111111",
       size: 3,
       opacity: 1,
