@@ -1897,6 +1897,7 @@ export class DrawingEngine {
     // outline on each pointer event. Canvas receives only the new samples.
     if (this.drawing && this.builder.deferSmoothing) {
       const source = this.builder.points;
+      this.renderer.resizeCanvasPreview?.();
       const canvas = this.renderer.canvasPreview;
       const rect = canvas?.getBoundingClientRect?.();
       const screenOrigin = this.coordinates.worldToScreen(0, 0);
