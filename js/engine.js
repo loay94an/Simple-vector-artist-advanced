@@ -1575,8 +1575,9 @@ export class DrawingEngine {
     const added = this.addPoint(point, input);
 
     if (added) {
+      // أثناء ملامسة الشاشة نعرض مسار الرسم الحي فقط؛
+      // التعرف النهائي على الأشكال مؤجل حتى pointerup.
       this.renderCurrent();
-      this.scheduleShapeRecognition();
     }
 
     return added;
@@ -1692,8 +1693,29 @@ export class DrawingEngine {
         this.addPoint(finalPoint, finalEvent, true);
       }
 
-      // نفّذ التصحيح على كامل الضربة بعد معرفة نقطة نهايتها،
-      // ثم حدّث المعاينة واعتمد نفس النسخة النهائية في المستند.
+      // لا نعتمد الشكل أثناء استمرار اللمس أو عند التوقف المؤقت.
+      // يبدأ التعرف والتصحيح النهائيان فقط بعد رفع الإصبع (pointerup)،
+      // بعد ضم آخر نقطة فعلية إلى الضربة.
+      if (
+        !this.shapeRecognitionApplied &&
+        ["pen", "pencil", "marker"].includes(this.settings.tool) &&
+        this.settings.lineCorrection > 0 &&
+        this.builder.points.length >= 8
+      ) {
+        const confirmed = recognizeHeldShape(
+          this.builder.points,
+          this.settings.lineCorrection
+        );
+
+        if (confirmed?.points?.length) {
+          this.builder.points = confirmed.points.map(point => ({ ...point }));
+          this.points = this.builder.points;
+          this.lastPoint = this.builder.points.at(-1) || null;
+          this.shapeRecognitionApplied = true;
+        }
+      }
+
+      // بناء النسخة المصححة وعرضها بعد رفع الإصبع مباشرة.
       finalizedElement = this.builder.build();
       if (finalizedElement) {
         this.currentElement = {
