@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feature/handwriting-performance-pipeline
 
 jobs:
   build:
