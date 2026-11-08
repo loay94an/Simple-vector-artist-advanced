@@ -1894,6 +1894,10 @@ export class DrawingEngine {
     clone.setAttribute("width", String(width));
     clone.setAttribute("height", String(height));
     clone.setAttribute("preserveAspectRatio", "none");
+    // The page background and editor guides are not drawing boundaries.
+    for (const selector of ["#canvasBackground", "#gridLayer", "#guideLayer", "#selectionLayer", "#previewLayer"]) {
+      clone.querySelector(selector)?.setAttribute("display", "none");
+    }
     try {
       const originals = [svg, ...svg.querySelectorAll("*")];
       const copies = [clone, ...clone.querySelectorAll("*")];
@@ -1905,24 +1909,27 @@ export class DrawingEngine {
       }
     } catch {}
 
-    // Preserve filled-only vector marks as boundaries; strip fill only from stroked geometry.
+    // Render only outlines: normal strokes keep their stroke, while filled-only
+    // marks are converted to a thin outline. This avoids treating a solid fill as
+    // a giant blocked area and lets the user fill inside its contour.
     const outlineTags = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline", "line", "text"]);
     const originals = [svg, ...svg.querySelectorAll("*")];
     const copies = [clone, ...clone.querySelectorAll("*")];
     for (let i = 0; i < Math.min(originals.length, copies.length); i++) {
       const node = copies[i];
-      if (!outlineTags.has(node.localName)) continue;
+      if (!outlineTags.has(node.localName) || node.id === "canvasBackground") continue;
       const computed = getComputedStyle(originals[i]);
       const stroke = computed.getPropertyValue("stroke");
       const fill = computed.getPropertyValue("fill");
       const hasStroke = stroke && stroke !== "none" && Number.parseFloat(computed.getPropertyValue("stroke-width")) > 0;
       const hasFill = fill && fill !== "none" && Number.parseFloat(computed.getPropertyValue("fill-opacity") || "1") > 0;
-      if (hasStroke) {
-        node.style?.setProperty("fill", "none", "important");
-        node.setAttribute("fill", "none");
-      } else if (hasFill) {
-        node.style?.setProperty("stroke", "none", "important");
-        node.setAttribute("stroke", "none");
+      node.style?.setProperty("fill", "none", "important");
+      node.setAttribute("fill", "none");
+      if (!hasStroke && hasFill) {
+        node.style?.setProperty("stroke", fill, "important");
+        node.style?.setProperty("stroke-width", "2", "important");
+        node.setAttribute("stroke", fill);
+        node.setAttribute("stroke-width", "2");
       }
     }
 
