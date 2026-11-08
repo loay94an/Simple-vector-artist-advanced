@@ -3812,3 +3812,56 @@ body.dark .canvas-area {
     box-shadow: 0 2px 10px rgba(15, 23, 42, 0.2) !important;
   }
 }
+
+
+/* Brush and nib gallery: illustrated heads with a clear selected state. */
+.tool-brush-presets,
+.brush-presets-calligraphy {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 7px;
+}
+.brush-preset {
+  min-width: 0;
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 5px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.brush-preset .brush-icon {
+  width: 44px;
+  height: 36px;
+  overflow: visible;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.brush-preset .brush-icon .brush-dots { fill: currentColor; stroke: none; }
+.brush-preset.active,
+.brush-preset[aria-pressed="true"] {
+  color: #fff !important;
+  background: var(--primary) !important;
+  border: 2px solid var(--primary-hover) !important;
+  box-shadow: 0 0 0 3px var(--primary-soft), 0 5px 14px rgba(37,99,235,.2);
+}
+.brush-preset.active .brush-icon,
+.brush-preset[aria-pressed="true"] .brush-icon {
+  color: #fff;
+}
+.brush-preset:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .brush-preset { min-height: 72px; }
+}
