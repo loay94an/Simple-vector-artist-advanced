@@ -104,11 +104,23 @@ function detectCorners(points, closed = false) {
     else straw.push(distance(sampled[(left + n) % n], sampled[right % n]));
   }
   const threshold = median(straw.filter(Number.isFinite)) * 0.94;
+  const angles = sampled.map((_, i) => cornerAngle(sampled, i, window, closed));
   const candidates = [];
   for (let i = closed ? 0 : window; i < (closed ? n : n - window); i++) {
     const prev = straw[(i - 1 + n) % n], next = straw[(i + 1) % n];
-    const angle = cornerAngle(sampled, i, window, closed);
-    if (straw[i] <= threshold && straw[i] <= prev && straw[i] <= next && angle >= 0.58) {
+    const previousAngle = angles[(i - 1 + n) % n];
+    const nextAngle = angles[(i + 1) % n];
+    const angle = angles[i];
+    const strawMinimum =
+      straw[i] <= threshold && straw[i] <= prev && straw[i] <= next && angle >= 0.58;
+    // Sharp turns can be missed by straw minima when hand jitter shifts the
+    // minimum a few samples away from the actual vertex. Keep angle peaks as
+    // an independent candidate source; later segment fitting rejects noise.
+    const anglePeak =
+      angle >= 0.72 &&
+      angle >= previousAngle &&
+      angle >= nextAngle;
+    if (strawMinimum || anglePeak) {
       candidates.push({ index: i, point: sampled[i], straw: straw[i], angle });
     }
   }
