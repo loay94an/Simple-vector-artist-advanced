@@ -1415,6 +1415,7 @@ export class DrawingEngine {
     this.renderFrameId = null;
     this.renderFrameUsesTimeout = false;
     this.canvasPreviewPointCount = 0;
+    this.canvasPreviewTransform = null;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.workerRequestId = 0;
@@ -1896,9 +1897,31 @@ export class DrawingEngine {
     // outline on each pointer event. Canvas receives only the new samples.
     if (this.drawing && this.builder.deferSmoothing) {
       const source = this.builder.points;
-      const from = Math.max(0, this.canvasPreviewPointCount - 1);
       const canvas = this.renderer.canvasPreview;
       const rect = canvas?.getBoundingClientRect?.();
+      const screenOrigin = this.coordinates.worldToScreen(0, 0);
+      const screenUnit = this.coordinates.worldToScreen(1, 0);
+      const screenScale = screenOrigin && screenUnit
+        ? Math.hypot(screenUnit.x - screenOrigin.x, screenUnit.y - screenOrigin.y)
+        : 1;
+      const transform = screenOrigin ? {
+        x: screenOrigin.x,
+        y: screenOrigin.y,
+        scale: screenScale
+      } : null;
+      const previousTransform = this.canvasPreviewTransform;
+      const transformChanged = transform && previousTransform && (
+        Math.abs(transform.x - previousTransform.x) > 0.25 ||
+        Math.abs(transform.y - previousTransform.y) > 0.25 ||
+        Math.abs(transform.scale - previousTransform.scale) > 0.001
+      );
+      if (transformChanged) {
+        this.renderer.clearCanvasPreview?.();
+        this.canvasPreviewPointCount = 0;
+      }
+      this.canvasPreviewTransform = transform;
+      const canvasNeedsReset = this.renderer.canvasPreviewId !== this.currentElement.id;
+      const from = canvasNeedsReset ? 0 : Math.max(0, this.canvasPreviewPointCount - 1);
       const screenPoints = rect ? source.slice(from).map(point => {
         const screen = this.coordinates.worldToScreen(point);
         return screen ? {
@@ -1913,11 +1936,6 @@ export class DrawingEngine {
       const isCalligraphy = this.builder.tool === "calligraphy" ||
         preset === "calligraphy" || preset.startsWith("cal-");
       const brushStyle = this.builder.brushStyle || {};
-      const screenOrigin = this.coordinates.worldToScreen(0, 0);
-      const screenUnit = this.coordinates.worldToScreen(1, 0);
-      const screenScale = screenOrigin && screenUnit
-        ? Math.hypot(screenUnit.x - screenOrigin.x, screenUnit.y - screenOrigin.y)
-        : 1;
       this.currentElement.points = source;
       this.currentElement.renderMode = (isCalligraphy ||
         (this.builder.pressureEnabled && !["marker", "pencil"].includes(this.builder.tool)))
@@ -2815,6 +2833,7 @@ export class DrawingEngine {
     this.workerRequestId++;
     this.renderer?.clearCanvasPreview?.();
     this.canvasPreviewPointCount = 0;
+    this.canvasPreviewTransform = null;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
     this.drawing = false;
