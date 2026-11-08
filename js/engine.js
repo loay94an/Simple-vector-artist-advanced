@@ -1,6 +1,7 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
 import { recognizeShape } from "./shape-recognition.js";
+import { closeBoundaryMask, floodRegion, traceRegionContours, contoursToPath } from "./bucket-fill.js";
 
 /* =========================================================
    RASEM 2.0
@@ -1045,6 +1046,8 @@ export class DrawingEngine {
       calligraphyAngle: 45
     };
 
+    this.bucketSettings = { gap: 1, edgeThreshold: 12, maxPixels: 1300000, resolution: 1 };
+
     this.builder = new StrokeBuilder({
       smoothing: this.settings.lineCorrection,
       minDistance: this.settings.minDistance
@@ -1848,330 +1851,137 @@ export class DrawingEngine {
   }
 
 
+  setBucketSettings(options = {}) {
+    if (!options || typeof options !== "object") return false;
+    if (Number.isFinite(options.gap)) this.bucketSettings.gap = EngineUtils.clamp(Math.round(options.gap), 0, 3);
+    if (Number.isFinite(options.edgeThreshold)) this.bucketSettings.edgeThreshold = EngineUtils.clamp(Math.round(options.edgeThreshold), 1, 96);
+    if (Number.isFinite(options.maxPixels)) this.bucketSettings.maxPixels = EngineUtils.clamp(Math.round(options.maxPixels), 10000, 2000000);
+    if (Number.isFinite(options.resolution)) this.bucketSettings.resolution = EngineUtils.clamp(options.resolution, 0.5, 2);
+    return true;
+  }
+
   async fillAt(event) {
     const layer = this.activeLayer;
     if (!this.canDraw() || !event) return false;
-
     const color = this.settings.color;
-    if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) {
-      return false;
-    }
-
+    if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) return false;
     const svg = this.renderer?.svg;
     if (!svg || typeof XMLSerializer === "undefined") return false;
-
     const rect = svg.getBoundingClientRect();
     if (!(rect.width > 0 && rect.height > 0)) return false;
 
-    // تحديد دقة مناسبة للهاتف لتقليل استهلاك الذاكرة.
-    const scale = Math.min(1, 1100 / rect.width, 1100 / rect.height);
+    const requestedScale = this.bucketSettings.resolution || 1;
+    const scale = Math.min(requestedScale, 1200 / rect.width, 1200 / rect.height);
     const width = Math.max(1, Math.round(rect.width * scale));
     const height = Math.max(1, Math.round(rect.height * scale));
     const total = width * height;
-
-    if (total > 1300000) return false;
-
-    // ربط نقطة الضغط بإحداثيات SVG الفعلية، مع مراعاة viewBox والتحويلات.
+    if (total > this.bucketSettings.maxPixels) return false;
     const svgMatrix = svg.getScreenCTM();
     if (!svgMatrix) return false;
-
     let viewBox = svg.viewBox?.baseVal;
-    if (!viewBox || !(viewBox.width > 0 && viewBox.height > 0)) {
-      viewBox = {
-        x: 0,
-        y: 0,
-        width: rect.width,
-        height: rect.height
-      };
-    }
+    if (!viewBox || !(viewBox.width > 0 && viewBox.height > 0)) viewBox = { x: 0, y: 0, width: rect.width, height: rect.height };
 
     const pointer = svg.createSVGPoint();
     pointer.x = event.clientX;
     pointer.y = event.clientY;
-
     let svgPointer;
-    try {
-      svgPointer = pointer.matrixTransform(svgMatrix.inverse());
-    } catch {
-      return false;
-    }
-
-    const seedX = Math.floor(
-      (svgPointer.x - viewBox.x) * width / viewBox.width
-    );
-    const seedY = Math.floor(
-      (svgPointer.y - viewBox.y) * height / viewBox.height
-    );
-
-    if (seedX < 0 || seedY < 0 || seedX >= width || seedY >= height) {
-      return false;
-    }
+    try { svgPointer = pointer.matrixTransform(svgMatrix.inverse()); } catch { return false; }
+    const seedX = Math.floor((svgPointer.x - viewBox.x) * width / viewBox.width);
+    const seedY = Math.floor((svgPointer.y - viewBox.y) * height / viewBox.height);
+    if (seedX < 0 || seedY < 0 || seedX >= width || seedY >= height) return false;
 
     const clone = svg.cloneNode(true);
     clone.setAttribute("width", String(width));
     clone.setAttribute("height", String(height));
-
-    clone.setAttribute("width", String(width));
-    clone.setAttribute("height", String(height));
-
-    // تضمين التنسيقات المحسوبة حتى تظهر الخطوط كما يراها المستخدم.
+    clone.setAttribute("preserveAspectRatio", "none");
     try {
       const originals = [svg, ...svg.querySelectorAll("*")];
       const copies = [clone, ...clone.querySelectorAll("*")];
-      const properties = [
-        "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin",
-        "stroke-dasharray", "fill", "fill-opacity", "stroke-opacity",
-        "opacity", "display", "visibility", "font-family", "font-size",
-        "font-weight"
-      ];
-
+      const properties = ["stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "fill", "fill-opacity", "stroke-opacity", "opacity", "display", "visibility", "font-family", "font-size", "font-weight"];
       for (let i = 0; i < Math.min(originals.length, copies.length); i++) {
         const computed = getComputedStyle(originals[i]);
-        const inline = properties
-          .map(key => `${key}:${computed.getPropertyValue(key)}`)
-          .join(";");
-        const previous = copies[i].getAttribute("style") || "";
-        copies[i].setAttribute("style", previous + ";" + inline);
+        const inline = properties.map(key => `${key}:${computed.getPropertyValue(key)}`).join(";");
+        copies[i].setAttribute("style", (copies[i].getAttribute("style") || "") + ";" + inline);
       }
-    } catch {
-      // يستمر باستخدام التنسيقات الموجودة في SVG عند تعذر قراءة computed style.
-    }
+    } catch {}
 
-    // نسخة الفحص تعرض حدود العناصر فقط، وليس تعبئاتها الأصلية.
-    const outlineTags = new Set([
-      "path", "rect", "circle", "ellipse",
-      "polygon", "polyline", "line"
-    ]);
-
-    for (const node of clone.querySelectorAll("*")) {
-      if (outlineTags.has(node.localName)) {
-        // !important يمنع قيمة fill المنسوخة داخل style من إظهار التعبئة الأصلية.
+    // Preserve filled-only vector marks as boundaries; strip fill only from stroked geometry.
+    const outlineTags = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline", "line", "text"]);
+    const originals = [svg, ...svg.querySelectorAll("*")];
+    const copies = [clone, ...clone.querySelectorAll("*")];
+    for (let i = 0; i < Math.min(originals.length, copies.length); i++) {
+      const node = copies[i];
+      if (!outlineTags.has(node.localName)) continue;
+      const computed = getComputedStyle(originals[i]);
+      const stroke = computed.getPropertyValue("stroke");
+      const fill = computed.getPropertyValue("fill");
+      const hasStroke = stroke && stroke !== "none" && Number.parseFloat(computed.getPropertyValue("stroke-width")) > 0;
+      const hasFill = fill && fill !== "none" && Number.parseFloat(computed.getPropertyValue("fill-opacity") || "1") > 0;
+      if (hasStroke) {
         node.style?.setProperty("fill", "none", "important");
-        node.style?.setProperty("fill-opacity", "1", "important");
         node.setAttribute("fill", "none");
-        node.setAttribute("fill-opacity", "1");
+      } else if (hasFill) {
+        node.style?.setProperty("stroke", "none", "important");
+        node.setAttribute("stroke", "none");
       }
     }
-
-    // جعل صورة الفحص تغطي كامل viewBox دون هوامش letterbox.
-    clone.setAttribute("preserveAspectRatio", "none");
 
     let objectUrl = null;
-
     try {
       const source = new XMLSerializer().serializeToString(clone);
-      const blob = new Blob([source], {
-        type: "image/svg+xml;charset=utf-8"
-      });
-      objectUrl = URL.createObjectURL(blob);
-
+      objectUrl = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
       const image = new Image();
       await new Promise((resolve, reject) => {
         image.onload = resolve;
         image.onerror = reject;
         image.src = objectUrl;
       });
-
-      // تحويل نسخة SVG إلى صورة نقطية لفحص الحدود.
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-
-      const context = canvas.getContext("2d", {
-        willReadFrequently: true
-      });
-
+      const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) return false;
-
       context.clearRect(0, 0, width, height);
       context.drawImage(image, 0, 0, width, height);
-
       const pixels = context.getImageData(0, 0, width, height).data;
-      const seed = seedY * width + seedX;
-
-      // كل بكسل مرئي من الخطوط الملونة أو الداكنة يمثل جزءاً من الحدود.
       const boundary = new Uint8Array(total);
+      const threshold = this.bucketSettings.edgeThreshold;
+      for (let i = 0; i < total; i++) if (pixels[i * 4 + 3] >= threshold) boundary[i] = 1;
 
-      for (let i = 0; i < total; i++) {
-        const alpha = pixels[i * 4 + 3];
-        if (alpha > 12) boundary[i] = 1;
-      }
+      // Temporary gap closing changes only the detection mask, never the source drawing.
+      const closedBoundary = closeBoundaryMask(boundary, width, height, this.bucketSettings.gap);
+      const region = floodRegion(closedBoundary, width, height, seedX, seedY);
+      if (!region || region.touchesEdge || region.size < 2) return false;
+      const contours = traceRegionContours(region.mask, width, height);
+      if (!contours.length) return false;
 
-      // توسيع الحدود بكسلاً واحداً لإغلاق الفجوات الناتجة عن تنعيم الحواف.
-      const expandedBoundary = new Uint8Array(total);
-
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const index = y * width + x;
-          if (!boundary[index]) continue;
-
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              const nx = x + dx;
-              const ny = y + dy;
-
-              if (
-                nx >= 0 && nx < width &&
-                ny >= 0 && ny < height
-              ) {
-                expandedBoundary[ny * width + nx] = 1;
-              }
-            }
-          }
-        }
-      }
-
-      const isBoundary = index => expandedBoundary[index] === 1;
-
-      if (isBoundary(seed)) return false;
-
-      const visited = new Uint8Array(total);
-      const queue = new Int32Array(total);
-      let head = 0;
-      let tail = 0;
-      queue[tail++] = seed;
-      visited[seed] = 1;
-
-      let touchesEdge = false;
-      while (head < tail) {
-        const index = queue[head++];
-        const x = index % width;
-        const y = Math.floor(index / width);
-
-        if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
-          touchesEdge = true;
-        }
-
-        const neighbors = [
-          x > 0 ? index - 1 : -1,
-          x + 1 < width ? index + 1 : -1,
-          y > 0 ? index - width : -1,
-          y + 1 < height ? index + width : -1
-        ];
-
-        for (const next of neighbors) {
-          if (next < 0 || visited[next] || isBoundary(next)) continue;
-          visited[next] = 1;
-          queue[tail++] = next;
-        }
-
-        if (tail >= total) break;
-      }
-
-      // منع تعبئة المساحة الخارجية المفتوحة بالخطأ.
-      if (touchesEdge || tail < 2) return false;
-
-      // ضم حافة الخط إلى التعبئة عندما يكون لونها مطابقاً للون المختار.
-      const fillMask = visited.slice();
-      const targetR = parseInt(color.slice(1, 3), 16);
-      const targetG = parseInt(color.slice(3, 5), 16);
-      const targetB = parseInt(color.slice(5, 7), 16);
-
-      for (let index = 0; index < total; index++) {
-        if (!visited[index]) continue;
-
-        const x = index % width;
-        const y = Math.floor(index / width);
-
-        const neighbors = [
-          x > 0 ? index - 1 : -1,
-          x + 1 < width ? index + 1 : -1,
-          y > 0 ? index - width : -1,
-          y + 1 < height ? index + width : -1
-        ];
-
-        for (const next of neighbors) {
-          if (next < 0 || !boundary[next]) continue;
-
-          const p = next * 4;
-          if (
-            pixels[p + 3] > 12 &&
-            Math.abs(pixels[p] - targetR) <= 45 &&
-            Math.abs(pixels[p + 1] - targetG) <= 45 &&
-            Math.abs(pixels[p + 2] - targetB) <= 45
-          ) {
-            fillMask[next] = 1;
-          }
-        }
-      }
-
-      // تحويل المنطقة إلى مسارات مستطيلة متصلة، وليس صورة نقطية.
-      const parts = [];
-
-      // تحويل كل بكسل من صورة الفحص إلى إحداثيات SVG ثم إلى العالم.
-      const screenToWorld = (px, py) => {
-        const svgPoint = svg.createSVGPoint();
-        svgPoint.x = viewBox.x + px * viewBox.width / width;
-        svgPoint.y = viewBox.y + py * viewBox.height / height;
-
-        const screenPoint = svgPoint.matrixTransform(svgMatrix);
-
-        return this.coordinates.screenToWorld(
-          screenPoint.x,
-          screenPoint.y
-        );
+      const mapPoint = ({ x, y }) => {
+        const point = svg.createSVGPoint();
+        point.x = viewBox.x + x * viewBox.width / width;
+        point.y = viewBox.y + y * viewBox.height / height;
+        const screenPoint = point.matrixTransform(svgMatrix);
+        return this.coordinates.screenToWorld(screenPoint.x, screenPoint.y);
       };
-
-      for (let y = 0; y < height; y++) {
-        let x = 0;
-        while (x < width) {
-          while (x < width && !fillMask[y * width + x]) x++;
-          if (x >= width) break;
-
-          const start = x;
-          while (x < width && fillMask[y * width + x]) x++;
-          const end = x;
-
-          const a = screenToWorld(start, y);
-          const b = screenToWorld(end, y);
-          const c = screenToWorld(end, y + 1);
-          const d = screenToWorld(start, y + 1);
-
-          if (![a, b, c, d].every(p =>
-            p && Number.isFinite(p.x) && Number.isFinite(p.y)
-          )) return false;
-
-          parts.push(
-            `M${a.x} ${a.y}L${b.x} ${b.y}L${c.x} ${c.y}L${d.x} ${d.y}Z`
-          );
-
-          if (parts.length > 30000) return false;
-        }
-      }
-
-      if (!parts.length || this.activeLayer !== layer || !this.canDraw()) {
-        return false;
-      }
+      const path = contoursToPath(contours, mapPoint);
+      if (!path || this.activeLayer !== layer || !this.canDraw()) return false;
 
       const element = {
-        id: globalThis.crypto?.randomUUID
-          ? `bucket-${globalThis.crypto.randomUUID()}`
-          : `bucket-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: EngineUtils.createId("bucket"),
         type: "path",
-        path: parts.join(""),
+        path,
         tool: "bucket",
-        style: {
-          fill: color,
-          color,
-          size: 0,
-          opacity: 1
-        }
+        bucketFill: true,
+        style: { fill: color, color, size: 0, opacity: this.settings.opacity, lineCap: "round", lineJoin: "round" }
       };
 
-      let committed = false;
-      if (typeof this.document.addElement === "function") {
-        committed = this.document.addElement(element);
-      } else {
-        layer.elements.push(element);
-        this.document.touch?.();
-        committed = true;
-      }
-
-      if (committed) {
-        this.commitHistory();
-        this.renderer.render(this.document);
-      }
-      return committed;
+      // Insert below ordinary strokes to keep the original boundaries crisp.
+      let insertAt = 0;
+      while (insertAt < layer.elements.length && layer.elements[insertAt]?.bucketFill === true) insertAt++;
+      layer.elements.splice(insertAt, 0, element);
+      this.document.touch?.();
+      this.commitHistory();
+      this.renderer.render(this.document);
+      return true;
     } catch (error) {
       console.error("Bucket fill failed:", error);
       return false;
