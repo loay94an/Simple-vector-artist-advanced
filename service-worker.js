@@ -4,12 +4,12 @@
    while preserving full offline support as a robust PWA.
 ========================================================= */
 
-const CACHE_NAME = "rasem-sva-advanced-v11-network-first";
+const CACHE_NAME = "rasem-sva-advanced-v12-network-first";
 const PRECACHE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./css/app.css?v=20261108-02",
+  "./css/app.css?v=20261108-03",
   "./js/app.js?v=20261108-03",
   "./js/core.js",
   "./js/engine.js",
