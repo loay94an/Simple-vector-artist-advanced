@@ -1551,7 +1551,7 @@ export class DrawingEngine {
   }
 
   move(event, pointerData = null) {
-    if (!this.drawing || this.destroyed || this.shapeRecognitionApplied) {
+    if (!this.drawing || this.destroyed) {
       return false;
     }
 
@@ -1572,12 +1572,19 @@ export class DrawingEngine {
 
     const input = pointerData || event;
 
+    // إذا استأنف المستخدم الرسم بعد توقف قصير والتصحيح التلقائي،
+    // نسمح بمتابعة الضربة من آخر نقطة مصححة.
+    if (this.shapeRecognitionApplied) {
+      this.shapeRecognitionApplied = false;
+      this.clearShapeRecognitionTimer();
+    }
+
     const added = this.addPoint(point, input);
 
     if (added) {
-      // أثناء ملامسة الشاشة نعرض مسار الرسم الحي فقط؛
-      // التعرف النهائي على الأشكال مؤجل حتى pointerup.
       this.renderCurrent();
+      // اكتشاف نهاية الضربة عند توقف حركة الإصبع مع بقائه ملامساً للشاشة.
+      this.scheduleShapeRecognition();
     }
 
     return added;
