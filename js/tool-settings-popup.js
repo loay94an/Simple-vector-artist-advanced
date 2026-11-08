@@ -264,6 +264,152 @@
     }
   }
 
+
+  // لكل رأس فرشاة ملف إعدادات مستقل؛ الضغطة الطويلة على الرأس تفتح ملفه.
+  const headProfiles = {
+    feather: {
+      "feather-pointed": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
+      "feather-flat": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
+      "feather-round": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
+      "feather-fan": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
+      "feather-soft": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
+      "feather-dry": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
+      "feather-quill": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
+      "feather-script": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"]
+    },
+    calligraphy: {
+      "*": ["brushSize","brushOpacity","calligraphyAngle","calligraphyEndStyle","pressureEnabled"]
+    },
+    pencil: {
+      "*": ["brushSize","brushOpacity","pressureEnabled"]
+    }
+  };
+  const headLabels = {
+    brushSize:"حجم الرأس", brushOpacity:"شفافية الرأس", pressureEnabled:"استجابة الضغط",
+    calligraphyAngle:"زاوية السن", calligraphyEndStyle:"نهاية الضربة",
+    featherDensity:"عدد الشعيرات", featherSpread:"انتشار الشعيرات",
+    featherSoftness:"نعومة الأثر", featherTaper:"تلاشي البداية والنهاية",
+    featherSpacing:"تباعد الشعيرات", featherGlow:"التوهج"
+  };
+  const headRanges = {
+    brushSize:{min:0.5,max:120,step:0.5}, brushOpacity:{min:0.05,max:1,step:0.01},
+    calligraphyAngle:{min:0,max:180,step:1}, featherDensity:{min:3,max:32,step:1},
+    featherSpread:{min:0,max:1,step:0.05}, featherSoftness:{min:0,max:1,step:0.05},
+    featherTaper:{min:0,max:1,step:0.05}, featherSpacing:{min:0.25,max:2.5,step:0.05},
+    featherGlow:{min:0,max:1,step:0.05}
+  };
+  let headOptionsPanel = null;
+  let headPressTimer = null;
+  let headPressMoved = false;
+  let headPressButton = null;
+  let headLongPressFired = false;
+
+  function headKeysFor(brush) {
+    const group = activeTool === "feather" ? "feather" : activeTool === "calligraphy" ? "calligraphy" : "pencil";
+    return headProfiles[group]?.[brush] || headProfiles[group]?.["*"] || ["brushSize","brushOpacity","pressureEnabled"];
+  }
+
+  function ensureHeadOptionsPanel() {
+    if (headOptionsPanel) return headOptionsPanel;
+    const section = document.getElementById("brushPresetsSection");
+    if (!section) return null;
+    headOptionsPanel = document.createElement("div");
+    headOptionsPanel.id = "brushHeadOptions";
+    headOptionsPanel.className = "brush-head-options";
+    headOptionsPanel.hidden = true;
+    section.appendChild(headOptionsPanel);
+    return headOptionsPanel;
+  }
+
+  function showHeadOptions(brush) {
+    const panel = ensureHeadOptionsPanel();
+    if (!panel) return;
+    if (!settings[activeTool]) settings[activeTool] = {};
+    const toolSettings = settings[activeTool];
+    toolSettings.headSettings ||= {};
+    const profile = toolSettings.headSettings[brush] || {};
+    const keys = headKeysFor(brush);
+    const button = popup.querySelector('[data-brush="' + brush + '"]');
+    const label = button?.querySelector("span")?.textContent || labels[brush] || brush;
+    panel.innerHTML = '<div class="brush-head-options-head"><strong>إعدادات رأس: ' +
+      label.replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])) +
+      '</strong><span>تُحفظ لهذا الرأس وحده</span></div><div class="brush-head-options-grid"></div>';
+    const grid = panel.querySelector(".brush-head-options-grid");
+    keys.forEach(key => {
+      const wrap = document.createElement("label");
+      wrap.className = "brush-head-option";
+      const caption = document.createElement("span");
+      caption.textContent = headLabels[key] || key;
+      wrap.appendChild(caption);
+      if (key === "pressureEnabled") {
+        const select = document.createElement("select");
+        select.dataset.headKey = key;
+        select.innerHTML = '<option value="true">مفعّل</option><option value="false">متوقف</option>';
+        select.value = String(profile[key] ?? document.getElementById(key)?.checked ?? true);
+        wrap.appendChild(select);
+      } else if (key === "calligraphyEndStyle") {
+        const select = document.createElement("select");
+        select.dataset.headKey = key;
+        select.innerHTML = '<option value="none">طبيعية</option><option value="thin">رفيعة</option><option value="wide">عريضة</option><option value="pointed">مدببة</option><option value="crescent">هلال</option>';
+        select.value = profile[key] ?? document.getElementById(key)?.value ?? "none";
+        wrap.appendChild(select);
+      } else {
+        const range = headRanges[key] || {min:0,max:1,step:0.01};
+        const input = document.createElement("input");
+        input.type = "range"; input.min = range.min; input.max = range.max; input.step = range.step;
+        input.dataset.headKey = key;
+        const sourceId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
+        input.value = String(profile[key] ?? document.getElementById(sourceId)?.value ?? (key === "featherDensity" ? 10 : 0));
+        wrap.appendChild(input);
+        const value = document.createElement("output");
+        value.textContent = key === "brushOpacity" || key === "featherGlow" || key === "featherSpread" || key === "featherSoftness" || key === "featherTaper" ? Math.round(Number(input.value)*100)+"%" : input.value + (key === "calligraphyAngle" ? "°" : "");
+        wrap.appendChild(value);
+        input.addEventListener("input", () => { value.textContent = key === "brushOpacity" || key.startsWith("feather") && key !== "featherDensity" ? Math.round(Number(input.value)*100)+"%" : input.value + (key === "calligraphyAngle" ? "°" : ""); });
+      }
+      grid.appendChild(wrap);
+    });
+    const note = document.createElement("p");
+    note.className = "brush-head-options-note";
+    note.textContent = "اضغط مطولاً على رأس آخر لفتح إعداداته. التغيير هنا لا يبدّل إعدادات الرؤوس الأخرى.";
+    panel.appendChild(note);
+    panel.hidden = false;
+    panel.querySelectorAll("[data-head-key]").forEach(control => {
+      control.addEventListener("input", () => saveHeadProfile(brush, control));
+      control.addEventListener("change", () => saveHeadProfile(brush, control));
+    });
+  }
+
+  function saveHeadProfile(brush, control) {
+    if (!settings[activeTool]) settings[activeTool] = {};
+    const toolSettings = settings[activeTool];
+    toolSettings.headSettings ||= {};
+    toolSettings.headSettings[brush] ||= {};
+    const key = control.dataset.headKey;
+    const value = key === "pressureEnabled" ? control.value === "true" :
+      key === "calligraphyEndStyle" ? control.value : Number(control.value);
+    toolSettings.headSettings[brush][key] = value;
+    const targetId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
+    const target = document.getElementById(targetId);
+    if (target) {
+      if (key === "pressureEnabled") target.checked = value;
+      else target.value = String(value);
+    }
+    save();
+    updateOutputs();
+  }
+
+  function restoreHeadProfile(brush) {
+    const profile = settings[activeTool]?.headSettings?.[brush];
+    if (!profile) return;
+    Object.entries(profile).forEach(([key,value]) => {
+      const id = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
+      const input = document.getElementById(id);
+      if (!input) return;
+      if (key === "pressureEnabled") input.checked = Boolean(value);
+      else input.value = String(value);
+    });
+  }
+
   function restore(tool) {
     activeTool = tool;
 
@@ -310,6 +456,7 @@
     }
 
     const current = settings[tool];
+    restoreHeadProfile(current.brush || (tool === "calligraphy" ? "calligraphy" : "round"));
 
     const brushSettings = [
       ["brushSize", "brushSizeValue"],
@@ -582,6 +729,7 @@
 
       save();
       updateOutputs();
+      showHeadOptions(button.dataset.brush);
       return;
     }
 
@@ -607,6 +755,43 @@
       save();
       return;
     }
+  });
+
+
+  // Long press on an individual brush/nib opens only that head's settings.
+  popup.addEventListener("pointerdown", event => {
+    const button = event.target.closest("#brushPresetsSection [data-brush]");
+    if (!button) return;
+    headPressButton = button;
+    headPressMoved = false;
+    headLongPressFired = false;
+    clearTimeout(headPressTimer);
+    button.classList.add("tool-pressing");
+    headPressTimer = setTimeout(() => {
+      if (!headPressButton || headPressMoved) return;
+      headLongPressFired = true;
+      button.classList.remove("tool-pressing");
+      if (navigator.vibrate) { try { navigator.vibrate(35); } catch {} }
+      button.click();
+      showHeadOptions(button.dataset.brush);
+    }, 450);
+  });
+  popup.addEventListener("pointermove", event => {
+    if (!headPressTimer) return;
+    if (headPressButton && Math.hypot(event.clientX - Number(headPressButton.dataset.pressX || event.clientX), event.clientY - Number(headPressButton.dataset.pressY || event.clientY)) > 14) {
+      headPressMoved = true; clearTimeout(headPressTimer); headPressTimer = null;
+      headPressButton.classList.remove("tool-pressing");
+    }
+  });
+  const cancelHeadPress = () => {
+    clearTimeout(headPressTimer); headPressTimer = null;
+    headPressButton?.classList.remove("tool-pressing");
+    headPressButton = null;
+  };
+  popup.addEventListener("pointerup", cancelHeadPress);
+  popup.addEventListener("pointercancel", cancelHeadPress);
+  popup.addEventListener("contextmenu", event => {
+    if (event.target.closest("#brushPresetsSection [data-brush]")) event.preventDefault();
   });
 
   popup.addEventListener("input", event => {
