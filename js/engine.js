@@ -616,7 +616,7 @@ export class StrokeBuilder {
       flat:"flat", chisel:"flat", "cal-kufi":"flat", "cal-italic":"flat", "cal-oblique":"flat",
       square:"square", point:"point", oval:"oval", soft:"soft", dry:"dry", chalk:"dry",
       watercolor:"watercolor", spray:"spray", ink:"ink", highlighter:"highlighter",
-      "marker-round":"marker", "feather-pointed":"point", "feather-flat":"flat", "feather-round":"round", "feather-fan":"soft", "feather-soft":"soft", "feather-dry":"dry", "feather-quill":"ink", "feather-script":"flat", round:"round"
+"feather-pointed":"point", "feather-flat":"flat", "feather-round":"round", "feather-fan":"soft", "feather-soft":"soft", "feather-dry":"dry", "feather-quill":"ink", "feather-script":"flat", round:"round"
     };
     const kind = profiles[preset];
     if (!kind || preset === "dash" || preset === "custom") return "";
