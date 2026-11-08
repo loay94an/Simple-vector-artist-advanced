@@ -638,6 +638,34 @@ export class StrokeBuilder {
       return Math.max(0.35,r);
     };
     const poly = pts => pts.map((p,i)=>`${i?"L":"M"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ")+" Z";
+    if (preset.startsWith("feather-")) {
+      const density = EngineUtils.clamp(Math.round(EngineUtils.number(this.brushStyle?.featherDensity, 10)), 3, 32);
+      const spread = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpread, 0.45), 0, 1);
+      const softness = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSoftness, 0.35), 0, 1);
+      const taper = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTaper, 0.7), 0, 1);
+      const lanes = preset === "feather-fan" ? density : preset === "feather-dry" ? Math.max(3, Math.round(density * 0.65)) : preset === "feather-flat" ? Math.max(3, Math.round(density * 0.45)) : preset === "feather-soft" ? Math.max(3, Math.round(density * 0.7)) : 1;
+      const paths = [];
+      for (let lane = 0; lane < lanes; lane++) {
+        const ratio = lanes === 1 ? 0 : lane / (lanes - 1) - 0.5;
+        const leftSide = [], rightSide = [];
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i], a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+          const nx = -dy / len, ny = dx / len;
+          const progress = points.length <= 1 ? 0.5 : i / (points.length - 1);
+          const endTaper = Math.max(0.08, 1 - taper * (1 - Math.min(1, Math.min(progress, 1 - progress) * 5)));
+          const r = radiusAt(p, i) * endTaper;
+          const laneOffset = ratio * spread * r * 1.65;
+          const laneRadius = Math.max(0.22, r * (preset === "feather-fan" ? 0.12 : preset === "feather-flat" ? 0.30 : preset === "feather-dry" ? 0.10 : 0.42));
+          const cx = p.x + nx * laneOffset, cy = p.y + ny * laneOffset;
+          leftSide.push({x:cx + nx * laneRadius, y:cy + ny * laneRadius});
+          rightSide.push({x:cx - nx * laneRadius, y:cy - ny * laneRadius});
+        }
+        paths.push(poly([...leftSide, ...rightSide.reverse()]));
+      }
+      return paths.join(" ");
+    }
+
     if (points.length === 1) {
       const p=points[0],r=radiusAt(p,0);
       if(kind==="flat"){const tx=-nibY,ty=nibX,h=Math.max(1,r*0.7);return poly([
@@ -932,7 +960,11 @@ export class StrokeBuilder {
         calligraphyClean: isCalligraphy,
         brushPreset: preset,
         brushAngle: this.calligraphyAngle,
-        brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity
+        brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity,
+        featherDensity: this.brushStyle?.featherDensity ?? 10,
+        featherSpread: this.brushStyle?.featherSpread ?? 0.45,
+        featherSoftness: this.brushStyle?.featherSoftness ?? 0.35,
+        featherTaper: this.brushStyle?.featherTaper ?? 0.7
       }
     };
   }
@@ -1739,7 +1771,11 @@ export class DrawingEngine {
         customBrush: brushStyle.image || null,
         calligraphyClean: isCalligraphy,
         brushPreset: brushStyle.preset || "round",
-        brushAngle: this.builder.calligraphyAngle
+        brushAngle: this.builder.calligraphyAngle,
+        featherDensity: brushStyle.featherDensity ?? 10,
+        featherSpread: brushStyle.featherSpread ?? 0.45,
+        featherSoftness: brushStyle.featherSoftness ?? 0.35,
+        featherTaper: brushStyle.featherTaper ?? 0.7
       };
 
       if (screenPoints.length && this.renderer.appendCanvasPreview?.(
@@ -1751,6 +1787,10 @@ export class DrawingEngine {
           calligraphy: isCalligraphy,
           calligraphyAngle: this.builder.calligraphyAngle,
           brushPreset: brushStyle.preset || "round",
+          featherDensity: brushStyle.featherDensity,
+          featherSpread: brushStyle.featherSpread,
+          featherSoftness: brushStyle.featherSoftness,
+          featherTaper: brushStyle.featherTaper,
           pressureEnabled: this.builder.pressureEnabled
         }
       )) {
