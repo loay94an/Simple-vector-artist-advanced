@@ -731,12 +731,17 @@ export class Scene {
       node.style.filter = "none";
       node.removeAttribute("filter");
     } else {
+      const isFeather = style.brushPreset?.startsWith("feather-");
       const featherGlow = clamp(numberOr(Number(style.featherGlow), 0), 0, 1);
-      if (style.brushPreset?.startsWith("feather-") && featherGlow > 0) {
-        node.style.filter = `drop-shadow(0 0 ${(Number(style.size) || 2) * featherGlow * 0.9}px ${color})`;
-      } else {
-        node.style.filter = "none";
+      const featherSoftness = clamp(numberOr(Number(style.featherSoftness), 0), 0, 1);
+      const filters = [];
+      if (isFeather && featherSoftness > 0) {
+        filters.push(`blur(${(Number(style.size) || 2) * featherSoftness * 0.16}px)`);
       }
+      if (isFeather && featherGlow > 0) {
+        filters.push(`drop-shadow(0 0 ${(Number(style.size) || 2) * featherGlow * 0.9}px ${color})`);
+      }
+      node.style.filter = filters.length ? filters.join(" ") : "none";
     }
     const customBrush = style.customBrush;
 
@@ -1121,12 +1126,19 @@ export class Scene {
       const softness=Math.max(0,Math.min(1,Number(options.featherSoftness??style.featherSoftness??0.35)));
       const taper=Math.max(0,Math.min(1,Number(options.featherTaper??style.featherTaper??0.7)));
       context.save();context.globalAlpha=opacity;
-      // Feather strokes should stay crisp: no colored shadow or blur halo.
-      context.shadowColor=glow>0?color:"transparent";context.shadowBlur=glow>0?size*glow*0.9:0;
+      // Draw all bristle lanes as one compound fill. Separate fills darken
+      // overlapping centers when opacity is below 100%.
+      const blur=Math.max(glow*size*0.9,softness*size*0.16);
+      context.shadowColor=blur>0?color:"transparent";context.shadowBlur=blur;
       const lanes=preset==="feather-fan"?density:preset==="feather-dry"?Math.max(3,Math.round(density*0.65)):preset==="feather-flat"?Math.max(3,Math.round(density*0.45)):preset==="feather-soft"?Math.max(3,Math.round(density*0.7)):1;
+      if(points.length===1){
+        const p=points[0],r=radius(p,p,p);
+        context.beginPath();context.arc(p.x,p.y,Math.max(0.35,r),0,Math.PI*2);context.fill();
+        context.restore();this.canvasPreviewCount+=points.length;return true;
+      }
+      context.beginPath();
       for(let lane=0;lane<lanes;lane++){
         const ratio=lanes===1?0:lane/(lanes-1)-0.5;
-        context.beginPath();
         for(let i=0;i<points.length;i++){
           const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
           const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
@@ -1147,8 +1159,10 @@ export class Scene {
           const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
           context.lineTo(p.x+nx*offset-nx*laneWidth,p.y+ny*offset-ny*laneWidth);
         }
-        context.closePath();context.fill();
+        context.closePath();
       }
+      // A single fill prevents alpha accumulation where bristles overlap.
+      context.fill();
       context.restore();this.canvasPreviewCount+=points.length;return true;
     }
     const draw=(a,b,isLast=false)=>{const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len,ra=radius(a,a,b);let rb=radius(b,a,b);
