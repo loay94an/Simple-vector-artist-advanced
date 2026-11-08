@@ -170,7 +170,8 @@ export class ArabicWritingAssistant {
 
   observe(element, layer) {
     if (this.destroyed || !element || !layer) return false;
-    if (!["pen", "pencil", "calligraphy"].includes(element.tool)) return false;
+    // قلم الخط العربي مستثنى تماماً من تحليل الحروف وتجميع الضربات.
+    if (!["pen", "pencil"].includes(element.tool)) return false;
     if (!Array.isArray(element.points) || element.points.length < 2) return false;
 
     const bounds = boundsOf(element.points);

@@ -1806,7 +1806,10 @@ export class DrawingEngine {
 
             if (committed) {
               this.commitHistory();
-              this.arabicWriting?.observe(element, layer, this.settings);
+              // Arabic stroke recognition is intentionally disabled for the calligraphy tool.
+              if (element.tool !== "calligraphy") {
+                this.arabicWriting?.observe(element, layer, this.settings);
+              }
             }
           }
         }
