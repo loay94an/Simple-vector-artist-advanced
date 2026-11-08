@@ -507,8 +507,8 @@ export class RasemApplication {
           this.handleMultitouch(pointers);
         },
 
-        multitouchEnd: () => {
-          this.handleMultitouchEnd();
+        multitouchEnd: (pointers, event) => {
+          this.handleMultitouchEnd(event);
         },
 
         pointerCount: count => {
@@ -662,7 +662,7 @@ export class RasemApplication {
     };
   }
 
-  handleMultitouchEnd() {
+  handleMultitouchEnd(event = null) {
     const wasSelectionGesture =
       this.pointerGesture?.mode === "selection";
 
@@ -670,7 +670,10 @@ export class RasemApplication {
 
     if (wasSelectionGesture) {
       const selector = window.rasem?.tools?.get?.("selector");
-      selector?.endMultiTouch();
+      const wasCancelled = event?.type === "pointercancel" ||
+        event?.type === "lostpointercapture";
+      if (wasCancelled) selector?.cancel?.();
+      else selector?.endMultiTouch?.();
     } else {
       if (this.modules.engine?.drawing) {
         this.modules.engine.cancel();
