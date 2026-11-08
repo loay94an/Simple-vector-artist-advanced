@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
@@ -24,6 +27,8 @@ jobs:
           java-version: 21
       - name: Install dependencies
         run: npm ci
+      - name: Test drawing algorithms
+        run: npm test
       - name: Build web application
         run: npm run build
       - name: Sync Android
