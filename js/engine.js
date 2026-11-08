@@ -126,9 +126,17 @@ export class Smoothing {
       totalLength += this.distance(points[i - 1], points[i]);
     }
     const averageStep = totalLength / Math.max(1, points.length - 1);
-    const passes = points.length < 5
+    // عند 100% نرفع عدد التمريرات بوضوح، مع مراعاة أن
+    // المسارات القصيرة جداً قليلة العينات لا تحتمل الإفراط في التنعيم.
+    const passes = points.length < 3
       ? 1
-      : (strength >= 0.72 ? 3 : (strength >= 0.22 ? 2 : 1));
+      : (strength >= 0.95
+        ? (points.length < 5 ? 1 : 6)
+        : (strength >= 0.85
+          ? (points.length < 5 ? 1 : 5)
+          : (strength >= 0.72
+            ? (points.length < 5 ? 1 : 4)
+            : (strength >= 0.22 ? 2 : 1))));
 
     // الضربات الكثيفة تستفيد من تنعيم إضافي خفيف، أما النقاط المتباعدة
     // فلا نبالغ في تحريكها حتى لا نفقد شكل المسار الأصلي.
@@ -137,10 +145,12 @@ export class Smoothing {
       0.78,
       1.15
     );
+    // استجابة تصاعدية: القيم المنخفضة تبقى قريبة من سلوكها السابق،
+    // بينما تزداد قوة التصحيح بقفزة واضحة قرب 100%.
     const blend = EngineUtils.clamp(
-      (0.18 + strength * 0.44) * densityFactor,
+      (0.18 + strength * 0.44 + Math.pow(strength, 4) * 0.22) * densityFactor,
       0.12,
-      0.68
+      0.86
     );
 
     const turnAt = (source, index) => {
