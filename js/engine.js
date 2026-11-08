@@ -569,6 +569,11 @@ export class StrokeBuilder {
       const softness = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSoftness, 0.35), 0, 1);
       const taper = EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTaper, 0.7), 0, 1);
       const lanes = preset === "feather-fan" ? density : preset === "feather-dry" ? Math.max(3, Math.round(density * 0.65)) : preset === "feather-flat" ? Math.max(3, Math.round(density * 0.45)) : preset === "feather-soft" ? Math.max(3, Math.round(density * 0.7)) : 1;
+      // A tap without pointer movement still needs a visible feather mark.
+      if (points.length === 1) {
+        const p = points[0], r = radiusAt(p, 0);
+        return `M ${(p.x-r).toFixed(2)} ${p.y.toFixed(2)} a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(r*2).toFixed(2)} 0 a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(-r*2).toFixed(2)} 0`;
+      }
       const paths = [];
       for (let lane = 0; lane < lanes; lane++) {
         const ratio = lanes === 1 ? 0 : lane / (lanes - 1) - 0.5;
