@@ -1599,37 +1599,44 @@ export class DrawingEngine {
 
   scheduleShapeRecognition() {
     this.clearShapeRecognitionTimer();
+
+    // التصحيح عند السكون يعمل مع قلم الخط العربي وجميع أقلام الرسم،
+    // ولا يشمل الممحاة. ننتظر توقف الحركة مع بقاء المؤشر مضغوطاً.
     if (
       !this.drawing ||
-      this.shapeRecognitionApplied ||
-      !["pen", "pencil", "marker"].includes(this.settings.tool) ||
+      this.settings.tool === "eraser" ||
       this.settings.lineCorrection <= 0 ||
-      this.builder.points.length < 8
+      this.builder.points.length < 2
     ) return;
 
-    const candidate = recognizeHeldShape(
-      this.builder.points,
-      this.settings.lineCorrection
-    );
-    if (!candidate) return;
-
-    // لا نثبت الشكل إلا بعد توقف الإصبع فترة قصيرة عند نهاية الرسم.
     this.shapeRecognitionTimer = setTimeout(() => {
       this.shapeRecognitionTimer = null;
-      if (!this.drawing || this.shapeRecognitionApplied) return;
+      if (!this.drawing || this.destroyed) return;
+
+      // أعد بناء المسار بعد السكون لتطبيق التنعيم على آخر عينة
+      // حتى لو لم يكن المسار شكلاً هندسياً قابلاً للتعرّف.
+      this.renderCurrent();
+
+      // التعرف الهندسي الإضافي يظل محصوراً بالأقلام العامة؛
+      // قلم الخط العربي يحصل على التنعيم دون تحويل حروفه إلى أشكال.
+      if (
+        this.shapeRecognitionApplied ||
+        !["pen", "pencil", "marker"].includes(this.settings.tool) ||
+        this.builder.points.length < 8
+      ) return;
 
       const confirmed = recognizeHeldShape(
         this.builder.points,
         this.settings.lineCorrection
       );
-      if (!confirmed) return;
+      if (!confirmed?.points?.length) return;
 
       this.builder.points = confirmed.points.map(point => ({ ...point }));
       this.points = this.builder.points;
       this.lastPoint = this.builder.points.at(-1) || null;
       this.shapeRecognitionApplied = true;
       this.renderCurrent();
-    }, 650);
+    }, 500);
   }
 
   buildPath(points) {
@@ -1700,9 +1707,8 @@ export class DrawingEngine {
         this.addPoint(finalPoint, finalEvent, true);
       }
 
-      // لا نعتمد الشكل أثناء استمرار اللمس أو عند التوقف المؤقت.
-      // يبدأ التعرف والتصحيح النهائيان فقط بعد رفع الإصبع (pointerup)،
-      // بعد ضم آخر نقطة فعلية إلى الضربة.
+      // عند رفع الإصبع نعيد محاولة التعرف الهندسي كاحتياط أخير؛
+      // أما التنعيم العام فيُطبّق أيضاً أثناء توقف الإصبع على الشاشة.
       if (
         !this.shapeRecognitionApplied &&
         ["pen", "pencil", "marker"].includes(this.settings.tool) &&
