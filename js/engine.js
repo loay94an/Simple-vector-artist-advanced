@@ -1672,7 +1672,11 @@ export class DrawingEngine {
           event.pointerType === "pen" &&
           (!Number.isFinite(event.pressure) || event.pressure <= 0)
         )
-          ? { ...event, pressure: lastPoint?.pressure ?? 0.5 }
+          ? {
+              pointerType: event.pointerType,
+              pressure: lastPoint?.pressure ?? 0.5,
+              timeStamp: event.timeStamp
+            }
           : event;
 
         this.addPoint(finalPoint, finalEvent, true);
