@@ -1892,15 +1892,8 @@ export class DrawingEngine {
   renderCurrent() {
     if (!this.currentElement) return false;
 
-    const built = this.builder.build();
-    if (!built) return false;
-
-    this.currentElement = {
-      ...this.currentElement,
-      ...built,
-      points: this.builder.points
-    };
-
+    // Live preview for every drawing pen: avoid building a complete SVG
+    // outline on each pointer event. Canvas receives only the new samples.
     if (this.drawing && this.builder.deferSmoothing) {
       const source = this.builder.points;
       const from = Math.max(0, this.canvasPreviewPointCount - 1);
@@ -1915,28 +1908,71 @@ export class DrawingEngine {
           time: point.time
         } : null;
       }).filter(Boolean) : [];
+
+      const preset = String(this.builder.brushStyle?.preset || "");
+      const isCalligraphy = this.builder.tool === "calligraphy" ||
+        preset === "calligraphy" || preset.startsWith("cal-");
+      const brushStyle = this.builder.brushStyle || {};
+      this.currentElement.points = source;
+      this.currentElement.renderMode = (isCalligraphy ||
+        (this.builder.pressureEnabled && !["marker", "pencil"].includes(this.builder.tool)))
+        ? "fill" : "stroke";
+      this.currentElement.style = {
+        ...(this.currentElement.style || {}),
+        color: this.builder.color,
+        size: this.builder.baseSize,
+        opacity: this.builder.opacity,
+        fill: isCalligraphy ? this.builder.color : "none",
+        lineCap: brushStyle.lineCap || "round",
+        lineJoin: brushStyle.lineJoin || "round",
+        dashArray: brushStyle.dashArray || "",
+        customBrush: brushStyle.image || null,
+        calligraphyClean: isCalligraphy
+      };
+
       if (screenPoints.length && this.renderer.appendCanvasPreview?.(
         this.currentElement.id,
         screenPoints,
         this.currentElement.style,
         {
-          calligraphy: this.currentElement.tool === "calligraphy" || String(this.builder.brushStyle?.preset || "").startsWith("cal-"),
+          tool: this.builder.tool,
+          calligraphy: isCalligraphy,
           calligraphyAngle: this.builder.calligraphyAngle,
-          pressureEnabled: this.builder.pressureEnabled
+          pressureEnabled: isCalligraphy || this.builder.tool === "pen"
+            ? this.builder.pressureEnabled : false
         }
       )) {
         this.canvasPreviewPointCount = source.length;
         return true;
       }
 
-      if (this.currentElement.tool === "calligraphy" && this.builder.points.length > 1 && this.builder.calligraphyPreviewDelta) {
+      // Fallback: retain incremental SVG chunks for calligraphy. Other tools
+      // use the regular SVG renderer only when Canvas is unavailable.
+      const builtPreview = this.builder.build();
+      if (!builtPreview) return false;
+      this.currentElement = {
+        ...this.currentElement,
+        ...builtPreview,
+        points: source
+      };
+      if (isCalligraphy && source.length > 1 && this.builder.calligraphyPreviewDelta) {
         const appended = this.renderer.appendPreviewChunk?.(
           this.currentElement,
           this.builder.calligraphyPreviewDelta
         );
         if (appended) return true;
       }
+      return this.renderer.updateElement(this.currentElement);
     }
+
+    const built = this.builder.build();
+    if (!built) return false;
+
+    this.currentElement = {
+      ...this.currentElement,
+      ...built,
+      points: this.builder.points
+    };
 
     this.renderer.clearCanvasPreview?.();
     this.canvasPreviewPointCount = 0;
