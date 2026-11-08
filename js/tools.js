@@ -1454,8 +1454,8 @@ export class Shapes extends BaseTool {
         ...base,
         svgTag: "ellipse",
         geometry: {
-          cx: a.x + Math.sign(dx || 1) * radius,
-          cy: a.y + Math.sign(dy || 1) * radius,
+          cx: (a.x + b.x) / 2,
+          cy: (a.y + b.y) / 2,
           rx: radius,
           ry: radius
         }
