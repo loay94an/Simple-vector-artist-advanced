@@ -359,6 +359,7 @@ export class StrokeBuilder {
     // Incremental live calligraphy outline cache. It is reset with each stroke.
     this.calligraphyPreviewPointCount = 0;
     this.calligraphyPreviewPath = "";
+    this.workerFilteredPoints = null;
 
     this.pressure.reset();
   }
@@ -439,6 +440,10 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
+    if (!this.deferSmoothing && Array.isArray(this.workerFilteredPoints)) {
+      return this.workerFilteredPoints;
+    }
+
     // لا يُصحح مسار الخط العربي أثناء الكتابة أو الرسم أو حركة القلم.
     // تبقى العينات الأصلية كما هي حتى يثبت القلم ويستمر الضغط طوال مهلة السكون.
     const preset = String(this.brushStyle?.preset || "");
@@ -1405,6 +1410,26 @@ export class DrawingEngine {
     this.renderFrameUsesTimeout = false;
     this.shapeRecognitionApplied = false;
     this.idleCorrectionApplied = false;
+    this.workerRequestId = 0;
+    this.smoothingWorker = null;
+    if (typeof Worker !== "undefined") {
+      try {
+        this.smoothingWorker = new Worker(
+          new URL("./smoothing-worker.js", import.meta.url),
+          { type: "module" }
+        );
+        this.smoothingWorker.onmessage = event => {
+          const result = event.data || {};
+          if (result.id !== this.workerRequestId || !Array.isArray(result.points)) return;
+          if (!this.drawing || this.destroyed || this.builder.deferSmoothing) return;
+          this.builder.workerFilteredPoints = result.points;
+          this.renderCurrent();
+        };
+      } catch (error) {
+        console.warn("Rasem smoothing worker unavailable; using main-thread fallback.", error);
+        this.smoothingWorker = null;
+      }
+    }
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
       this.renderer,
@@ -1708,6 +1733,8 @@ export class DrawingEngine {
       this.clearShapeRecognitionTimer();
       // استئناف الحركة يعيد المسار إلى العرض الخام ويعيد انتظار السكون.
       this.builder.deferSmoothing = true;
+      this.builder.workerFilteredPoints = null;
+      this.workerRequestId++;
     }
 
     const added = this.addPoint(point, input);
@@ -1754,7 +1781,7 @@ export class DrawingEngine {
       // هذا التنعيم محافظ ويخص الانحناءات؛ لا يشغّل التعرف الهندسي.
       this.idleCorrectionApplied = true;
       this.builder.deferSmoothing = false;
-      this.renderCurrent();
+      if (!this.requestWorkerSmoothing()) this.renderCurrent();
 
       // لا نحوّل ضربات الخط العربي إلى أشكال هندسية؛
       // نكتفي بتنعيم مسارها بعد انتهاء الكتابة والتوقف عند نهايته.
@@ -1776,12 +1803,31 @@ export class DrawingEngine {
       );
       if (!confirmed?.points?.length) return;
 
+      this.workerRequestId++;
+      this.builder.workerFilteredPoints = null;
       this.builder.points = confirmed.points.map(point => ({ ...point }));
       this.points = this.builder.points;
       this.lastPoint = this.builder.points.at(-1) || null;
       this.shapeRecognitionApplied = true;
       this.renderCurrent();
     }, 1300);
+  }
+
+  requestWorkerSmoothing() {
+    if (!this.smoothingWorker || !this.drawing || this.builder.points.length < 3) return false;
+    const id = ++this.workerRequestId;
+    const points = this.builder.points.map(point => ({ ...point }));
+    try {
+      this.smoothingWorker.postMessage({
+        id,
+        points,
+        strength: this.settings.lineCorrection
+      });
+      return true;
+    } catch (error) {
+      console.warn("Rasem smoothing worker request failed; using main-thread fallback.", error);
+      return false;
+    }
   }
 
   buildPath(points) {
