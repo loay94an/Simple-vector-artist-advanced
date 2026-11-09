@@ -540,7 +540,7 @@
         swatch.addEventListener("click", () => {
           const next = hexToHsv(hex);
           activeHue = next.h; activeSat = next.s; activeVal = next.v;
-          applyColor(hex, true);
+          applyColor(hex, true, false);
           closeComplementaryColorsMenu();
         });
         familyGroup.appendChild(swatch);
@@ -565,7 +565,6 @@
     btn.addEventListener("click", event => {
       event.stopPropagation();
       if (menu.classList.contains("open")) { closeComplementaryColorsMenu(); return; }
-      updateComplementaryColorsMenu();
       const rect = btn.getBoundingClientRect();
       menu.style.top = Math.round(rect.bottom + 7) + "px";
       menu.style.right = Math.max(8, Math.round(window.innerWidth - rect.right)) + "px";
@@ -580,7 +579,7 @@
     window.addEventListener("scroll", closeComplementaryColorsMenu, true);
     updateComplementaryColorsMenu();
   }
-  function applyColor(color, saveHistory = false) {
+  function applyColor(color, saveHistory = false, refreshComplementaryMenu = true) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) return;
     currentColor = color.toUpperCase();
 
@@ -608,7 +607,7 @@
       selectedDot.setAttribute("aria-label", "اللون المختار " + currentColor);
     }
     updateHarmonies();
-    updateComplementaryColorsMenu();
+    if (refreshComplementaryMenu) updateComplementaryColorsMenu();
     const topColor = $("complementaryColorsColor");
     if (topColor) topColor.style.backgroundColor = currentColor;
 
