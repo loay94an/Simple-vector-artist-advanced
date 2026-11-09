@@ -512,15 +512,17 @@
     swatches.replaceChildren();
 
     // Four color-rule groups: selected hue, complementary, analogous, and triadic.
+    const shadeSet = hue => [
+      hsvToHex(hue, Math.max(.16, hsv.s * .38), Math.min(1, hsv.v * 1.18)),
+      hsvToHex(hue, Math.max(.22, hsv.s * .62), Math.min(1, hsv.v * 1.04)),
+      hsvToHex(hue, Math.min(1, hsv.s * .88), Math.max(.12, hsv.v * .82)),
+      hsvToHex(hue, Math.min(1, hsv.s), Math.max(.08, hsv.v * .58))
+    ];
     const groups = [
-      { name: "اللون المحدد وتدرجاته", colors: [currentColor, ...getHarmonies(hsv.h, hsv.s, hsv.v).slice(0, 1).flatMap(() => [
-        hsvToHex(hsv.h, Math.max(.16, hsv.s * .62), Math.min(1, hsv.v * 1.04)),
-        hsvToHex(hsv.h, hsv.s, hsv.v * .82),
-        hsvToHex(hsv.h, hsv.s, hsv.v * .58)
-      ])] },
-      { name: "اللون المكمل", colors: harmonies.filter(item => item.name === "مكمل").flatMap(item => item.colors) },
-      { name: "الألوان المتجاورة", colors: harmonies.filter(item => item.name === "متجاور").flatMap(item => item.colors) },
-      { name: "الألوان الثلاثية", colors: harmonies.filter(item => item.name === "ثلاثي" || item.name === "مكمل منقسم").flatMap(item => item.colors) }
+      { name: "اللون المحدد وتدرجاته", colors: [currentColor, ...shadeSet(hsv.h).slice(1)] },
+      { name: "اللون المكمل", colors: harmonies.find(item => item.name === "مكمل")?.colors || [] },
+      { name: "الألوان المتجاورة", colors: [...shadeSet(hsv.h + 30), ...shadeSet(hsv.h - 30)] },
+      { name: "الألوان الثلاثية", colors: [...shadeSet(hsv.h + 120), ...shadeSet(hsv.h + 240)] }
     ];
 
     groups.forEach(group => {
