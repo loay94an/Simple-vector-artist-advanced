@@ -16,7 +16,7 @@
    - Cleanup application resources
 ========================================================= */
 
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 
 // Expose the official Capacitor runtime for the legacy inline UI controllers.
 if (typeof window !== "undefined") {
@@ -55,36 +55,7 @@ import {
   UIManager
 } from "./ui.js";
 
-/* Android native Save As bridge */
-const Downloads = registerPlugin("Downloads");
-
-if (typeof window !== "undefined") {
-  window.rasemNativeSaveAs = async function (blob, filename) {
-    if (!(blob instanceof Blob)) {
-      throw new TypeError("بيانات الملف غير صالحة.");
-    }
-
-    const safeName = String(filename || "rasem-drawing.svg")
-      .replace(/[\\/:*?"<>|]/g, "-")
-      .trim();
-
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let binary = "";
-    const chunkSize = 0x8000;
-
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(
-        ...bytes.subarray(i, i + chunkSize)
-      );
-    }
-
-    return await Downloads.save({
-      filename: safeName,
-      mimeType: blob.type || "image/svg+xml",
-      data: btoa(binary)
-    });
-  };
-}
+// Native Android file saving is centralized in storage-export.js.
 
 
 // =========================================================
