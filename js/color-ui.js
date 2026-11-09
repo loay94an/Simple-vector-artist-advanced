@@ -509,16 +509,18 @@
     const base = menu.querySelector(".complementary-menu-base");
     if (!family || !swatches || !base) return;
     base.replaceChildren();
-    const dot = document.createElement("span");
-    dot.style.cssText = "width:15px;height:15px;border-radius:50%;background:" + currentColor + ";border:1px solid rgba(127,127,127,.35)";
-    base.append(dot, document.createTextNode("اللون الحالي " + currentColor));
+    // Reuse the exact circular swatch group and button class used by the wheel.
+    const familyGroup = document.createElement("div");
+    familyGroup.className = "concepts-harmony-family";
+    familyGroup.setAttribute("role", "group");
+    familyGroup.setAttribute("aria-label", family.name);
     swatches.replaceChildren();
     family.colors.forEach((hex, index) => {
       const swatch = document.createElement("button");
       swatch.type = "button";
-      swatch.className = "complementary-menu-swatch";
+      swatch.className = "concepts-swatch";
       swatch.style.backgroundColor = hex;
-      swatch.title = "درجة اللون المتكامل " + (index + 1) + " · " + hex;
+      swatch.title = family.name + " · درجة " + (index + 1) + ": " + hex;
       swatch.setAttribute("aria-label", swatch.title);
       swatch.addEventListener("click", () => {
         const next = hexToHsv(hex);
@@ -526,8 +528,9 @@
         applyColor(hex, true);
         closeComplementaryColorsMenu();
       });
-      swatches.appendChild(swatch);
+      familyGroup.appendChild(swatch);
     });
+    swatches.appendChild(familyGroup);
   }
 
   function closeComplementaryColorsMenu() {
