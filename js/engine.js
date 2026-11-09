@@ -52,7 +52,8 @@ const EngineUtils = {
    1. SMOOTHING
 ========================================================= */
 
-// Preserve the sampled stroke as a straight polyline; no curve fitting.
+// Preserve raw samples for ordinary tools. Arabic calligraphy uses a
+// dedicated low-pass + Catmull-Rom pipeline so only that tool gets fluid curves.
 function pointsToPath(points) {
   if (!Array.isArray(points) || !points.length) return "";
   if (points.length === 1) {
@@ -62,6 +63,52 @@ function pointsToPath(points) {
   return points.map((point, index) =>
     `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
   ).join(" ");
+}
+
+function smoothCalligraphyPoints(source) {
+  if (!Array.isArray(source) || source.length < 3) return source || [];
+
+  // Three gentle passes remove hand tremor without flattening the stroke ends.
+  let filtered = source.map(point => ({ ...point }));
+  for (let pass = 0; pass < 3; pass++) {
+    const next = filtered.map(point => ({ ...point }));
+    for (let i = 1; i < filtered.length - 1; i++) {
+      const before = filtered[i - 1], current = filtered[i], after = filtered[i + 1];
+      next[i] = {
+        ...current,
+        x: before.x * 0.22 + current.x * 0.56 + after.x * 0.22,
+        y: before.y * 0.22 + current.y * 0.56 + after.y * 0.22,
+        pressure: before.pressure * 0.22 + current.pressure * 0.56 + after.pressure * 0.22
+      };
+    }
+    filtered = next;
+  }
+
+  // Resample with a centripetal-style Catmull-Rom curve for a continuous nib path.
+  const result = [filtered[0]];
+  const subdivisions = 3;
+  for (let i = 0; i < filtered.length - 1; i++) {
+    const p0 = filtered[Math.max(0, i - 1)];
+    const p1 = filtered[i];
+    const p2 = filtered[i + 1];
+    const p3 = filtered[Math.min(filtered.length - 1, i + 2)];
+    for (let step = 1; step <= subdivisions; step++) {
+      const t = step / subdivisions, t2 = t * t, t3 = t2 * t;
+      const interpolate = key => 0.5 * (
+        2 * p1[key] +
+        (-p0[key] + p2[key]) * t +
+        (2*p0[key] - 5*p1[key] + 4*p2[key] - p3[key]) * t2 +
+        (-p0[key] + 3*p1[key] - 3*p2[key] + p3[key]) * t3
+      );
+      result.push({
+        x: interpolate("x"),
+        y: interpolate("y"),
+        pressure: Math.max(0, Math.min(1, interpolate("pressure"))),
+        time: p1.time + (p2.time - p1.time) * t
+      });
+    }
+  }
+  return result;
 }
 
 /* =========================================================
@@ -256,9 +303,11 @@ export class StrokeBuilder {
   }
 
   getFilteredPoints() {
-    // Preserve every captured sample exactly: automatic stroke correction,
-    // smoothing and shape substitution are disabled for all drawing tools.
-    return this.points;
+    // Only the Arabic calligraphy tool receives strong live curve smoothing.
+    // Raw captured samples remain untouched in this.points for editing/history.
+    return this.tool === "calligraphy"
+      ? smoothCalligraphyPoints(this.points)
+      : this.points;
   }
 
   getCenterPath() {
@@ -544,7 +593,7 @@ export class StrokeBuilder {
     // While the pointer is down, append only the newly received segment.
     // Rebuilding every previous quadrilateral on every frame made long
     // calligraphy strokes approach quadratic work.
-    if (this.active && this.deferSmoothing) {
+    if (this.active && this.deferSmoothing && this.tool !== "calligraphy") {
       let delta = "";
       if (this.calligraphyPreviewPointCount > points.length) { this.calligraphyPreviewDelta = "";
         this.calligraphyPreviewPointCount = 0;
@@ -1324,7 +1373,7 @@ export class DrawingEngine {
 
     // Live preview for every drawing pen: avoid building a complete SVG
     // outline on each pointer event. Canvas receives only the new samples.
-    if (this.drawing && this.builder.deferSmoothing) {
+    if (this.drawing && this.builder.deferSmoothing && this.builder.tool !== "calligraphy") {
       const source = this.builder.points;
       this.renderer.resizeCanvasPreview?.();
       const canvas = this.renderer.canvasPreview;
