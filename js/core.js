@@ -1164,7 +1164,7 @@ export class Scene {
     if(preset==="soft"){context.shadowColor=color;context.shadowBlur=Math.max(2,size*0.24);}
     const dash=String(style.dashArray||"").trim();context.setLineDash(dash?dash.split(/[ ,]+/).map(Number).filter(v=>Number.isFinite(v)&&v>=0):[]);
     if(options.tool==="feather"){
-      const density=Math.max(3,Math.min(32,Math.round(Number(options.featherDensity??style.featherDensity??10))));
+      const density=Math.max(3,Math.min(48,Math.round(Number(options.featherDensity??style.featherDensity??10))));
       const spread=Math.max(0,Math.min(1,Number(options.featherSpread??style.featherSpread??0.45)));
       const spacing=Math.max(0.25,Math.min(2.5,Number(options.featherSpacing??style.featherSpacing??1)));
       const glow=Math.max(0,Math.min(1,Number(options.featherGlow??style.featherGlow??0)));
