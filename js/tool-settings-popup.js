@@ -176,7 +176,15 @@
   function apply() {
     const current = settings[activeTool] || {};
     const brush = current.brush || (activeTool === "calligraphy" ? "calligraphy" : "round");
-    const activeSettings = activeTool === "feather" ? {...current, ...(featherDefaults[brush] || {}), ...(current.headSettings?.[brush] || {})} : current;
+    const headSettings = current.headSettings?.[brush] || {};
+    const activeSettings = activeTool === "feather"
+      ? { ...current, ...(featherDefaults[brush] || {}), ...headSettings }
+      : {
+          ...current,
+          ...headSettings,
+          ...(headSettings.brushSize !== undefined ? { size: headSettings.brushSize } : {}),
+          ...(headSettings.brushOpacity !== undefined ? { opacity: headSettings.brushOpacity } : {})
+        };
     const style = presets[brush] || presets.round;
 
     const engine = window.rasem?.engine;
@@ -384,6 +392,7 @@
     }
     save();
     updateOutputs();
+    apply();
   }
 
   function restoreHeadProfile(brush) {
