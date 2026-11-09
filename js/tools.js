@@ -691,7 +691,16 @@ export class Selector extends BaseTool {
         const snap = this.initialSnapshot.get(el.id);
         if (!snap) continue;
 
-        if (Array.isArray(snap.points)) {
+        if (el.type === "stroke" && Array.isArray(snap.points)) {
+          // Keep the finished brush outline intact; points are source samples,
+          // not a centerline from which a calligraphy stroke can be rebuilt.
+          el.points = snap.points.map(p => ({ ...p }));
+          el.path = snap.path;
+          el.transform = [
+            `translate(${dx} ${dy})`,
+            snap.transform
+          ].filter(Boolean).join(" ");
+        } else if (Array.isArray(snap.points)) {
           el.points = snap.points.map(p => ({
             ...p,
             x: p.x + dx,
@@ -769,7 +778,18 @@ export class Selector extends BaseTool {
         const snap = this.initialSnapshot.get(el.id);
         if (!snap) continue;
 
-        if (Array.isArray(snap.points)) {
+        if (el.type === "stroke" && Array.isArray(snap.points)) {
+          // Transform the existing SVG outline instead of rebuilding it from
+          // raw samples, which would lose the nib profile and pressure shape.
+          el.points = snap.points.map(p => ({ ...p }));
+          el.path = snap.path;
+          const scaleTransform = [
+            `translate(${originX} ${originY})`,
+            `scale(${scaleX} ${scaleY})`,
+            `translate(${-originX} ${-originY})`
+          ].join(" ");
+          el.transform = [scaleTransform, snap.transform].filter(Boolean).join(" ");
+        } else if (Array.isArray(snap.points)) {
           el.points = snap.points.map(p => ({
             ...p,
             x: originX + (p.x - originX) * scaleX,
@@ -1012,7 +1032,10 @@ export class Selector extends BaseTool {
     for (const el of this.getSelectedElements()) {
       const copy = EngineUtils.clone(el);
       copy.id = EngineUtils.createId(copy.type || "element");
-      if (Array.isArray(copy.points)) {
+      if (copy.type === "stroke" && Array.isArray(copy.points)) {
+        // Duplicate the exact rendered stroke without reconstructing its path.
+        copy.transform = [`translate(20 20)`, copy.transform].filter(Boolean).join(" ");
+      } else if (Array.isArray(copy.points)) {
         copy.points = copy.points.map(p => ({ ...p, x: p.x + 20, y: p.y + 20 }));
         copy.path = this.engine.buildPath(copy.points);
       } else if (copy.geometry) {
