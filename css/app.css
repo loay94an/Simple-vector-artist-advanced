@@ -3926,3 +3926,16 @@ body.dark .canvas-area {
 .brush-head-option select { width:100%; min-height:32px; border:1px solid var(--border); border-radius:7px; padding:4px 6px; background:var(--surface); color:var(--text); }
 .brush-head-option output { color:var(--primary); font-size:10px; font-weight:700; }
 .brush-head-options-note { margin:9px 0 0; line-height:1.5; }
+
+
+/* Organized preset families and specialty groups. */
+#brushPresetsSection .brush-preset-family-heading { display:flex; flex-direction:column; gap:3px; margin:2px 0 10px; }
+#brushPresetsSection .brush-preset-family-heading strong { font-size:13px; color:var(--text-primary); }
+#brushPresetsSection .brush-preset-family-heading span,
+#brushPresetsSection .brush-preset-group-note { color:var(--text-muted); font-size:10px; line-height:1.45; }
+#brushPresetsSection .brush-preset-groups { display:flex; flex-direction:column; gap:12px; }
+#brushPresetsSection .brush-preset-group { min-width:0; padding-top:8px; border-top:1px solid var(--border); }
+#brushPresetsSection .brush-preset-group-title { margin:0 0 3px; color:var(--text-primary); font-size:11px; font-weight:750; }
+#brushPresetsSection .brush-preset-group-note { margin:0 0 7px; }
+#brushPresetsSection .brush-preset-group-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+#brushPresetsSection .brush-preset-family-heading + .brush-preset-groups { margin-top:4px; }
