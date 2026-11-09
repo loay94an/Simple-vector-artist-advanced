@@ -317,6 +317,48 @@ function fitLine(points, strength) {
     confidence: clamp(1 - rms / chord * 12, 0.76, 0.99), corners: [] };
 }
 
+
+function fitSmoothCurve(points) {
+  const first = points[0], last = points.at(-1);
+  const chord = distance(first, last);
+  const total = pathLength(points);
+  if (chord < 24 || total / chord < 1.035 || total / chord > 1.7) return null;
+
+  const box = boundsOf(points);
+  const diagonal = Math.hypot(box.width, box.height);
+  if (!diagonal) return null;
+
+  // A single smooth bend has a consistent curvature direction. An S stroke
+  // changes direction and is deliberately left as freehand.
+  let previousSign = 0, reversals = 0, meaningfulTurns = 0;
+  for (let i = 2; i < points.length; i++) {
+    const a = { x: points[i - 1].x - points[i - 2].x, y: points[i - 1].y - points[i - 2].y };
+    const b = { x: points[i].x - points[i - 1].x, y: points[i].y - points[i - 1].y };
+    const turn = cross(a, b);
+    if (Math.abs(turn) < length(a) * length(b) * 0.002) continue;
+    const sign = Math.sign(turn);
+    if (previousSign && sign !== previousSign) reversals++;
+    previousSign = sign;
+    meaningfulTurns++;
+  }
+  if (meaningfulTurns < 3 || reversals > Math.max(1, meaningfulTurns * 0.12)) return null;
+
+  const baseline = points.map(p => Math.abs(
+    (last.x - first.x) * (first.y - p.y) -
+    (first.x - p.x) * (last.y - first.y)
+  ) / chord);
+  const maxDeviation = Math.max(...baseline);
+  if (maxDeviation < diagonal * 0.035) return null;
+
+  const output = resample(points, Math.max(2, diagonal / 70), false);
+  return {
+    type: "curve",
+    points: output,
+    confidence: 0.78,
+    corners: []
+  };
+}
+
 function fitOpenPolyline(points, strength) {
   const { corners } = detectCorners(points, false);
   if (!corners.length || corners.length > 8) return null;
@@ -368,7 +410,17 @@ function fitOpenPolyline(points, strength) {
       Math.max(0.001, length(v1) * length(v2)), -1, 1)) * 180 / Math.PI;
   });
   return {
-    type: "polyline",
+    type: (() => {
+      const turns = [];
+      for (let i = 1; i < vertices.length - 1; i++) {
+        const a = { x: vertices[i].x - vertices[i - 1].x, y: vertices[i].y - vertices[i - 1].y };
+        const b = { x: vertices[i + 1].x - vertices[i].x, y: vertices[i + 1].y - vertices[i].y };
+        const turn = cross(a, b);
+        if (Math.abs(turn) > length(a) * length(b) * 0.08) turns.push(Math.sign(turn));
+      }
+      const alternations = turns.slice(1).filter((sign, i) => sign !== turns[i]).length;
+      return turns.length >= 3 && alternations >= turns.length - 2 ? "zigzag" : "polyline";
+    })(),
     points: output,
     corners,
     angles,
@@ -411,5 +463,7 @@ export function recognizeShape(sourcePoints, options = {}) {
   if (line) return line;
   const arc = fitArc(points);
   if (arc) return arc;
+  const curve = fitSmoothCurve(points);
+  if (curve) return curve;
   return fitOpenPolyline(points, strength);
 }
