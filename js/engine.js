@@ -588,14 +588,14 @@ export class StrokeBuilder {
     }
     // Taper both ends in the tangent direction of the stroke. The terminal
     // point is sharp; the wider base blends into the ribbon without a cap stamp.
-    const addTaperedEnd = (point, neighbour, radius, atStart) => {
+    const addTaperedEnd = (point, neighbour, radius) => {
       let dx = neighbour.x - point.x;
       let dy = neighbour.y - point.y;
       const length = Math.hypot(dx, dy);
       if (length < 0.0001) return;
       dx /= length;
       dy /= length;
-      const taperLength = Math.max(radius * 1.35, this.baseSize * 0.4);
+      const taperLength = Math.min(length, Math.max(radius * 1.35, this.baseSize * 0.4));
       const baseX = point.x + dx * taperLength;
       const baseY = point.y + dy * taperLength;
       const sideX = cosA * radius;
@@ -606,9 +606,9 @@ export class StrokeBuilder {
         { x: baseX - sideX, y: baseY - sideY }
       ]));
     };
-    addTaperedEnd(points[0], points[1], radii[0], true);
+    addTaperedEnd(points[0], points[1], radii[0]);
     addTaperedEnd(points[points.length - 1], points[points.length - 2],
-      radii[radii.length - 1], false);
+      radii[radii.length - 1]);
     return paths.join(" ");
   }
   build(options = {}) {
