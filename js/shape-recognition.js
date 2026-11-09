@@ -331,17 +331,21 @@ function fitSmoothCurve(points) {
   // A single smooth bend has a consistent curvature direction. An S stroke
   // changes direction and is deliberately left as freehand.
   let previousSign = 0, reversals = 0, meaningfulTurns = 0;
-  for (let i = 2; i < points.length; i++) {
-    const a = { x: points[i - 1].x - points[i - 2].x, y: points[i - 1].y - points[i - 2].y };
-    const b = { x: points[i].x - points[i - 1].x, y: points[i].y - points[i - 1].y };
+  const window = Math.max(2, Math.round(points.length / 36));
+  for (let i = window; i < points.length - window; i++) {
+    const before = points[i - window], current = points[i], after = points[i + window];
+    const a = { x: current.x - before.x, y: current.y - before.y };
+    const b = { x: after.x - current.x, y: after.y - current.y };
     const turn = cross(a, b);
-    if (Math.abs(turn) < length(a) * length(b) * 0.002) continue;
+    if (Math.abs(turn) < length(a) * length(b) * 0.004) continue;
     const sign = Math.sign(turn);
     if (previousSign && sign !== previousSign) reversals++;
     previousSign = sign;
     meaningfulTurns++;
   }
-  if (meaningfulTurns < 3 || reversals > Math.max(1, meaningfulTurns * 0.12)) return null;
+  // A simple arch keeps one curvature direction; an S-shaped freehand stroke
+  // reverses it and must not be mistaken for a single curve.
+  if (meaningfulTurns < 3 || reversals > 1) return null;
 
   const baseline = points.map(p => Math.abs(
     (last.x - first.x) * (first.y - p.y) -
