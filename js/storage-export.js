@@ -79,6 +79,22 @@ export async function downloadBlob(blob, filename) {
   else if (ext === "pdf") description = "مستند PDF";
   else if (ext === "rasem" || ext === "json") description = "مشروع رسم";
 
+  // Native Android APK: use the registered Save As plugin instead of an HTML download.
+  // WebView downloads are not reliably handled by an anchor element.
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
+      if (typeof window.rasemNativeSaveAs !== "function") {
+        throw new Error("خدمة الحفظ الأصلية غير متاحة في نسخة التطبيق.");
+      }
+      const result = await window.rasemNativeSaveAs(blob, filename);
+      return result?.cancelled === true ? false : result?.saved === true;
+    }
+  } catch (nativeError) {
+    console.error("Native Android export failed:", nativeError);
+    throw new Error("تعذر حفظ الملف على Android: " + (nativeError?.message || nativeError));
+  }
+
   // 1. File System Access API: Opens the system File Manager / Save Dialog
   // allowing the user to choose the exact directory/folder and save the file.
   if (typeof window.showSaveFilePicker === "function") {
@@ -234,9 +250,19 @@ export async function shareBlob(blob, filename) {
 
     return true;
   } catch (error) {
-    if (error?.name === "AbortError") return false;
+    if (error?.name === "AbortError" || error?.message?.toLowerCase?.().includes("cancel")) {
+      return false;
+    }
 
     console.error("Android native sharing failed:", error);
+
+    // Keep a working native export path if the Android share sheet is unavailable.
+    if (typeof window.rasemNativeSaveAs === "function") {
+      const saved = await window.rasemNativeSaveAs(blob, safeName);
+      if (saved?.cancelled === true) return false;
+      if (saved?.saved === true) return true;
+    }
+
     throw new Error(
       "تعذرت مشاركة الملف عبر Android: " + (error?.message || error)
     );
