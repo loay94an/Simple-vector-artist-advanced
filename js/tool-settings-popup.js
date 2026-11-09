@@ -303,6 +303,15 @@
     return headProfiles[group]?.[brush] || headProfiles[group]?.["*"] || ["brushSize","brushOpacity","pressureEnabled"];
   }
 
+  function isHeadForActiveTool(button) {
+    if (!button) return false;
+    const family = button.closest(".brush-presets-general, .brush-presets-calligraphy, .brush-presets-feather");
+    if (!family) return false;
+    if (activeTool === "feather") return family.classList.contains("brush-presets-feather");
+    if (activeTool === "calligraphy") return family.classList.contains("brush-presets-calligraphy");
+    return family.classList.contains("brush-presets-general");
+  }
+
   function ensureHeadOptionsPanel() {
     if (headOptionsPanel) return headOptionsPanel;
     const section = document.getElementById("brushPresetsSection");
@@ -516,15 +525,11 @@
 
     const generalBrushes = popup.querySelector(".brush-presets-general");
     const calligraphyBrushes = popup.querySelector(".brush-presets-calligraphy");
-    if (generalBrushes) {
-      generalBrushes.style.display = tool === "calligraphy" ? "none" : "grid";
-    }
-    if (calligraphyBrushes) {
-      calligraphyBrushes.style.display = tool === "calligraphy" ? "grid" : "none";
-    }
     const featherBrushes = popup.querySelector(".brush-presets-feather");
-    if (featherBrushes) featherBrushes.style.display = tool === "feather" ? "grid" : "none";
-    if (generalBrushes && tool === "feather") generalBrushes.style.display = "none";
+    // Exactly one family is visible at a time; hidden is enforced by CSS with !important.
+    if (generalBrushes) generalBrushes.hidden = tool === "calligraphy" || tool === "feather";
+    if (calligraphyBrushes) calligraphyBrushes.hidden = tool !== "calligraphy";
+    if (featherBrushes) featherBrushes.hidden = tool !== "feather";
     const featherSettings = popup.querySelector(".feather-settings");
     if (featherSettings) featherSettings.style.display = tool === "feather" ? "block" : "none";
 
@@ -697,6 +702,7 @@
   popup.addEventListener("click", event => {
     const button = event.target.closest("[data-brush]");
     if (button) {
+      if (!isHeadForActiveTool(button)) return;
       if (!settings[activeTool]) settings[activeTool] = {};
       settings[activeTool].brush = button.dataset.brush;
       restoreHeadProfile(button.dataset.brush);
@@ -749,7 +755,7 @@
   // Long press on an individual brush/nib opens only that head's settings.
   popup.addEventListener("pointerdown", event => {
     const button = event.target.closest("#brushPresetsSection [data-brush]");
-    if (!button) return;
+    if (!button || !isHeadForActiveTool(button)) return;
     headPressButton = button;
     headPressStartX = event.clientX;
     headPressStartY = event.clientY;
