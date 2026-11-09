@@ -69,11 +69,29 @@ function smoothCalligraphyPoints(source) {
   if (!Array.isArray(source) || !source.length) return [];
   if (source.length < 3) return source.map(point => ({ ...point }));
 
-  // A single symmetric low-pass pass calms pointer tremor while keeping
-  // the first and last contact points anchored. Repeated full-path filtering
-  // made the beginning of a live stroke drift whenever a new sample arrived.
+  // Preserve intentional corners: filtering a sharp change of direction
+  // rounds Arabic letter joints and can make the nib appear to twist around them.
+  // Keep the corner sample and its immediate neighbours anchored; smooth only
+  // the calmer spans between corners.
   const filtered = source.map(point => ({ ...point }));
+  const protectedCorners = new Set([0, source.length - 1]);
+  const cornerCosine = Math.cos(22 * Math.PI / 180);
   for (let i = 1; i < source.length - 1; i++) {
+    const before = source[i - 1];
+    const current = source[i];
+    const after = source[i + 1];
+    const ax = current.x - before.x, ay = current.y - before.y;
+    const bx = after.x - current.x, by = after.y - current.y;
+    const al = Math.hypot(ax, ay), bl = Math.hypot(bx, by);
+    if (al > 0.35 && bl > 0.35 &&
+        (ax * bx + ay * by) / (al * bl) < cornerCosine) {
+      protectedCorners.add(i);
+      if (i > 1) protectedCorners.add(i - 1);
+      if (i < source.length - 2) protectedCorners.add(i + 1);
+    }
+  }
+  for (let i = 1; i < source.length - 1; i++) {
+    if (protectedCorners.has(i)) continue;
     const before = source[i - 1];
     const current = source[i];
     const after = source[i + 1];
