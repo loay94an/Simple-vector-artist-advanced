@@ -1190,7 +1190,7 @@ export class Scene {
         for(let i=0;i<points.length;i++){
           const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
           const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;
-          if(preset==="feather-script"){const ox=nx,oy=ny,co=Math.cos(headAngle),si=Math.sin(headAngle);nx=ox*co-oy*si;ny=ox*si+oy*co;}
+          if(headAngle!==0){const ox=nx,oy=ny,co=Math.cos(headAngle),si=Math.sin(headAngle);nx=ox*co-oy*si;ny=ox*si+oy*co;}
           const progress=points.length<=1?0.5:i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
           const pressureValue=options.pressureEnabled===false?1:Math.max(.25,.35+(Number(p.pressure)||.5)*.65),rawSpeed=Math.hypot(next.x-prev.x,next.y-prev.y)/Math.max(1,Number(next.time||0)-Number(prev.time||0));
           const pSens=Math.max(0,Math.min(1,Number(options.featherPressure??style.featherPressure??.75))),sSens=Math.max(0,Math.min(1,Number(options.featherSpeed??style.featherSpeed??.25))),speedFactor=Math.max(.78,Math.min(1.12,1.12-rawSpeed*.22));
@@ -1204,7 +1204,7 @@ export class Scene {
         for(let i=points.length-1;i>=0;i--){
           const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
           const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;
-          if(preset==="feather-script"){const ox=nx,oy=ny,co=Math.cos(headAngle),si=Math.sin(headAngle);nx=ox*co-oy*si;ny=ox*si+oy*co;}
+          if(headAngle!==0){const ox=nx,oy=ny,co=Math.cos(headAngle),si=Math.sin(headAngle);nx=ox*co-oy*si;ny=ox*si+oy*co;}
           const progress=points.length<=1?0.5:i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
           const pressureValue=options.pressureEnabled===false?1:Math.max(.25,.35+(Number(p.pressure)||.5)*.65),rawSpeed=Math.hypot(next.x-prev.x,next.y-prev.y)/Math.max(1,Number(next.time||0)-Number(prev.time||0));
           const pSens=Math.max(0,Math.min(1,Number(options.featherPressure??style.featherPressure??.75))),sSens=Math.max(0,Math.min(1,Number(options.featherSpeed??style.featherSpeed??.25))),speedFactor=Math.max(.78,Math.min(1.12,1.12-rawSpeed*.22)),r=size*.5*(1-pSens+pSens*pressureValue)*(1-sSens+sSens*speedFactor)*fade;
