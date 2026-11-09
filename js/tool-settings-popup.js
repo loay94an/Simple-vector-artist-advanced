@@ -32,7 +32,7 @@
     featherSoftness: "featherSoftness",
     featherTaper: "featherTaper",
     featherFade: "featherFade",
-    featherSpacing: "featherSpacing",
+    featherSpacing: "featherSpacing", featherGap:"featherGap", featherPressure:"featherPressure", featherSpeed:"featherSpeed", featherAngle:"featherAngle", featherTexture:"featherTexture",
     calligraphyEndStyle: "calligraphyEndStyle"
   };
 
@@ -159,7 +159,7 @@
     result.featherSoftness = Number(document.getElementById("featherSoftness")?.value ?? 0.35);
     result.featherTaper = Number(document.getElementById("featherTaper")?.value ?? 0.7);
     result.featherFade = document.getElementById("featherFade")?.checked === true;
-
+    for (const key of ["featherGap","featherPressure","featherSpeed","featherAngle","featherTexture"]) { const input=document.getElementById(key); if(input) result[key]=Number(input.value); }
     return result;
   }
 
@@ -176,35 +176,38 @@
   function apply() {
     const current = settings[activeTool] || {};
     const brush = current.brush || (activeTool === "calligraphy" ? "calligraphy" : "round");
+    const activeSettings = activeTool === "feather" ? {...current, ...(featherDefaults[brush] || {}), ...(current.headSettings?.[brush] || {})} : current;
     const style = presets[brush] || presets.round;
 
     const engine = window.rasem?.engine;
     if (engine) {
       if (activeTool === "eraser") {
         engine.setSettings({
-          eraserSize: current.size || 16,
+          eraserSize: activeSettings.size || 16,
           eraserMode: current.eraserMode || "partial"
         });
       } else {
         engine.setSettings({
-          size: current.size,
-          opacity: current.opacity,
-          pressureEnabled: current.pressureEnabled,
-          calligraphyAngle: Number.isFinite(current.calligraphyAngle) ? current.calligraphyAngle : 45,
-          calligraphyEndStyle: current.calligraphyEndStyle || "none",
+          size: activeSettings.size,
+          opacity: activeSettings.opacity,
+          pressureEnabled: activeSettings.pressureEnabled,
+          calligraphyAngle: Number.isFinite(activeSettings.calligraphyAngle) ? activeSettings.calligraphyAngle : 45,
+          calligraphyEndStyle: activeSettings.calligraphyEndStyle || "none",
           brushStyle: {
             preset: brush,
-            calligraphyEndStyle: current.calligraphyEndStyle || "none",
+            calligraphyEndStyle: activeSettings.calligraphyEndStyle || "none",
             lineCap: style.lineCap || "round",
             dashArray: style.dashArray || "",
-            image: current.customBrush || null,
-            featherDensity: current.featherDensity ?? 10,
-            featherGlow: current.featherGlow ?? 0,
-            featherSpacing: current.featherSpacing ?? 1,
-            featherSpread: current.featherSpread ?? 0.45,
-            featherSoftness: current.featherSoftness ?? 0.35,
-            featherTaper: current.featherTaper ?? 0.7,
-            featherFade: current.featherFade === true
+            image: activeSettings.customBrush || null,
+            featherDensity: activeSettings.featherDensity ?? 10,
+            featherGlow: activeSettings.featherGlow ?? 0,
+            featherSpacing: activeSettings.featherSpacing ?? 1,
+            featherSpread: activeSettings.featherSpread ?? 0.45,
+            featherSoftness: activeSettings.featherSoftness ?? 0.35,
+            featherTaper: activeSettings.featherTaper ?? 0.7,
+            featherFade: activeSettings.featherFade === true,
+            featherGap:activeSettings.featherGap??.35, featherPressure:activeSettings.featherPressure??.75,
+            featherSpeed:activeSettings.featherSpeed??.25, featherAngle:activeSettings.featherAngle??0, featherTexture:activeSettings.featherTexture??.35
           }
         });
       }
@@ -214,7 +217,7 @@
       detail: {
         name: brush,
         style,
-        image: current.customBrush || null,
+        image: activeSettings.customBrush || null,
         tool: activeTool
       }
     }));
@@ -241,7 +244,8 @@
       ["featherSpacing", "featherSpacingValue", "%", true],
       ["featherSpread", "featherSpreadValue", "%", true],
       ["featherSoftness", "featherSoftnessValue", "%", true],
-      ["featherTaper", "featherTaperValue", "%", true]
+      ["featherTaper", "featherTaperValue", "%", true],
+      ["featherGap","featherGapValue","%",true],["featherPressure","featherPressureValue","%",true],["featherSpeed","featherSpeedValue","%",true],["featherAngle","featherAngleValue","°",false],["featherTexture","featherTextureValue","%",true]
     ]) {
       const input = document.getElementById(id);
       const output = document.getElementById(outputId);
@@ -258,38 +262,19 @@
 
 
   // لكل رأس فرشاة ملف إعدادات مستقل؛ الضغطة الطويلة على الرأس تفتح ملفه.
-  const headProfiles = {
-    feather: {
-      "feather-pointed": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
-      "feather-flat": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
-      "feather-round": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
-      "feather-fan": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
-      "feather-soft": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
-      "feather-dry": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
-      "feather-quill": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
-      "feather-script": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"]
-    },
-    calligraphy: {
-      "*": ["brushSize","brushOpacity","calligraphyAngle","calligraphyEndStyle","pressureEnabled"]
-    },
-    pencil: {
-      "*": ["brushSize","brushOpacity","pressureEnabled"]
-    }
+  const headProfiles = { feather:{"feather-pointed":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-flat":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-round":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-fan":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-soft":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-dry":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-quill":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-script":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"]},calligraphy:{"*":["brushSize","brushOpacity","calligraphyAngle","calligraphyEndStyle","pressureEnabled"]},pencil:{"*":["brushSize","brushOpacity","pressureEnabled"]} };
+  const featherDefaults = {
+    "feather-pointed":{featherDensity:8,featherSpread:.20,featherSoftness:.15,featherTaper:.85,featherSpacing:1,featherGap:.18,featherPressure:.9,featherSpeed:.2,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:false},
+    "feather-flat":{featherDensity:18,featherSpread:.10,featherSoftness:.10,featherTaper:.30,featherSpacing:1,featherGap:.12,featherPressure:.35,featherSpeed:.1,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:false},
+    "feather-round":{featherDensity:16,featherSpread:.25,featherSoftness:.35,featherTaper:.45,featherSpacing:1,featherGap:.2,featherPressure:.65,featherSpeed:.2,featherAngle:0,featherTexture:.12,featherGlow:0,featherFade:false},
+    "feather-fan":{featherDensity:24,featherSpread:.85,featherSoftness:.10,featherTaper:.25,featherSpacing:1,featherGap:.8,featherPressure:.25,featherSpeed:.1,featherAngle:0,featherTexture:.2,featherGlow:0,featherFade:false},
+    "feather-soft":{featherDensity:20,featherSpread:.45,featherSoftness:.85,featherTaper:.65,featherSpacing:1,featherGap:.15,featherPressure:.45,featherSpeed:.25,featherAngle:0,featherTexture:0,featherGlow:0,featherFade:false},
+    "feather-dry":{featherDensity:16,featherSpread:.65,featherSoftness:.05,featherTaper:.20,featherSpacing:1,featherGap:.65,featherPressure:.5,featherSpeed:.55,featherAngle:0,featherTexture:.9,featherGlow:0,featherFade:false},
+    "feather-quill":{featherDensity:5,featherSpread:.12,featherSoftness:.08,featherTaper:.9,featherSpacing:1,featherGap:.08,featherPressure:1,featherSpeed:.25,featherAngle:0,featherTexture:.18,featherGlow:0,featherFade:false},
+    "feather-script":{featherDensity:12,featherSpread:.18,featherSoftness:.15,featherTaper:.7,featherSpacing:1,featherGap:.12,featherPressure:.85,featherSpeed:.15,featherAngle:35,featherTexture:.08,featherGlow:0,featherFade:false}
   };
-  const headLabels = {
-    brushSize:"حجم الرأس", brushOpacity:"شفافية الرأس", pressureEnabled:"استجابة الضغط",
-    calligraphyAngle:"زاوية السن", calligraphyEndStyle:"نهاية الضربة",
-    featherDensity:"عدد الشعيرات", featherSpread:"انتشار الشعيرات",
-    featherSoftness:"نعومة الأثر", featherTaper:"تلاشي البداية والنهاية",
-    featherSpacing:"تباعد الشعيرات", featherGlow:"التوهج"
-  };
-  const headRanges = {
-    brushSize:{min:0.5,max:120,step:0.5}, brushOpacity:{min:0.05,max:1,step:0.01},
-    calligraphyAngle:{min:0,max:180,step:1}, featherDensity:{min:3,max:32,step:1},
-    featherSpread:{min:0,max:1,step:0.05}, featherSoftness:{min:0,max:1,step:0.05},
-    featherTaper:{min:0,max:1,step:0.05}, featherSpacing:{min:0.25,max:2.5,step:0.05},
-    featherGlow:{min:0,max:1,step:0.05}
-  };
+  const headLabels = {featherDensity:"عدد الشعيرات",featherSpread:"انتشار الشعيرات",featherSoftness:"نعومة الأثر",featherTaper:"تلاشي البداية والنهاية",featherSpacing:"مقياس تباعد الأثر",featherGap:"الفجوة بين الشعيرات",featherPressure:"حساسية الضغط",featherSpeed:"استجابة السرعة",featherAngle:"زاوية الريشة",featherTexture:"خشونة وملمس الشعيرات",featherGlow:"التوهج",featherFade:"التلاشي المتوازن من الوسط",brushSize:"حجم الرأس",brushOpacity:"شفافية الرأس",pressureEnabled:"استجابة الضغط",calligraphyAngle:"زاوية السن",calligraphyEndStyle:"نهاية الضربة"};
+  const headRanges = {brushSize:{min:.5,max:120,step:.5},brushOpacity:{min:.05,max:1,step:.01},calligraphyAngle:{min:0,max:180,step:1},featherDensity:{min:3,max:48,step:1},featherSpread:{min:0,max:1,step:.01},featherSoftness:{min:0,max:1,step:.01},featherTaper:{min:0,max:1,step:.01},featherSpacing:{min:.25,max:2.5,step:.05},featherGap:{min:0,max:1.5,step:.01},featherPressure:{min:0,max:1,step:.01},featherSpeed:{min:0,max:1,step:.01},featherAngle:{min:0,max:180,step:1},featherTexture:{min:0,max:1,step:.01},featherGlow:{min:0,max:1,step:.01}};
   let headOptionsPanel = null;
   let headPressTimer = null;
   let headPressMoved = false;
@@ -362,12 +347,12 @@
         input.type = "range"; input.min = range.min; input.max = range.max; input.step = range.step;
         input.dataset.headKey = key;
         const sourceId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
-        input.value = String(profile[key] ?? document.getElementById(sourceId)?.value ?? (key === "featherDensity" ? 10 : 0));
+        input.value = String(profile[key] ?? document.getElementById(sourceId)?.value ?? (featherDefaults[brush]?.[key] ?? (key === "featherDensity" ? 10 : 0)));
         wrap.appendChild(input);
         const value = document.createElement("output");
-        value.textContent = key === "brushOpacity" || key === "featherGlow" || key === "featherSpread" || key === "featherSoftness" || key === "featherTaper" ? Math.round(Number(input.value)*100)+"%" : input.value + (key === "calligraphyAngle" ? "°" : "");
+        value.textContent = key==="featherAngle"||key==="calligraphyAngle"?input.value+"°":key==="brushOpacity"||key.startsWith("feather")&&key!=="featherDensity"?Math.round(Number(input.value)*100)+"%":input.value;
         wrap.appendChild(value);
-        input.addEventListener("input", () => { value.textContent = key === "brushOpacity" || key.startsWith("feather") && key !== "featherDensity" ? Math.round(Number(input.value)*100)+"%" : input.value + (key === "calligraphyAngle" ? "°" : ""); });
+        input.addEventListener("input", () => { value.textContent = key==="featherAngle"||key==="calligraphyAngle"?input.value+"°":key==="brushOpacity"||key.startsWith("feather")&&key!=="featherDensity"?Math.round(Number(input.value)*100)+"%":input.value; });
       }
       grid.appendChild(wrap);
     });
@@ -402,8 +387,7 @@
   }
 
   function restoreHeadProfile(brush) {
-    const profile = settings[activeTool]?.headSettings?.[brush];
-    if (!profile) return;
+    const profile = {...(activeTool==="feather"?(featherDefaults[brush]||featherDefaults["feather-pointed"]):{}),...(settings[activeTool]?.headSettings?.[brush]||{})};
     Object.entries(profile).forEach(([key,value]) => {
       const id = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
       const input = document.getElementById(id);
@@ -427,12 +411,7 @@
         base.opacity = 0.9;
         base.size = 16;
         base.brush = "feather-pointed";
-        base.featherDensity = 10;
-        base.featherGlow = 0;
-        base.featherSpacing = 1;
-        base.featherSpread = 0.45;
-        base.featherSoftness = 0.35;
-        base.featherTaper = 0.7;
+        Object.assign(base, featherDefaults["feather-pointed"]);
       } else if (tool === "marker") {
         base.pressureEnabled = false;
         base.opacity = 0.45;
