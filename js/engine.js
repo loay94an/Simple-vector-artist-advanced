@@ -227,7 +227,7 @@ function recognizeSmartStroke(source, level = 0) {
   if (!Array.isArray(source) || source.length < 8 || level < 1) return null;
   const result = recognizeShape(source, { strength: level / 100 });
   if (!result || !Array.isArray(result.points) || result.points.length < 2) return null;
-  return result.points;
+  return result;
 }
 
 /* =========================================================
@@ -1053,6 +1053,7 @@ export class DrawingEngine {
     this.canvasPreviewPointCount = 0;
     this.canvasPreviewTransform = null;
     this.shapeRecognitionApplied = false;
+    this.shapeRecognitionResult = null;
     this.idleCorrectionApplied = false;
     this.arabicWriting = new ArabicWritingAssistant(
       this.document,
@@ -1273,6 +1274,7 @@ export class DrawingEngine {
 
     this.points = this.builder.points;
 
+    this.shapeRecognitionResult = null;
     this.currentElement = {
       id: this.builder.id,
       type: "stroke",
@@ -1617,11 +1619,21 @@ export class DrawingEngine {
         }
         if (this.smartDrawing.recognition > 0) {
           const recognized = recognizeSmartStroke(this.builder.points, this.smartDrawing.recognition);
-          if (recognized) this.builder.points = recognized;
+          if (recognized) {
+            this.builder.points = recognized.points;
+            this.shapeRecognitionResult = {
+              type: recognized.type,
+              classification: recognized.classification,
+              classifications: recognized.classifications || []
+            };
+          }
         }
         this.points = this.builder.points;
       }
       finalizedElement = this.builder.build();
+      if (finalizedElement && this.shapeRecognitionResult) {
+        finalizedElement.shapeRecognition = this.shapeRecognitionResult;
+      }
       if (finalizedElement) {
         this.currentElement = {
           ...this.currentElement,
