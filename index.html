@@ -804,7 +804,7 @@
         <button id="executeShareBtn" type="button"
                 class="header-action-btn primary"
                 style="padding:0 16px;font-weight:700;">
-          تحميل الملف
+          مشاركة الملف
         </button>
       </div>
     </div>
@@ -1151,7 +1151,7 @@
       }
 
       executeShareBtn.disabled = true;
-      executeShareBtn.textContent = "جاري تجهيز الملف...";
+      executeShareBtn.textContent = "جاري تجهيز المشاركة...";
 
       try {
         const scope =
@@ -1187,36 +1187,15 @@
           throw new Error("تعذر إنشاء ملف المشاركة.");
         }
 
-        // Detect Capacitor from its module, not window.Capacitor.
-        // Capacitor is not automatically exposed on window in production APK builds.
-        const Capacitor = window.Capacitor;
-        const isNative = Capacitor?.isNativePlatform?.() === true
-          && Capacitor?.getPlatform?.() === "android";
-        let completed = false;
-
-        if (isNative) {
-          completed = await storageModule.shareBlob(blob, filename);
-        } else {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = filename;
-          link.style.display = "none";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-
-          setTimeout(() => URL.revokeObjectURL(url), 2000);
-          completed = true;
-        }
+        // The platform-aware helper opens Android's native share chooser in APK,
+        // uses Web Share in supported browsers, and downloads only as a web fallback.
+        const completed = await storageModule.shareBlob(blob, filename);
 
         if (completed) {
           closeExport();
           const toast = document.getElementById("toast");
           if (toast) {
-            toast.textContent = isNative
-              ? "تم تجهيز الملف"
-              : "بدأ تنزيل الملف";
+            toast.textContent = "تم تنفيذ المشاركة";
             toast.classList.add("show");
             setTimeout(() => toast.classList.remove("show"), 2500);
           }
@@ -1226,7 +1205,7 @@
         alert("تعذرت تحميل الملف: " + (err?.message || err));
       } finally {
         executeShareBtn.disabled = false;
-        executeShareBtn.textContent = "تحميل الملف";
+        executeShareBtn.textContent = "مشاركة الملف";
       }
     });
 
