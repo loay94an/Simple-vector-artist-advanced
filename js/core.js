@@ -1170,12 +1170,15 @@ export class Scene {
       const glow=Math.max(0,Math.min(1,Number(options.featherGlow??style.featherGlow??0)));
       const softness=Math.max(0,Math.min(1,Number(options.featherSoftness??style.featherSoftness??0.35)));
       const taper=Math.max(0,Math.min(1,Number(options.featherTaper??style.featherTaper??0.7)));
+      const gap=Math.max(0,Math.min(1.5,Number(options.featherGap??style.featherGap??.35)));
+      const texture=Math.max(0,Math.min(1,Number(options.featherTexture??style.featherTexture??.35)));
+      const headAngle=Number(options.featherAngle??style.featherAngle??0)*Math.PI/180;
+      const lanes=preset==="feather-fan"?density:preset==="feather-flat"?Math.max(4,density):preset==="feather-soft"?Math.max(6,density):preset==="feather-dry"?Math.max(4,density):preset==="feather-quill"?Math.max(3,Math.min(9,density)):Math.max(5,density);
       context.save();context.globalAlpha=opacity;
       // Draw all bristle lanes as one compound fill. Separate fills darken
       // overlapping centers when opacity is below 100%.
       const blur=Math.max(glow*size*0.9,softness*size*0.16);
       context.shadowColor=blur>0?color:"transparent";context.shadowBlur=blur;
-      const lanes=preset==="feather-fan"?density:preset==="feather-dry"?Math.max(3,Math.round(density*0.65)):preset==="feather-flat"?Math.max(3,Math.round(density*0.45)):preset==="feather-soft"?Math.max(3,Math.round(density*0.7)):1;
       if(points.length===1){
         const p=points[0],r=radius(p,p,p);
         context.beginPath();context.arc(p.x,p.y,Math.max(0.35,r),0,Math.PI*2);context.fill();
@@ -1186,22 +1189,28 @@ export class Scene {
         const ratio=lanes===1?0:lane/(lanes-1)-0.5;
         for(let i=0;i<points.length;i++){
           const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
-          const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
-          const progress=points.length<=1?0.5:i/(points.length-1);
-          const fade=Math.max(0.08,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
-          const r=radius(p,prev,next)*fade;
-          const offset=ratio*spread*spacing*r*1.65;
-          const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
+          const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;
+          if(preset==="feather-script"){const ox=nx,oy=ny,co=Math.cos(headAngle),si=Math.sin(headAngle);nx=ox*co-oy*si;ny=ox*si+oy*co;}
+          const progress=points.length<=1?0.5:i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
+          const pressureValue=options.pressureEnabled===false?1:Math.max(.25,.35+(Number(p.pressure)||.5)*.65),rawSpeed=Math.hypot(next.x-prev.x,next.y-prev.y)/Math.max(1,Number(next.time||0)-Number(prev.time||0));
+          const pSens=Math.max(0,Math.min(1,Number(options.featherPressure??style.featherPressure??.75))),sSens=Math.max(0,Math.min(1,Number(options.featherSpeed??style.featherSpeed??.25))),speedFactor=Math.max(.78,Math.min(1.12,1.12-rawSpeed*.22));
+          const r=size*.5*(1-pSens+pSens*pressureValue)*(1-sSens+sSens*speedFactor)*fade;
+          let dist=ratio;if(preset==="feather-fan")dist=Math.sign(ratio)*Math.pow(Math.abs(ratio),.72);if(preset==="feather-pointed"||preset==="feather-quill")dist=Math.sign(ratio)*Math.pow(Math.abs(ratio),1.55);if(preset==="feather-round"||preset==="feather-soft")dist=Math.sin(ratio*Math.PI/2);
+          let weight=1;if(preset==="feather-pointed"||preset==="feather-quill")weight=.35+.65*Math.pow(Math.max(0,1-Math.abs(ratio)),.65);if(preset==="feather-round")weight=.55+.45*Math.sqrt(Math.max(0,1-ratio*ratio));if(preset==="feather-soft")weight=.72+.28*Math.sqrt(Math.max(0,1-ratio*ratio));
+          const offset=dist*spread*spacing*r*(1+gap*.65),variation=1-texture*.22+texture*.44*(.5+.5*Math.sin((lane+1)*12.9898+(i+1)*7.233)),laneWidth=Math.max(.12,r*(preset==="feather-fan"?.075:preset==="feather-flat"?.22:preset==="feather-dry"?.075:preset==="feather-soft"?.24:.17)*weight*variation*(1-gap*.35));
           const x=p.x+nx*offset,y=p.y+ny*offset;
           if(i===0)context.moveTo(x+nx*laneWidth,y+ny*laneWidth);else context.lineTo(x+nx*laneWidth,y+ny*laneWidth);
         }
         for(let i=points.length-1;i>=0;i--){
           const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
-          const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
-          const progress=points.length<=1?0.5:i/(points.length-1);
-          const fade=Math.max(0.08,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
-          const r=radius(p,prev,next)*fade,offset=ratio*spread*spacing*r*1.65;
-          const laneWidth=Math.max(0.25,r*(preset==="feather-fan"?0.12:preset==="feather-flat"?0.30:preset==="feather-dry"?0.10:0.42));
+          const dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;
+          if(preset==="feather-script"){const ox=nx,oy=ny,co=Math.cos(headAngle),si=Math.sin(headAngle);nx=ox*co-oy*si;ny=ox*si+oy*co;}
+          const progress=points.length<=1?0.5:i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5)));
+          const pressureValue=options.pressureEnabled===false?1:Math.max(.25,.35+(Number(p.pressure)||.5)*.65),rawSpeed=Math.hypot(next.x-prev.x,next.y-prev.y)/Math.max(1,Number(next.time||0)-Number(prev.time||0));
+          const pSens=Math.max(0,Math.min(1,Number(options.featherPressure??style.featherPressure??.75))),sSens=Math.max(0,Math.min(1,Number(options.featherSpeed??style.featherSpeed??.25))),speedFactor=Math.max(.78,Math.min(1.12,1.12-rawSpeed*.22)),r=size*.5*(1-pSens+pSens*pressureValue)*(1-sSens+sSens*speedFactor)*fade;
+          let dist=ratio;if(preset==="feather-fan")dist=Math.sign(ratio)*Math.pow(Math.abs(ratio),.72);if(preset==="feather-pointed"||preset==="feather-quill")dist=Math.sign(ratio)*Math.pow(Math.abs(ratio),1.55);if(preset==="feather-round"||preset==="feather-soft")dist=Math.sin(ratio*Math.PI/2);
+          let weight=1;if(preset==="feather-pointed"||preset==="feather-quill")weight=.35+.65*Math.pow(Math.max(0,1-Math.abs(ratio)),.65);if(preset==="feather-round")weight=.55+.45*Math.sqrt(Math.max(0,1-ratio*ratio));if(preset==="feather-soft")weight=.72+.28*Math.sqrt(Math.max(0,1-ratio*ratio));
+          const offset=dist*spread*spacing*r*(1+gap*.65),variation=1-texture*.22+texture*.44*(.5+.5*Math.sin((lane+1)*12.9898+(i+1)*7.233)),laneWidth=Math.max(.12,r*(preset==="feather-fan"?.075:preset==="feather-flat"?.22:preset==="feather-dry"?.075:preset==="feather-soft"?.24:.17)*weight*variation*(1-gap*.35));
           context.lineTo(p.x+nx*offset-nx*laneWidth,p.y+ny*offset-ny*laneWidth);
         }
         context.closePath();
