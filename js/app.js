@@ -28,11 +28,11 @@ import {
 
 import {
   DrawingEngine
-} from "./engine.js?v=20261109-29";
+} from "./engine.js?v=20261109-30";
 
 import {
   ToolManager
-} from "./tools.js";
+} from "./tools.js?v=20261109-02";
 
 import {
   HistoryManager
