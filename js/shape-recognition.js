@@ -433,7 +433,7 @@ function fitOpenPolyline(points, strength) {
   };
 }
 
-export function recognizeShape(sourcePoints, options = {}) {
+function recognizeShapeBase(sourcePoints, options = {}) {
   if (!Array.isArray(sourcePoints) || sourcePoints.length < 8) return null;
   const points = sourcePoints.filter(valid);
   if (points.length < 8) return null;
@@ -470,4 +470,150 @@ export function recognizeShape(sourcePoints, options = {}) {
   const curve = fitSmoothCurve(points);
   if (curve) return curve;
   return fitOpenPolyline(points, strength);
+}
+
+
+/*
+ * Extended classification catalogue: 23 existing base types plus 39
+ * specific classifications. The base type remains stable for renderer
+ * compatibility; classifications are additional semantic labels.
+ */
+export const SHAPE_CLASSIFICATIONS = Object.freeze([
+  "triangle","square","rectangle","rhombus","parallelogram","trapezoid",
+  "quadrilateral","pentagon","hexagon","heptagon","octagon","nonagon",
+  "decagon","hendecagon","dodecagon","polygon","circle","ellipse","line",
+  "arc","curve","polyline","zigzag",
+  "triangle-equilateral","triangle-isosceles","triangle-scalene",
+  "triangle-right","triangle-acute","triangle-obtuse",
+  "kite","dart","trapezoid-isosceles","trapezoid-right","quadrilateral-concave",
+  "polygon-convex","polygon-concave","polygon-regular","polygon-irregular",
+  "polygon-star","polygon-self-intersecting",
+  "semicircle","quarter-circle","circular-sector","annulus","crescent","circular-segment",
+  "parabola","hyperbola","sine-wave","spiral","cardioid","limacon",
+  "lemniscate","rose-curve","astroid","cycloid","catenary","lissajous",
+  "s-curve","wavy-line","orthogonal-polyline","compound-curve"
+]);
+
+const EPSILON = 1e-6;
+const angleBetween = (a,b,c) => {
+  const u={x:a.x-b.x,y:a.y-b.y},v={x:c.x-b.x,y:c.y-b.y};
+  const d=Math.hypot(u.x,u.y)*Math.hypot(v.x,v.y);
+  return d<EPSILON?0:Math.acos(clamp((u.x*v.x+u.y*v.y)/d,-1,1))*180/Math.PI;
+};
+const polygonArea = points => points.reduce((sum,p,i)=>{
+  const q=points[(i+1)%points.length]; return sum+p.x*q.y-q.x*p.y;
+},0)/2;
+function segmentIntersection(a,b,c,d) {
+  const orient=(p,q,r)=>(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);
+  const o1=orient(a,b,c),o2=orient(a,b,d),o3=orient(c,d,a),o4=orient(c,d,b);
+  return o1*o2 < -EPSILON && o3*o4 < -EPSILON;
+}
+function hasSelfIntersection(points) {
+  const n=points.length;
+  for(let i=0;i<n;i++) for(let j=i+2;j<n;j++) {
+    if(i===0&&j===n-1) continue;
+    if(segmentIntersection(points[i],points[(i+1)%n],points[j],points[(j+1)%n])) return true;
+  }
+  return false;
+}
+function classifyExtended(points,result) {
+  const labels=new Set([result.type]);
+  const shapePoints=result.corners?.length>=3?result.corners:points;
+  if(result.type==="triangle" && result.corners?.length===3) {
+    const v=result.corners, sides=v.map((p,i)=>distance(p,v[(i+1)%3]));
+    const angles=v.map((p,i)=>angleBetween(v[(i+2)%3],p,v[(i+1)%3]));
+    const equal01=Math.abs(sides[0]-sides[1])/Math.max(...sides)<.09;
+    const equal12=Math.abs(sides[1]-sides[2])/Math.max(...sides)<.09;
+    const equal20=Math.abs(sides[2]-sides[0])/Math.max(...sides)<.09;
+    const right=angles.some(a=>Math.abs(a-90)<13);
+    const obtuse=angles.some(a=>a>103);
+    const acute=angles.every(a=>a<97);
+    if(right) labels.add("triangle-right");
+    if(obtuse) labels.add("triangle-obtuse");
+    if(acute) labels.add("triangle-acute");
+    if(equal01&&equal12&&equal20) labels.add("triangle-equilateral");
+    else if(equal01||equal12||equal20) labels.add("triangle-isosceles");
+    else labels.add("triangle-scalene");
+  }
+  if(result.type==="trapezoid"&&result.corners?.length===4) {
+    const v=result.corners, sides=v.map((p,i)=>distance(p,v[(i+1)%4]));
+    const parallel=(a,b)=>Math.abs(cross(a,b))/Math.max(EPSILON,length(a)*length(b))<.12;
+    const e=v.map((p,i)=>({x:v[(i+1)%4].x-p.x,y:v[(i+1)%4].y-p.y}));
+    if(Math.abs(sides[0]-sides[2])/Math.max(...sides)<.1 ||
+       Math.abs(sides[1]-sides[3])/Math.max(...sides)<.1) labels.add("trapezoid-isosceles");
+    if(v.some((p,i)=>Math.abs(angleBetween(v[(i+3)%4],p,v[(i+1)%4])-90)<13)) labels.add("trapezoid-right");
+  }
+  if(result.corners?.length===4) {
+    const v=result.corners, sides=v.map((p,i)=>distance(p,v[(i+1)%4]));
+    const pairs=Math.abs(sides[0]-sides[1])<Math.max(...sides)*.1 &&
+      Math.abs(sides[2]-sides[3])<Math.max(...sides)*.1;
+    const reflex=v.some((p,i)=>angleBetween(v[(i+3)%4],p,v[(i+1)%4])>190);
+    if(reflex) labels.add("quadrilateral-concave");
+    else if(result.type==="quadrilateral"&&pairs) labels.add("kite");
+    if(result.type==="quadrilateral"&&reflex) labels.add("dart");
+    if(result.type==="quadrilateral"&&!reflex&&pairs) labels.add("kite");
+  }
+  if(result.corners?.length>=5) {
+    const v=result.corners, turns=[];
+    for(let i=0;i<v.length;i++){
+      const a=v[i],b=v[(i+1)%v.length],c=v[(i+2)%v.length];
+      turns.push(cross({x:b.x-a.x,y:b.y-a.y},{x:c.x-b.x,y:c.y-b.y}));
+    }
+    const signs=turns.filter(x=>Math.abs(x)>EPSILON).map(Math.sign);
+    const concave=signs.some(s=>s!==signs[0]);
+    const sides=v.map((p,i)=>distance(p,v[(i+1)%v.length]));
+    const regular=Math.max(...sides)/Math.max(EPSILON,Math.min(...sides))<1.12;
+    if(concave) labels.add("polygon-concave"); else labels.add("polygon-convex");
+    labels.add(regular?"polygon-regular":"polygon-irregular");
+    if(hasSelfIntersection(v)) labels.add("polygon-self-intersecting");
+    if(v.length>=5&&concave) labels.add("polygon-star");
+  }
+  const box=boundsOf(points), diag=Math.hypot(box.width,box.height);
+  if(["curve","arc"].includes(result.type)) {
+    const open=distance(points[0],points.at(-1));
+    const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
+    const yRange=Math.max(...ys)-Math.min(...ys),xRange=Math.max(...xs)-Math.min(...xs);
+    let extrema=0,last=0;
+    for(let i=2;i<points.length;i++){
+      const a=points[i-1].y-points[i-2].y,b=points[i].y-points[i-1].y;
+      const s=Math.sign(b);
+      if(s&&last&&s!==last) extrema++;
+      if(s) last=s;
+    }
+    if(extrema>=2&&xRange>yRange*.9) labels.add("sine-wave");
+    if(extrema>=3&&xRange>yRange*.7) labels.add("wavy-line");
+    if(result.type==="curve"&&extrema===1) labels.add("parabola");
+    if(result.type==="curve"&&extrema>=2&&open/Math.max(1,diag)<.22) labels.add("lissajous");
+    if(result.type==="curve"&&open/Math.max(1,diag)<.12) labels.add("compound-curve");
+    // Radial monotonicity identifies spiral-like strokes conservatively.
+    const center={x:(box.minX+box.maxX)/2,y:(box.minY+box.maxY)/2};
+    const radii=points.map(p=>distance(p,center));
+    let radialChanges=0;
+    for(let i=1;i<radii.length;i++) if(Math.abs(radii[i]-radii[i-1])>diag*.002) radialChanges++;
+    if(radialChanges>points.length*.55&&open/Math.max(1,diag)>.18) labels.add("spiral");
+    // A double-lobed closed-looking open stroke is a lemniscate candidate.
+    if(extrema>=2&&open/Math.max(1,diag)<.08) labels.add("lemniscate");
+  }
+  if(result.type==="polyline"||result.type==="zigzag") {
+    const v=[points[0],...(result.corners||[]),points.at(-1)];
+    const orthogonal=v.length>=3&&v.slice(1).every((p,i)=>{
+      const q=v[i]; return Math.min(Math.abs(p.x-q.x),Math.abs(p.y-q.y))<diag*.055;
+    });
+    if(orthogonal) labels.add("orthogonal-polyline");
+  }
+  if(result.type==="curve"&&points.length>24) {
+    const ys=points.map(p=>p.y),xs=points.map(p=>p.x);
+    const changes=ys.slice(1).filter((v,i)=>Math.sign(v-ys[i])!==Math.sign(ys[i]-ys[Math.max(0,i-1)])).length;
+    if(changes>=2) labels.add("s-curve");
+  }
+  return [...labels];
+}
+
+export function recognizeShape(sourcePoints, options = {}) {
+  const result=recognizeShapeBase(sourcePoints,options);
+  if(!result) return null;
+  const labels=classifyExtended(sourcePoints.filter(valid),result);
+  result.classifications=labels;
+  result.classification=labels.find(label=>label!==result.type)||result.type;
+  return result;
 }
