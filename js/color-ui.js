@@ -97,33 +97,18 @@
           <div class="concepts-wheel-header">
             <div class="concepts-title-row">
               <span class="concepts-dot" id="conceptsTitleDot"></span>
-              <strong>عجلة ألوان Concepts</strong>
+              <strong>اختيار اللون</strong>
+              <span class="concepts-hex-label" id="conceptsHexLabel">#2563EB</span>
             </div>
             <button id="conceptsCloseBtn" type="button" class="concepts-close-btn" title="إغلاق">✕</button>
           </div>
 
           <div class="concepts-canvas-wrap">
-            <canvas id="conceptsCanvas" width="280" height="280"></canvas>
-            <div class="concepts-center-hub" id="conceptsCenterHub">
-              <div class="concepts-center-color" id="conceptsCenterColor"></div>
-              <span class="concepts-hex-label" id="conceptsHexLabel">#2563EB</span>
-            </div>
+            <canvas id="conceptsCanvas" width="280" height="280" aria-label="حلقة لاختيار درجة اللون ودائرة داخلية لاختيار التشبع والسطوع"></canvas>
           </div>
 
-          <div class="concepts-harmonies-row">
-            <span class="concepts-subhead">التناغم اللوني:</span>
-            <div class="concepts-harmonies-list" id="conceptsHarmoniesList"></div>
-          </div>
-
-          <div class="concepts-controls-row">
-            <div class="concepts-slider-group">
-              <label>السطوع</label>
-              <input type="range" id="conceptsBrightness" min="0.05" max="1" step="0.01" value="0.9">
-            </div>
-            <div class="concepts-slider-group">
-              <label>التشبع</label>
-              <input type="range" id="conceptsSaturation" min="0.05" max="1" step="0.01" value="0.85">
-            </div>
+          <div class="concepts-tools-row">
+            <span class="concepts-subhead">الحلقة: درجة اللون · الدائرة: التشبع والسطوع</span>
             <button type="button" id="conceptsEyedropper" class="concepts-eyedropper-btn" title="أداة قطارة اللون">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l2.5 2.5a2.12 2.12 0 0 0 3 0L19 11Z"/><path d="m5 13 4 4"/><path d="m2 22 3-3"/></svg>
             </button>
@@ -142,130 +127,144 @@
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // Precision hue ring with a refined selector and a live center preview.
+    // Outer ring selects hue; the inner circular field selects saturation (X) and value (Y).
     const geometry = () => {
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
       const outer = canvas.width / 2 - 7;
       const inner = outer - 38;
-      const centerRadius = inner - 9;
-      return { cx, cy, outer, inner, centerRadius };
+      const fieldRadius = inner - 9;
+      return { cx, cy, outer, inner, fieldRadius };
     };
 
+    const clamp01 = value => Math.max(0, Math.min(1, value));
+
     function drawWheel() {
-      const { cx, cy, outer, inner, centerRadius } = geometry();
+      const { cx, cy, outer, inner, fieldRadius } = geometry();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // A true continuous conic gradient replaces the visibly segmented ring.
-      // Keep a high-resolution sector fallback for older canvas implementations.
+      // Smooth, continuous hue ring.
       ctx.save();
-      ctx.shadowColor = "rgba(15,23,42,.22)";
-      ctx.shadowBlur = 10;
+      ctx.shadowColor = "rgba(15,23,42,.18)";
+      ctx.shadowBlur = 8;
       ctx.shadowOffsetY = 2;
-
       let spectrum;
       if (typeof ctx.createConicGradient === "function") {
         spectrum = ctx.createConicGradient(-Math.PI / 2, cx, cy);
         [
-          [0, "#FF3030"],
-          [1 / 6, "#FFE13B"],
-          [2 / 6, "#42D66B"],
-          [3 / 6, "#25D9D2"],
-          [4 / 6, "#3978FF"],
-          [5 / 6, "#B94BEB"],
+          [0, "#FF3030"], [1 / 6, "#FFE13B"], [2 / 6, "#42D66B"],
+          [3 / 6, "#25D9D2"], [4 / 6, "#3978FF"], [5 / 6, "#B94BEB"],
           [1, "#FF3030"]
         ].forEach(([stop, color]) => spectrum.addColorStop(stop, color));
-
         ctx.beginPath();
         ctx.arc(cx, cy, outer, 0, Math.PI * 2);
         ctx.arc(cx, cy, inner, 0, Math.PI * 2, true);
         ctx.fillStyle = spectrum;
         ctx.fill("evenodd");
       } else {
-        const segments = 1440;
+        const segments = 720;
         for (let i = 0; i < segments; i++) {
-          const hue = i * 360 / segments;
           const a0 = (i / segments) * Math.PI * 2 - Math.PI / 2;
-          const a1 = ((i + 1.05) / segments) * Math.PI * 2 - Math.PI / 2;
+          const a1 = ((i + 1.02) / segments) * Math.PI * 2 - Math.PI / 2;
           ctx.beginPath();
           ctx.arc(cx, cy, outer, a0, a1);
           ctx.arc(cx, cy, inner, a1, a0, true);
           ctx.closePath();
-          ctx.fillStyle = hsvToHex(hue, 1, 1);
+          ctx.fillStyle = hsvToHex(i * 360 / segments, 1, 1);
           ctx.fill();
         }
       }
       ctx.restore();
 
-      // Fine outlines and a restrained inner highlight give the smooth ring definition.
+      // The inner disk is a simple 2D saturation/value picker.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, fieldRadius, 0, Math.PI * 2);
+      ctx.clip();
+
+      const hueColor = hsvToHex(activeHue, 1, 1);
+      const saturationGradient = ctx.createLinearGradient(cx - fieldRadius, cy, cx + fieldRadius, cy);
+      saturationGradient.addColorStop(0, "#FFFFFF");
+      saturationGradient.addColorStop(1, hueColor);
+      ctx.fillStyle = saturationGradient;
+      ctx.fillRect(cx - fieldRadius, cy - fieldRadius, fieldRadius * 2, fieldRadius * 2);
+
+      const valueGradient = ctx.createLinearGradient(cx, cy - fieldRadius, cx, cy + fieldRadius);
+      valueGradient.addColorStop(0, "rgba(0,0,0,0)");
+      valueGradient.addColorStop(1, "rgba(0,0,0,1)");
+      ctx.fillStyle = valueGradient;
+      ctx.fillRect(cx - fieldRadius, cy - fieldRadius, fieldRadius * 2, fieldRadius * 2);
+      ctx.restore();
+
+      // Minimal outlines.
       ctx.beginPath();
       ctx.arc(cx, cy, outer, 0, Math.PI * 2);
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "rgba(255,255,255,.9)";
+      ctx.strokeStyle = "rgba(255,255,255,.92)";
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(cx, cy, inner, 0, Math.PI * 2);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1;
       ctx.strokeStyle = "rgba(15,23,42,.18)";
       ctx.stroke();
-
-      // Twelve subtle radial reference marks.
-      for (let i = 0; i < 12; i++) {
-        const angle = (i * 30 - 90) * Math.PI / 180;
-        const r1 = inner + 3;
-        const r2 = inner + 9;
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
-        ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "rgba(255,255,255,.88)";
-        ctx.stroke();
-      }
-
-      // Selected hue handle: dark outer edge, white separation, vivid core.
-      const angle = (activeHue * Math.PI) / 180 - Math.PI / 2;
-      const mid = (outer + inner) / 2;
-      const hx = cx + Math.cos(angle) * mid;
-      const hy = cy + Math.sin(angle) * mid;
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,.35)";
-      ctx.shadowBlur = 5;
       ctx.beginPath();
-      ctx.arc(hx, hy, 10, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
+      ctx.arc(cx, cy, fieldRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(255,255,255,.92)";
+      ctx.stroke();
+
+      // Hue selector on the ring.
+      const hueAngle = activeHue * Math.PI / 180 - Math.PI / 2;
+      const ringRadius = (outer + inner) / 2;
+      const hx = cx + Math.cos(hueAngle) * ringRadius;
+      const hy = cy + Math.sin(hueAngle) * ringRadius;
+      ctx.beginPath();
+      ctx.arc(hx, hy, 8, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = "rgba(15,23,42,.72)";
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(hx, hy, 6.5, 0, Math.PI * 2);
-      ctx.fillStyle = hsvToHex(activeHue, 1, 1);
+      ctx.arc(hx, hy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = hueColor;
       ctx.fill();
-      ctx.restore();
 
-      // Canvas center remains a clean circular color preview beneath the UI hub.
+      // Crosshair shows the current saturation/value point.
+      const sx = cx + (activeSat * 2 - 1) * fieldRadius;
+      const sy = cy + (1 - activeVal * 2) * fieldRadius;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,.35)";
+      ctx.shadowBlur = 3;
       ctx.beginPath();
-      ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
+      ctx.arc(sx, sy, 7, 0, Math.PI * 2);
       ctx.fillStyle = currentColor;
       ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+      ctx.restore();
     }
 
     function pickFromCoords(x, y) {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const px = (x - rect.left) * scaleX;
-      const py = (y - rect.top) * scaleY;
-      const { cx, cy, outer, inner } = geometry();
+      const px = (x - rect.left) * canvas.width / rect.width;
+      const py = (y - rect.top) * canvas.height / rect.height;
+      const { cx, cy, outer, inner, fieldRadius } = geometry();
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.hypot(dx, dy);
 
-      // Only the outer ring changes hue; the center is a live color preview.
-      if (dist < inner - 5 || dist > outer + 5) return;
-      let angle = Math.atan2(dy, dx) + Math.PI / 2;
-      if (angle < 0) angle += Math.PI * 2;
-      activeHue = (angle * 180 / Math.PI + 360) % 360;
+      if (dist >= inner - 5 && dist <= outer + 5) {
+        let angle = Math.atan2(dy, dx) + Math.PI / 2;
+        if (angle < 0) angle += Math.PI * 2;
+        activeHue = (angle * 180 / Math.PI + 360) % 360;
+      } else if (dist <= fieldRadius + 3) {
+        activeSat = clamp01((dx / (fieldRadius * 2)) + 0.5);
+        activeVal = clamp01(0.5 - (dy / (fieldRadius * 2)));
+      } else {
+        return;
+      }
 
       const hex = hsvToHex(activeHue, activeSat, activeVal);
       applyColor(hex, false);
@@ -286,36 +285,14 @@
       pickFromCoords(e.clientX, e.clientY);
     });
 
-    canvas.addEventListener("pointerup", e => {
-      if (isDragging) {
-        isDragging = false;
-        try { canvas.releasePointerCapture(e.pointerId); } catch {}
-        saveToHistory(currentColor);
-      }
-    });
-
-    // Sliders
-    const bSlider = $("conceptsBrightness");
-    if (bSlider) {
-      bSlider.addEventListener("input", e => {
-        activeVal = parseFloat(e.target.value);
-        const hex = hsvToHex(activeHue, activeSat, activeVal);
-        applyColor(hex, false);
-        drawWheel();
-        updateHarmonies();
-      });
-    }
-
-    const sSlider = $("conceptsSaturation");
-    if (sSlider) {
-      sSlider.addEventListener("input", e => {
-        activeSat = parseFloat(e.target.value);
-        const hex = hsvToHex(activeHue, activeSat, activeVal);
-        applyColor(hex, false);
-        drawWheel();
-        updateHarmonies();
-      });
-    }
+    const finishWheelDrag = e => {
+      if (!isDragging) return;
+      isDragging = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+      saveToHistory(currentColor);
+    };
+    canvas.addEventListener("pointerup", finishWheelDrag);
+    canvas.addEventListener("pointercancel", finishWheelDrag);
 
     // Eyedropper
     const eyeBtn = $("conceptsEyedropper");
@@ -428,10 +405,8 @@
       if (dot) dot.style.backgroundColor = currentColor;
     }
 
-    const centerColor = $("conceptsCenterColor");
     const hexLabel = $("conceptsHexLabel");
     const titleDot = $("conceptsTitleDot");
-    if (centerColor) centerColor.style.backgroundColor = currentColor;
     if (hexLabel) hexLabel.textContent = currentColor;
     if (titleDot) titleDot.style.backgroundColor = currentColor;
 
