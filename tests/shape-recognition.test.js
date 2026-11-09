@@ -185,3 +185,35 @@ test("distinguishes a zigzag from an ordinary broken line", () => {
   assert.equal(recognizeShape(openStroke(zigzagVertices))?.type, "zigzag");
   assert.equal(recognizeShape(openStroke(brokenVertices))?.type, "polyline");
 });
+
+import { SHAPE_CLASSIFICATIONS } from "../js/shape-recognition.js";
+
+test("exposes exactly 62 unique shape classifications", () => {
+  assert.equal(SHAPE_CLASSIFICATIONS.length, 62);
+  assert.equal(new Set(SHAPE_CLASSIFICATIONS).size, 62);
+});
+
+test("adds triangle subtype classifications without changing renderer base type", () => {
+  const result=recognizeShape(polygon([
+    {x:40,y:140},{x:110,y:20},{x:180,y:140}
+  ]));
+  assert.equal(result?.type,"triangle");
+  assert.ok(result.classifications.some(x=>x.startsWith("triangle-")));
+});
+
+test("classifies right and isosceles triangle properties", () => {
+  const result=recognizeShape(polygon([
+    {x:40,y:140},{x:40,y:40},{x:140,y:140}
+  ]));
+  assert.equal(result?.type,"triangle");
+  assert.ok(result.classifications.includes("triangle-right"));
+  assert.ok(result.classifications.includes("triangle-isosceles"));
+});
+
+test("classifies regular and convex polygon properties", () => {
+  const result=recognizeShape(polygon(Array.from({length:6},(_,i)=>({
+    x:110+65*Math.cos(i*Math.PI/3),y:100+65*Math.sin(i*Math.PI/3)
+  }))));
+  assert.ok(result?.classifications.includes("polygon-convex"));
+  assert.ok(result?.classifications.includes("polygon-regular"));
+});
