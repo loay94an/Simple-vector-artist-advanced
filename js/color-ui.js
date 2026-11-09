@@ -72,15 +72,24 @@
 
   // Generate Concepts color harmonies
   function getHarmonies(baseHue, s = 0.85, v = 0.9) {
-    return [
-      { name: "الأساسي", hex: hsvToHex(baseHue, s, v) },
-      { name: "المكمل", hex: hsvToHex((baseHue + 180) % 360, s, v) },
-      { name: "متجاور 1", hex: hsvToHex((baseHue + 30) % 360, s, v) },
-      { name: "متجاور 2", hex: hsvToHex((baseHue + 330) % 360, s, v) },
-      { name: "ثلاثي", hex: hsvToHex((baseHue + 120) % 360, s, v) },
-      { name: "فاتح", hex: hsvToHex(baseHue, Math.max(0.1, s * 0.4), Math.min(1, v * 1.1)) },
-      { name: "داكن", hex: hsvToHex(baseHue, Math.min(1, s * 1.1), Math.max(0.2, v * 0.6)) }
+    const families = [
+      { name: "مكمل", hue: baseHue + 180 },
+      { name: "متجاور", hue: baseHue + 30 },
+      { name: "متجاور", hue: baseHue + 330 },
+      { name: "ثلاثي", hue: baseHue + 120 },
+      { name: "مكمل منقسم", hue: baseHue + 150 },
+      { name: "مكمل منقسم", hue: baseHue + 210 }
     ];
+    const shades = [
+      { s: Math.max(0.16, s * 0.38), v: Math.min(1, v * 1.18) },
+      { s: Math.max(0.22, s * 0.62), v: Math.min(1, v * 1.04) },
+      { s: Math.min(1, s * 0.88), v: Math.max(0.12, v * 0.82) },
+      { s: Math.min(1, s), v: Math.max(0.08, v * 0.58) }
+    ];
+    return families.map(f => ({
+      name: f.name,
+      colors: shades.map(sh => hsvToHex((f.hue + 360) % 360, sh.s, sh.v))
+    }));
   }
 
   // Create or modernize the concepts radial wheel structure
@@ -105,6 +114,7 @@
 
           <div class="concepts-canvas-wrap">
             <canvas id="conceptsCanvas" width="280" height="280" aria-label="حلقة لاختيار درجة اللون ودائرة داخلية لاختيار التشبع والسطوع"></canvas>
+            <span class="concepts-selected-color" id="conceptsSelectedColor" title="اللون المختار" aria-label="اللون المختار"></span>
           </div>
 
           <div class="concepts-tools-row">
@@ -112,6 +122,11 @@
             <button type="button" id="conceptsEyedropper" class="concepts-eyedropper-btn" title="أداة قطارة اللون">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l2.5 2.5a2.12 2.12 0 0 0 3 0L19 11Z"/><path d="m5 13 4 4"/><path d="m2 22 3-3"/></svg>
             </button>
+          </div>
+
+          <div class="concepts-harmonies-row">
+            <span class="concepts-subhead">الألوان المتكاملة وتدرجاتها:</span>
+            <div class="concepts-harmonies-list" id="conceptsHarmoniesList"></div>
           </div>
 
           <div class="concepts-recent-row">
@@ -351,27 +366,30 @@
     list.replaceChildren();
 
     const harmonies = getHarmonies(activeHue, activeSat, activeVal);
-    harmonies.forEach(h => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "concepts-swatch";
-      btn.style.backgroundColor = h.hex;
-      btn.title = `${h.name}: ${h.hex}`;
-      btn.addEventListener("click", () => {
-        const hsv = hexToHsv(h.hex);
-        activeHue = hsv.h;
-        activeSat = hsv.s;
-        activeVal = hsv.v;
-        applyColor(h.hex, true);
-        const canvas = $("conceptsCanvas");
-        if (canvas) {
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            initConceptsWheelUI();
-          }
-        }
+    harmonies.forEach((family) => {
+      const group = document.createElement("div");
+      group.className = "concepts-harmony-family";
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", family.name);
+      family.colors.forEach((hex, shadeIndex) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "concepts-swatch";
+        btn.style.backgroundColor = hex;
+        btn.title = family.name + " · درجة " + (shadeIndex + 1) + ": " + hex;
+        btn.setAttribute("aria-label", btn.title);
+        btn.addEventListener("click", () => {
+          const hsv = hexToHsv(hex);
+          activeHue = hsv.h;
+          activeSat = hsv.s;
+          activeVal = hsv.v;
+          applyColor(hex, true);
+          drawWheel();
+          updateHarmonies();
+        });
+        group.appendChild(btn);
       });
-      list.appendChild(btn);
+      list.appendChild(group);
     });
   }
 
@@ -441,8 +459,15 @@
 
     const hexLabel = $("conceptsHexLabel");
     const titleDot = $("conceptsTitleDot");
+    const selectedDot = $("conceptsSelectedColor");
     if (hexLabel) hexLabel.textContent = currentColor;
     if (titleDot) titleDot.style.backgroundColor = currentColor;
+    if (selectedDot) {
+      selectedDot.style.backgroundColor = currentColor;
+      selectedDot.title = "اللون المختار: " + currentColor;
+      selectedDot.setAttribute("aria-label", "اللون المختار " + currentColor);
+    }
+    updateHarmonies();
 
     if (saveHistory) {
       saveToHistory(currentColor);
