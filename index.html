@@ -761,7 +761,7 @@
           </label>
 
           <label class="export-radio-label">
-            <input type="radio" name="shareScope" value="full">
+            <input type="radio" name="saveScope" value="full">
             <div>
               <strong>حفظ جميع الرسوم على اللوحة</strong>
               <div style="font-size:11px;color:var(--text-muted);">
@@ -783,13 +783,13 @@
           </button>
 
           <button type="button" class="export-format-card"
-                  data-share-format="png">
+                  data-save-format="png">
             <strong>PNG</strong>
             <span>صورة عالية الجودة</span>
           </button>
 
           <button type="button" class="export-format-card"
-                  data-share-format="pdf">
+                  data-save-format="pdf">
             <strong>PDF</strong>
             <span>مستند للطباعة</span>
           </button>
@@ -1132,7 +1132,7 @@
     // اختيار صيغة الملف للحفظ
     document.querySelectorAll("[data-save-format]").forEach(card => {
       card.addEventListener("click", () => {
-        document.querySelectorAll("[data-share-format]").forEach(item => {
+        document.querySelectorAll("[data-save-format]").forEach(item => {
           item.classList.remove("active");
         });
 
@@ -1188,7 +1188,6 @@
         }
 
         // Android opens the system Save As picker; browsers use Save As or download.
-        
         const completed = await storageModule.downloadBlob(blob, filename);
 
         if (completed) {
