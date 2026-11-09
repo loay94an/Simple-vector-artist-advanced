@@ -142,13 +142,13 @@
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // Circular hue ring with a live selected-color preview in the center.
+    // Precision hue ring with a refined selector and a live center preview.
     const geometry = () => {
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
-      const outer = canvas.width / 2 - 5;
-      const inner = outer - 30;
-      const centerRadius = inner - 8;
+      const outer = canvas.width / 2 - 7;
+      const inner = outer - 38;
+      const centerRadius = inner - 9;
       return { cx, cy, outer, inner, centerRadius };
     };
 
@@ -156,47 +156,77 @@
       const { cx, cy, outer, inner, centerRadius } = geometry();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Smooth continuous hue ring.
-      const segments = 360;
+      // Soft shadow beneath the spectrum gives the ring visual depth.
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,.22)";
+      ctx.shadowBlur = 9;
+      ctx.shadowOffsetY = 2;
+
+      const segments = 720;
       for (let i = 0; i < segments; i++) {
+        const hue = i * 360 / segments;
         const a0 = (i / segments) * Math.PI * 2 - Math.PI / 2;
-        const a1 = ((i + 1.4) / segments) * Math.PI * 2 - Math.PI / 2;
+        const a1 = ((i + 1.35) / segments) * Math.PI * 2 - Math.PI / 2;
         ctx.beginPath();
         ctx.arc(cx, cy, outer, a0, a1);
         ctx.arc(cx, cy, inner, a1, a0, true);
         ctx.closePath();
-        ctx.fillStyle = hsvToHex(i, 1, 1);
+        ctx.fillStyle = hsvToHex(hue, 1, 1);
         ctx.fill();
       }
+      ctx.restore();
 
-      // Center circle previews the currently selected color.
+      // Fine outer and inner outlines keep the spectrum crisp on every theme.
       ctx.beginPath();
-      ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
-      ctx.fillStyle = currentColor;
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(255,255,255,.96)";
+      ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(255,255,255,.82)";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, inner, 0, Math.PI * 2);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(15,23,42,.24)";
       ctx.stroke();
 
-      // Subtle inner rim for a clean, distinct circular center.
-      ctx.beginPath();
-      ctx.arc(cx, cy, centerRadius - 4, 0, Math.PI * 2);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(15,23,42,.16)";
-      ctx.stroke();
+      // Twelve subtle radial reference marks.
+      for (let i = 0; i < 12; i++) {
+        const angle = (i * 30 - 90) * Math.PI / 180;
+        const r1 = inner + 3;
+        const r2 = inner + 9;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+        ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255,255,255,.88)";
+        ctx.stroke();
+      }
 
-      // Hue selector on the ring.
+      // Selected hue handle: dark outer edge, white separation, vivid core.
       const angle = (activeHue * Math.PI) / 180 - Math.PI / 2;
       const mid = (outer + inner) / 2;
       const hx = cx + Math.cos(angle) * mid;
       const hy = cy + Math.sin(angle) * mid;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,.35)";
+      ctx.shadowBlur = 5;
       ctx.beginPath();
-      ctx.arc(hx, hy, 8, 0, Math.PI * 2);
+      ctx.arc(hx, hy, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(15,23,42,.72)";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(hx, hy, 6.5, 0, Math.PI * 2);
       ctx.fillStyle = hsvToHex(activeHue, 1, 1);
       ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#ffffff";
-      ctx.stroke();
+      ctx.restore();
+
+      // Canvas center remains a clean circular color preview beneath the UI hub.
+      ctx.beginPath();
+      ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
+      ctx.fillStyle = currentColor;
+      ctx.fill();
     }
 
     function pickFromCoords(x, y) {
@@ -211,7 +241,7 @@
       const dist = Math.hypot(dx, dy);
 
       // Only the outer ring changes hue; the center is a live color preview.
-      if (dist < inner - 3 || dist > outer + 3) return;
+      if (dist < inner - 5 || dist > outer + 5) return;
       let angle = Math.atan2(dy, dx) + Math.PI / 2;
       if (angle < 0) angle += Math.PI * 2;
       activeHue = (angle * 180 / Math.PI + 360) % 360;
