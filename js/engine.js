@@ -1,5 +1,6 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
+import { recognizeShape } from "./shape-recognition.js";
 
 /* =========================================================
    RASEM 2.0
@@ -223,50 +224,10 @@ function smoothSmartStrokePoints(source, amount = 0) {
 }
 
 function recognizeSmartStroke(source, level = 0) {
-  if (!Array.isArray(source) || source.length < 5 || level < 1) return null;
-  const points = source.filter((p, i) => !i || EngineUtils.distance(p, source[i - 1]) > 0.01);
-  if (points.length < 5) return null;
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const p of points) {
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-  }
-  const width = maxX - minX, height = maxY - minY, diagonal = Math.hypot(width, height);
-  if (diagonal < 8) return null;
-  const closed = EngineUtils.distance(points[0], points[points.length - 1]) <= diagonal * (0.18 + level / 100 * 0.12);
-  const avg = (a, b) => (a + b) / 2;
-  if (closed && points.length >= 8) {
-    const edgeError = points.reduce((sum, p) => {
-      const dx = Math.min(Math.abs(p.x - minX), Math.abs(p.x - maxX));
-      const dy = Math.min(Math.abs(p.y - minY), Math.abs(p.y - maxY));
-      return sum + Math.min(dx, dy);
-    }, 0) / points.length;
-    if (edgeError < diagonal * (0.075 + level / 100 * 0.045) && width > 8 && height > 8) {
-      const corners = [[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]];
-      return corners.map(([x,y], i) => ({ ...(points[Math.round(i / 4 * (points.length - 1))] || points[0]), x, y }));
-    }
-    const cx = avg(minX, maxX), cy = avg(minY, maxY);
-    const rx = width / 2, ry = height / 2;
-    const radii = points.slice(0, -1).map(p => Math.hypot((p.x - cx) / Math.max(rx, 1), (p.y - cy) / Math.max(ry, 1)));
-    const mean = radii.reduce((sum, value) => sum + value, 0) / radii.length;
-    const variance = Math.sqrt(radii.reduce((sum, value) => sum + (value - mean) ** 2, 0) / radii.length) / Math.max(mean, 0.001);
-    if (variance < 0.2 - level / 100 * 0.08) {
-      const count = Math.max(32, Math.min(96, points.length));
-      return Array.from({ length: count + 1 }, (_, i) => {
-        const angle = -Math.PI / 2 + i / count * Math.PI * 2;
-        const nearest = points[Math.round(i / count * (points.length - 1))] || points[0];
-        return { ...nearest, x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry };
-      });
-    }
-  }
-  const first = points[0], last = points[points.length - 1];
-  const vx = last.x - first.x, vy = last.y - first.y, length = Math.hypot(vx, vy);
-  if (length > 8) {
-    const deviation = points.reduce((max, p) => Math.max(max,
-      Math.abs(vy * p.x - vx * p.y + last.x * first.y - last.y * first.x) / length), 0);
-    if (deviation < Math.max(2.5, length * (0.035 + level / 100 * 0.035))) return [{ ...first }, { ...last }];
-  }
-  return null;
+  if (!Array.isArray(source) || source.length < 8 || level < 1) return null;
+  const result = recognizeShape(source, { strength: level / 100 });
+  if (!result || !Array.isArray(result.points) || result.points.length < 2) return null;
+  return result.points;
 }
 
 /* =========================================================
