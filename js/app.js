@@ -779,10 +779,7 @@ export class RasemApplication {
       () => this.clearCanvas()
     );
 
-    this.bindClick(
-      this.elements.saveButton,
-      () => this.saveDocument()
-    );
+    // Save button is handled once by the save/export modal controller in index.html.
 
     this.bindClick(
       this.elements.themeButton,
