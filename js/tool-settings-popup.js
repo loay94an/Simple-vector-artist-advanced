@@ -404,6 +404,8 @@
     });
     const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
     const opacity = clamp(values.brushOpacity ?? 1, 0.05, 1);
+    const pressureEnabled = values.pressureEnabled !== "false";
+    const pressureFactor = pressureEnabled ? 1 : .72;
     const fade = normalizeFade(values.featherFade ?? 0);
     const softness = clamp(values.featherSoftness ?? 0.2, 0, 1);
     const glow = clamp(values.featherGlow ?? 0, 0, 1);
@@ -421,7 +423,7 @@
       const texture = clamp(values.featherTexture ?? 0, 0, 1);
       const pressure = clamp(values.featherPressure ?? .7, 0, 1);
       const speed = clamp(values.featherSpeed ?? .2, 0, 1);
-      const width = clamp(1.1 + size / 16 + pressure * 2, 1, 12);
+      const width = clamp((1.1 + size / 16 + pressure * 2) * pressureFactor, 1, 12);
       const spreadPx = 5 + spread * 27 + gap * 5;
       const paths = [];
       const lanes = Math.min(count, 32);
@@ -437,7 +439,7 @@
       drawing += glowLayer;
       art.innerHTML = defs + '<defs><mask id="headPreviewMask"><rect width="320" height="76" fill="url(#headPreviewFade)"/></mask></defs>' + drawing;
     } else {
-      const strokeWidth = clamp(2 + size / 7, 2, 18);
+      const strokeWidth = clamp((2 + size / 7) * pressureFactor, 2, 18);
       const endStyle = values.calligraphyEndStyle || "none";
       const path = '<path d="M 16 51 C 70 8 116 64 166 34 S 258 10 304 39" fill="none" stroke="currentColor" stroke-width="' + strokeWidth.toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" filter="' + (softness > .05 ? 'url(#headPreviewBlur)' : 'none') + '"/>';
       let end = "";
