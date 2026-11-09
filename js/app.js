@@ -986,7 +986,7 @@ export class RasemApplication {
       enabled: saved.enabled === true,
       smoothness: Number.isFinite(saved.smoothness) ? saved.smoothness : 35,
       correction: Number.isFinite(saved.correction) ? saved.correction : 20,
-      recognition: Number.isFinite(saved.recognition) ? saved.recognition : 0
+      recognition: Number.isFinite(saved.recognition) ? saved.recognition : 65
     });
     const persist = () => {
       const state = engine.setSmartDrawing({
