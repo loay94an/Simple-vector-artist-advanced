@@ -622,56 +622,6 @@ export class StrokeBuilder {
       );
     }
 
-    // شكل النهاية يُبنى على محور الضربة، لا على زاوية سن القلم؛
-    // لذلك تبقى سماكته المختارة ثابتة مهما تغيّرت زاوية الخط.
-    if (points.length > 1) {
-      const lastIndex = points.length - 1;
-      const lastPoint = points[lastIndex];
-      const previousPoint = points[lastIndex - 1];
-      const dx = lastPoint.x - previousPoint.x;
-      const dy = lastPoint.y - previousPoint.y;
-      const length = Math.hypot(dx, dy) || 1;
-      const tx = dx / length, ty = dy / length;
-      const nx = -ty, ny = tx;
-      const endStyle = ["thin", "wide", "pointed", "crescent"].includes(this.brushStyle?.calligraphyEndStyle)
-        ? this.brushStyle.calligraphyEndStyle
-        : "none";
-
-      if (endStyle !== "none") {
-        // احذف المقطع الأخير ذي السماكة المرتبطة بزاوية السن واستبدله
-        // بوصلة مستقلة ذات عرض نهائي ثابت مشتق من حجم القلم فقط.
-        segments.pop();
-        const baseRadius = Math.max(0.45, this.baseSize * nibScale * 0.5);
-        const pressureFactor = this.pressureEnabled
-          ? EngineUtils.clamp(0.35 + EngineUtils.number(lastPoint.pressure, 1) * 0.65, 0.25, 1.15)
-          : 1;
-        const endRadius = baseRadius * pressureFactor;
-        const capLength = Math.max(1.2, Math.min(endRadius * 1.15, length * 0.8));
-        const start = { x: lastPoint.x - tx * capLength, y: lastPoint.y - ty * capLength };
-        const startRadius = getRadius(previousPoint, lastIndex - 1);
-        const endWidth = endStyle === "wide" ? endRadius * 1.18
-          : endStyle === "pointed" ? 0.035
-          : endStyle === "thin" ? Math.max(0.12, endRadius * 0.10)
-          : endRadius * 0.72;
-        const poly = [
-          { x: start.x + nx * startRadius, y: start.y + ny * startRadius },
-          { x: lastPoint.x + nx * endWidth, y: lastPoint.y + ny * endWidth },
-          { x: lastPoint.x - nx * endWidth, y: lastPoint.y - ny * endWidth },
-          { x: start.x - nx * startRadius, y: start.y - ny * startRadius }
-        ];
-        segments.push(poly.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z");
-
-        if (endStyle === "crescent") {
-          const r = endRadius;
-          const left = { x: lastPoint.x - tx * r * 0.18 + nx * r, y: lastPoint.y - ty * r * 0.18 + ny * r };
-          const right = { x: lastPoint.x - tx * r * 0.18 - nx * r, y: lastPoint.y - ty * r * 0.18 - ny * r };
-          const tip = { x: lastPoint.x + tx * r * 0.55, y: lastPoint.y + ty * r * 0.55 };
-          const hollow = { x: lastPoint.x + tx * r * 0.05, y: lastPoint.y + ty * r * 0.05 };
-          segments.push(`M ${left.x.toFixed(2)} ${left.y.toFixed(2)} Q ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} ${right.x.toFixed(2)} ${right.y.toFixed(2)} Q ${hollow.x.toFixed(2)} ${hollow.y.toFixed(2)} ${left.x.toFixed(2)} ${left.y.toFixed(2)} Z`);
-        }
-      }
-    }
-
     return segments.join(" ");
   }
 
@@ -726,7 +676,6 @@ export class StrokeBuilder {
         calligraphyClean: isCalligraphy,
         brushPreset: preset,
         brushAngle: this.calligraphyAngle,
-        calligraphyEndStyle: brushStyle.calligraphyEndStyle || "none",
         brushOpacity: preset === "watercolor" ? this.opacity * 0.72 : preset === "soft" ? this.opacity * 0.82 : this.opacity,
         featherDensity: this.brushStyle?.featherDensity ?? 10,
         featherGlow: this.brushStyle?.featherGlow ?? 0,
@@ -1161,9 +1110,6 @@ export class DrawingEngine {
         image: typeof img === "string" && img.startsWith("data:image/")
           ? img
           : null,
-        calligraphyEndStyle: ["none", "thin", "wide", "pointed", "crescent"].includes(settings.brushStyle.calligraphyEndStyle)
-          ? settings.brushStyle.calligraphyEndStyle
-          : "none",
         featherDensity: EngineUtils.clamp(Math.round(EngineUtils.number(settings.brushStyle.featherDensity, 10)), 3, 48),
         featherGlow: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherGlow, 0), 0, 1),
         featherSpacing: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpacing, 1), 0.25, 2.5),
@@ -1457,7 +1403,6 @@ export class DrawingEngine {
         calligraphyClean: isCalligraphy,
         brushPreset: brushStyle.preset || "round",
         brushAngle: this.builder.calligraphyAngle,
-        calligraphyEndStyle: brushStyle.calligraphyEndStyle || "none",
         featherDensity: brushStyle.featherDensity ?? 10,
         featherGlow: brushStyle.featherGlow ?? 0,
         featherSpacing: brushStyle.featherSpacing ?? 1,
@@ -1481,7 +1426,6 @@ export class DrawingEngine {
           tool: this.builder.tool,
           calligraphy: isCalligraphy,
           calligraphyAngle: this.builder.calligraphyAngle,
-          calligraphyEndStyle: brushStyle.calligraphyEndStyle || "none",
           brushPreset: brushStyle.preset || "round",
           featherDensity: brushStyle.featherDensity,
           featherGlow: brushStyle.featherGlow,
