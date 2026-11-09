@@ -28,7 +28,7 @@ import {
 
 import {
   DrawingEngine
-} from "./engine.js?v=20261109-43";
+} from "./engine.js?v=20261109-44";
 
 import {
   ToolManager
@@ -961,7 +961,87 @@ export class RasemApplication {
       });
     }
 
+    this.initializeSmartDrawingControls();
     this.updateTwoFingerPanUI();
+  }
+
+  initializeSmartDrawingControls() {
+    const engine = this.modules.engine;
+    const toggle = getElement("smartDrawingToggleBtn");
+    const open = getElement("openSmartDrawingSettingsBtn");
+    const close = getElement("closeSmartDrawingModal");
+    const backdrop = getElement("smartDrawingModalBackdrop");
+    const modal = getElement("smartDrawingModal");
+    const enabledInput = getElement("smartDrawingEnabled");
+    const controls = {
+      smoothness: getElement("smartDrawingSmoothness"),
+      correction: getElement("smartDrawingCorrection"),
+      recognition: getElement("smartDrawingRecognition")
+    };
+    if (!engine || !toggle || !modal || !backdrop) return;
+
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem("rasem_smart_drawing_v1") || "{}"); } catch {}
+    const initial = engine.setSmartDrawing({
+      enabled: saved.enabled === true,
+      smoothness: Number.isFinite(saved.smoothness) ? saved.smoothness : 35,
+      correction: Number.isFinite(saved.correction) ? saved.correction : 20,
+      recognition: Number.isFinite(saved.recognition) ? saved.recognition : 0
+    });
+    const persist = () => {
+      const state = engine.setSmartDrawing({
+        enabled: Boolean(enabledInput?.checked),
+        smoothness: Number(controls.smoothness?.value || 0),
+        correction: Number(controls.correction?.value || 0),
+        recognition: Number(controls.recognition?.value || 0)
+      });
+      try { localStorage.setItem("rasem_smart_drawing_v1", JSON.stringify(state)); } catch {}
+      this.updateSmartDrawingUI(state);
+    };
+    if (enabledInput) enabledInput.checked = initial.enabled;
+    Object.entries(controls).forEach(([key, input]) => {
+      if (!input) return;
+      input.value = String(initial[key]);
+      const output = getElement(input.id + "Value");
+      const updateOutput = () => { if (output) output.textContent = input.value + "%"; };
+      updateOutput();
+      input.addEventListener("input", () => { updateOutput(); persist(); });
+      input.addEventListener("change", persist);
+    });
+    enabledInput?.addEventListener("change", persist);
+    const toggleHandler = () => {
+      if (enabledInput) enabledInput.checked = !enabledInput.checked;
+      persist();
+    };
+    const show = () => {
+      backdrop.hidden = false;
+      modal.hidden = false;
+      if (enabledInput) enabledInput.checked = engine.smartDrawing.enabled;
+    };
+    const hide = () => { modal.hidden = true; backdrop.hidden = true; };
+    const backdropHandler = event => { if (event.target === backdrop) hide(); };
+    toggle.addEventListener("click", toggleHandler);
+    open?.addEventListener("click", show);
+    close?.addEventListener("click", hide);
+    backdrop.addEventListener("click", backdropHandler);
+    this.cleanupCallbacks.push(() => {
+      toggle.removeEventListener("click", toggleHandler);
+      open?.removeEventListener("click", show);
+      close?.removeEventListener("click", hide);
+      backdrop.removeEventListener("click", backdropHandler);
+    });
+    this.updateSmartDrawingUI(initial);
+  }
+
+  updateSmartDrawingUI(state = this.modules.engine?.smartDrawing || {}) {
+    const button = getElement("smartDrawingToggleBtn");
+    if (!button) return;
+    const enabled = Boolean(state.enabled);
+    button.classList.toggle("smart-drawing-active", enabled);
+    button.setAttribute("aria-pressed", String(enabled));
+    button.title = enabled ? "الرسم الذكي: يعمل" : "الرسم الذكي: متوقف";
+    const status = getElement("smartDrawingStatus");
+    if (status) status.textContent = enabled ? "الرسم الذكي يعمل على أدوات الرسم" : "الرسم الذكي متوقف";
   }
 
   setTwoFingerPan(enabled, announce = true) {
