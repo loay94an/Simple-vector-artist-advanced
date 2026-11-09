@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
-  <link rel="stylesheet" href="./css/app.css?v=20261109-11">
+  <link rel="stylesheet" href="./css/app.css?v=20261109-12">
   <style>
     /* Bulletproof Flexbox Centering Overlay for All Dialogs & Modals */
     .modal-overlay-wrapper {
@@ -75,7 +75,7 @@
       display: none !important;
     }
   </style>
-  <script type="module" src="./js/app.js?v=20261109-27"></script>
+  <script type="module" src="./js/app.js?v=20261109-28"></script>
 </head>
 
 <body class="light">
@@ -86,6 +86,9 @@
     <header class="app-header">
 
       <div class="header-actions">
+        <button id="colorMenuBtn" class="header-tool-btn color-menu-toggle" type="button" aria-label="اختيار اللون والألوان المتكاملة" aria-expanded="false" title="اختيار اللون والألوان المتكاملة">
+          <span class="color-dot" id="colorMenuPreview" style="background-color: #2563EB;"></span>
+        </button>
         <!-- Undo / Redo -->
         <button id="undoBtn" class="header-tool-btn" disabled title="تراجع (Ctrl+Z)">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
@@ -328,11 +331,6 @@
         <!-- Hand pan -->
         <button class="tool" data-tool="hand" id="handToolBtn" title="تحريك اللوحة (نقرة: تحريك باليد / ضغطة طويلة: تفعيل التحريك بإصبعين مع الرسم)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
-        </button>
-
-        <!-- Concepts Color Wheel Trigger -->
-        <button id="colorMenuBtn" class="tool color-menu-toggle" type="button" title="عجلة الألوان Concepts (نقرة: العجلة / ضغطة مطولة: القطارة)">
-          <span class="color-dot" id="colorMenuPreview" style="background-color: #2563EB;"></span>
         </button>
 
         <input id="colorPicker" type="color" value="#2563EB" hidden />
@@ -1194,7 +1192,7 @@
 
 
   <!-- MODULE SCRIPTS -->
-  <script type="module" src="./js/color-ui.js?v=20261109-09"></script>
+  <script type="module" src="./js/color-ui.js?v=20261109-10"></script>
   <script type="module" src="./js/shapes-ui.js?v=20261109-03"></script>
   <script type="module" src="./js/tool-settings-popup.js?v=20261109-11"></script>
   <script type="module" src="./js/brush-library.js"></script>
