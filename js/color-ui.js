@@ -124,6 +124,11 @@
             </button>
           </div>
 
+          <div class="concepts-special-row">
+            <span class="concepts-subhead">الألوان المحايدة والمعدنية اللامعة:</span>
+            <div class="concepts-special-list" id="conceptsSpecialList"></div>
+          </div>
+
           <div class="concepts-harmonies-row">
             <span class="concepts-subhead">الألوان المتكاملة وتدرجاتها:</span>
             <div class="concepts-harmonies-list" id="conceptsHarmoniesList"></div>
@@ -354,6 +359,60 @@
     // Close actions
     $("conceptsCloseBtn")?.addEventListener("click", hideConceptsWheel);
     $("conceptsBackdrop")?.addEventListener("click", hideConceptsWheel);
+
+    const specialColors = [
+      { group: "محايدة", name: "أبيض نقي", color: "#FFFFFF", finish: "linear-gradient(145deg,#FFFFFF 0%,#F5F5F5 48%,#D9DDE2 100%)" },
+      { group: "محايدة", name: "عاجي", color: "#F2E8D5", finish: "linear-gradient(145deg,#FFFDF5 0%,#F2E8D5 52%,#D8CBB4 100%)" },
+      { group: "محايدة", name: "بيج", color: "#C8B89A", finish: "linear-gradient(145deg,#E8DCC5 0%,#C8B89A 52%,#9E8D70 100%)" },
+      { group: "محايدة", name: "رمادي دافئ", color: "#9B948B", finish: "linear-gradient(145deg,#D1CBC3 0%,#9B948B 52%,#68615A 100%)" },
+      { group: "محايدة", name: "رمادي بارد", color: "#9299A3", finish: "linear-gradient(145deg,#E1E5EA 0%,#9299A3 52%,#59616D 100%)" },
+      { group: "محايدة", name: "فحمي", color: "#343A40", finish: "linear-gradient(145deg,#737B83 0%,#343A40 52%,#111418 100%)" },
+      { group: "محايدة", name: "أسود", color: "#111111", finish: "linear-gradient(145deg,#666666 0%,#222222 48%,#050505 100%)" },
+      { group: "محايدة", name: "تاوب", color: "#8A7868", finish: "linear-gradient(145deg,#C5B4A4 0%,#8A7868 52%,#55483E 100%)" },
+      { group: "معدنية", name: "ذهبي لامع", color: "#D4AF37", finish: "linear-gradient(115deg,#6F4B08 0%,#C99416 18%,#FFF1A8 36%,#D4AF37 52%,#8B650B 72%,#F9D96A 88%,#9A7418 100%)" },
+      { group: "معدنية", name: "ذهبي فاتح", color: "#E6C86E", finish: "linear-gradient(115deg,#98752B 0%,#E6C86E 22%,#FFF7CE 42%,#DDBB58 62%,#A98228 82%,#F8E6A0 100%)" },
+      { group: "معدنية", name: "شامبانيا", color: "#C9B27C", finish: "linear-gradient(115deg,#79633D 0%,#C9B27C 22%,#FFF0C4 42%,#BCA16A 65%,#806A45 84%,#E9D7A5 100%)" },
+      { group: "معدنية", name: "فضي", color: "#C0C0C0", finish: "linear-gradient(115deg,#656B70 0%,#D8DDE0 22%,#FFFFFF 40%,#AEB5BA 58%,#737A80 78%,#E8ECEF 100%)" },
+      { group: "معدنية", name: "بلاتيني", color: "#D5D8DC", finish: "linear-gradient(115deg,#858B91 0%,#E9ECEF 24%,#FFFFFF 43%,#BFC5CA 62%,#777E85 82%,#F7F8F9 100%)" },
+      { group: "معدنية", name: "كروم", color: "#AEB7C0", finish: "linear-gradient(115deg,#454D55 0%,#DDE4EA 18%,#FFFFFF 34%,#8D99A4 52%,#F6FAFD 68%,#59636D 86%,#DCE2E8 100%)" },
+      { group: "معدنية", name: "روز غولد", color: "#B76E79", finish: "linear-gradient(115deg,#70404A 0%,#C9878D 22%,#FFE0D7 40%,#B76E79 58%,#75414B 80%,#E8B0A8 100%)" },
+      { group: "معدنية", name: "نحاسي", color: "#B87333", finish: "linear-gradient(115deg,#633514 0%,#C87935 22%,#FFD09A 40%,#A95D25 60%,#6F3C1A 82%,#E7A15B 100%)" },
+      { group: "معدنية", name: "برونزي", color: "#8C6239", finish: "linear-gradient(115deg,#49301C 0%,#A87845 22%,#E8C08A 40%,#875A32 60%,#49301D 82%,#C99A62 100%)" },
+      { group: "معدنية", name: "نحاس أحمر", color: "#A34F36", finish: "linear-gradient(115deg,#54271E 0%,#B85F43 22%,#F0B18C 40%,#9D4933 60%,#54271D 82%,#D88A67 100%)" },
+      { group: "معدنية", name: "نحاس أصفر", color: "#B5A642", finish: "linear-gradient(115deg,#625719 0%,#C8B94D 22%,#FFF3A0 40%,#A99A32 60%,#625719 82%,#E7D86C 100%)" },
+      { group: "معدنية", name: "تيتانيوم", color: "#777F87", finish: "linear-gradient(115deg,#333B43 0%,#AEB7BF 22%,#E9EEF2 40%,#737D86 60%,#343C44 82%,#C6CDD3 100%)" }
+    ];
+
+    const specialList = $("conceptsSpecialList");
+    if (specialList && specialList.dataset.bound !== "true") {
+      specialList.dataset.bound = "true";
+      let lastGroup = "";
+      specialColors.forEach(item => {
+        if (item.group !== lastGroup) {
+          const label = document.createElement("span");
+          label.className = "concepts-special-group-label";
+          label.textContent = item.group;
+          specialList.appendChild(label);
+          lastGroup = item.group;
+        }
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "concepts-special-swatch";
+        btn.style.background = item.finish;
+        btn.dataset.color = item.color;
+        btn.title = item.name + " · " + item.color;
+        btn.setAttribute("aria-label", "اختيار " + item.name + " " + item.color);
+        btn.addEventListener("click", () => {
+          const hsv = hexToHsv(item.color);
+          activeHue = hsv.h;
+          activeSat = hsv.s;
+          activeVal = hsv.v;
+          applyColor(item.color, true);
+          drawWheel();
+        });
+        specialList.appendChild(btn);
+      });
+    }
 
     drawWheel();
     updateHarmonies();
