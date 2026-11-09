@@ -97,26 +97,37 @@ export async function downloadBlob(blob, filename) {
       if (!started?.sessionId) throw new Error("لم يتم إنشاء جلسة حفظ صالحة.");
       sessionId = started.sessionId;
 
-      const reader = blob.stream().getReader();
       let totalBytes = 0;
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          // Keep each bridge payload small (48 KiB before Base64 encoding).
-          for (let offset = 0; offset < value.length; offset += 48 * 1024) {
-            const chunk = value.subarray(offset, Math.min(offset + 48 * 1024, value.length));
-            let binary = "";
-            for (let i = 0; i < chunk.length; i += 0x8000) {
-              binary += String.fromCharCode(...chunk.subarray(i, i + 0x8000));
-            }
-            await NativeDownloads.writeChunk({ sessionId, data: btoa(binary) });
-            totalBytes += chunk.length;
+      const sendChunk = async chunk => {
+        for (let offset = 0; offset < chunk.length; offset += 48 * 1024) {
+          const part = chunk.subarray(offset, Math.min(offset + 48 * 1024, chunk.length));
+          let binary = "";
+          for (let i = 0; i < part.length; i += 0x8000) {
+            binary += String.fromCharCode(...part.subarray(i, i + 0x8000));
           }
+          await NativeDownloads.writeChunk({ sessionId, data: btoa(binary) });
+          totalBytes += part.length;
         }
-      } catch (error) {
-        try { await reader.cancel(); } catch {}
-        throw error;
+      };
+
+      if (typeof blob.stream === "function") {
+        const reader = blob.stream().getReader();
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            await sendChunk(value);
+          }
+        } catch (error) {
+          try { await reader.cancel(); } catch {}
+          throw error;
+        }
+      } else {
+        // Compatibility fallback for older Android WebViews.
+        for (let offset = 0; offset < blob.size; offset += 48 * 1024) {
+          const bytes = new Uint8Array(await blob.slice(offset, offset + 48 * 1024).arrayBuffer());
+          await sendChunk(bytes);
+        }
       }
 
       const finished = await NativeDownloads.finishSave({ sessionId });
