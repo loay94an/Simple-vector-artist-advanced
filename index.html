@@ -118,9 +118,9 @@
         </button>
 
         <!-- Export button -->
-        <button id="topExportBtn" class="header-action-btn primary" type="button" title="مشاركة الرسم">
+        <button id="topExportBtn" class="header-action-btn primary" type="button" title="حفظ الرسم">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-          <span class="btn-text">مشاركة</span>
+          <span class="btn-text">حفظ</span>
         </button>
 
         <!-- PWA Install button (hidden until installable) -->
@@ -187,9 +187,9 @@
           <div class="settings-menu-item settings-menu-action settings-document-action">
             <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 0;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:right;">مشاركة الرسم (<span dir="ltr">SVG / PNG / PDF</span>)</span>
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:right;">حفظ نسخة من الرسم (<span dir="ltr">SVG / PNG / PDF</span>)</span>
             </div>
-            <button id="exportBtn" type="button" class="header-action-btn" style="flex-shrink:0;">مشاركة</button>
+            <button id="exportBtn" type="button" class="header-action-btn" style="flex-shrink:0;">حفظ نسخة</button>
           </div>
 
           <div class="settings-menu-item settings-menu-action">
@@ -729,16 +729,16 @@
     </div>
   </div>
 
-  <!-- NEW SHARE SYSTEM -->
+  <!-- SAVE FILE SYSTEM -->
   <div id="exportModalBackdrop" class="modal-overlay-wrapper" hidden>
     <div id="exportDialog" class="export-modal modal-box" role="dialog"
-         aria-label="مشاركة الرسم" aria-modal="true">
+         aria-label="حفظ الرسم" aria-modal="true">
 
       <div class="export-modal-head">
         <div>
-          <h2 style="font-size:16px; margin:0; font-weight:700;">مشاركة الرسم</h2>
+          <h2 style="font-size:16px; margin:0; font-weight:700;">حفظ نسخة من الرسم</h2>
           <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-            اختر نطاق المشاركة وصيغة الملف
+            اختر نطاق الرسم وصيغة الملف للحفظ على الجهاز
           </div>
         </div>
         <button id="closeExportBtn" type="button"
@@ -747,15 +747,15 @@
 
       <div class="export-modal-body">
 
-        <div class="export-section-title">ما الذي تريد مشاركته؟</div>
+        <div class="export-section-title">ما الذي تريد حفظه؟</div>
 
         <div class="export-scope-options">
           <label class="export-radio-label">
-            <input type="radio" name="shareScope" value="canvas" checked>
+            <input type="radio" name="saveScope" value="canvas" checked>
             <div>
-              <strong>مشاركة الرسم الظاهر على الشاشة</strong>
+              <strong>حفظ الجزء الظاهر من الرسم</strong>
               <div style="font-size:11px;color:var(--text-muted);">
-                مشاركة الجزء الظاهر حالياً داخل مساحة العمل
+                حفظ الجزء الظاهر حالياً داخل مساحة العمل
               </div>
             </div>
           </label>
@@ -763,7 +763,7 @@
           <label class="export-radio-label">
             <input type="radio" name="shareScope" value="full">
             <div>
-              <strong>مشاركة جميع الرسوم على اللوحة</strong>
+              <strong>حفظ جميع الرسوم على اللوحة</strong>
               <div style="font-size:11px;color:var(--text-muted);">
                 تضمين جميع العناصر حتى الموجودة خارج الجزء الظاهر
               </div>
@@ -777,7 +777,7 @@
 
         <div class="export-format-grid">
           <button type="button" class="export-format-card active"
-                  data-share-format="svg">
+                  data-save-format="svg">
             <strong>SVG</strong>
             <span>رسم متجهي</span>
           </button>
@@ -801,10 +801,10 @@
         <button id="cancelExportBtn" type="button"
                 class="header-action-btn">إلغاء</button>
 
-        <button id="executeShareBtn" type="button"
+        <button id="executeSaveFileBtn" type="button"
                 class="header-action-btn primary"
                 style="padding:0 16px;font-weight:700;">
-          مشاركة الملف
+          حفظ الملف
         </button>
       </div>
     </div>
@@ -1091,7 +1091,7 @@
       syncCanvasBackgroundTheme(true);
     }
 
-    // 6. NEW SHARE DIALOG CONTROLLER
+    // 6. SAVE FILE DIALOG CONTROLLER
 
     const exportDialog = document.getElementById("exportDialog");
     const topExportBtn = document.getElementById("topExportBtn");
@@ -1099,9 +1099,9 @@
     const closeExportBtn = document.getElementById("closeExportBtn");
     const cancelExportBtn = document.getElementById("cancelExportBtn");
     const exportModalBackdrop = document.getElementById("exportModalBackdrop");
-    const executeShareBtn = document.getElementById("executeShareBtn");
+    const executeSaveFileBtn = document.getElementById("executeSaveFileBtn");
 
-    let currentShareFormat = "svg";
+    let currentSaveFormat = "svg";
 
     function openExport() {
       if (!exportDialog) return;
@@ -1129,33 +1129,33 @@
       e.stopPropagation();
     });
 
-    // اختيار صيغة المشاركة
-    document.querySelectorAll("[data-share-format]").forEach(card => {
+    // اختيار صيغة الملف للحفظ
+    document.querySelectorAll("[data-save-format]").forEach(card => {
       card.addEventListener("click", () => {
         document.querySelectorAll("[data-share-format]").forEach(item => {
           item.classList.remove("active");
         });
 
         card.classList.add("active");
-        currentShareFormat = card.dataset.shareFormat;
+        currentSaveFormat = card.dataset.saveFormat;
       });
     });
 
-    // إنشاء الملف ثم فتح نافذة المشاركة
-    executeShareBtn?.addEventListener("click", async () => {
+    // إنشاء الملف ثم فتح نافذة الحفظ النظامية
+    executeSaveFileBtn?.addEventListener("click", async () => {
       const doc = window.rasem?.document;
 
       if (!doc) {
-        alert("لا يوجد رسم لمشاركته.");
+        alert("لا يوجد رسم لحفظه.");
         return;
       }
 
-      executeShareBtn.disabled = true;
-      executeShareBtn.textContent = "جاري تجهيز المشاركة...";
+      executeSaveFileBtn.disabled = true;
+      executeSaveFileBtn.textContent = "جاري تجهيز الملف...";
 
       try {
         const scope =
-          document.querySelector('input[name="shareScope"]:checked')?.value
+          document.querySelector('input[name="saveScope"]:checked')?.value
           || "canvas";
 
         const options = {
@@ -1170,42 +1170,42 @@
         const storageModule = await import("./js/storage-export.js");
 
         let blob;
-        const extension = currentShareFormat;
+        const extension = currentSaveFormat;
         const filename = `rasem-drawing-${Date.now()}.${extension}`;
 
-        if (currentShareFormat === "svg") {
+        if (currentSaveFormat === "svg") {
           blob = storageModule.SVGExport.export(data, options);
-        } else if (currentShareFormat === "png") {
+        } else if (currentSaveFormat === "png") {
           blob = await storageModule.PNGExport.export(data, options);
-        } else if (currentShareFormat === "pdf") {
+        } else if (currentSaveFormat === "pdf") {
           blob = await storageModule.PDFExport.export(data, options);
         } else {
-          throw new Error("صيغة المشاركة غير مدعومة.");
+          throw new Error("صيغة الحفظ غير مدعومة.");
         }
 
         if (!(blob instanceof Blob)) {
-          throw new Error("تعذر إنشاء ملف المشاركة.");
+          throw new Error("تعذر إنشاء ملف الحفظ.");
         }
 
-        // The platform-aware helper opens Android's native share chooser in APK,
-        // uses Web Share in supported browsers, and downloads only as a web fallback.
-        const completed = await storageModule.shareBlob(blob, filename);
+        // Android opens the system Save As picker; browsers use Save As or download.
+        
+        const completed = await storageModule.downloadBlob(blob, filename);
 
         if (completed) {
           closeExport();
           const toast = document.getElementById("toast");
           if (toast) {
-            toast.textContent = "تم تنفيذ المشاركة";
+            toast.textContent = "تم حفظ الملف بنجاح";
             toast.classList.add("show");
             setTimeout(() => toast.classList.remove("show"), 2500);
           }
         }
       } catch (err) {
-        console.error("Share error:", err);
-        alert("تعذرت المشاركة: " + (err?.message || err));
+        console.error("Save file error:", err);
+        alert("تعذر حفظ الملف: " + (err?.message || err));
       } finally {
-        executeShareBtn.disabled = false;
-        executeShareBtn.textContent = "مشاركة الملف";
+        executeSaveFileBtn.disabled = false;
+        executeSaveFileBtn.textContent = "حفظ الملف";
       }
     });
 

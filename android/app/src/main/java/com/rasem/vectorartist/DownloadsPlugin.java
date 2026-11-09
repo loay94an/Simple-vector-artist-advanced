@@ -25,6 +25,12 @@ public class DownloadsPlugin extends Plugin {
             "mimeType",
             "application/octet-stream"
         );
+        if (mime != null && mime.contains(";")) {
+            mime = mime.substring(0, mime.indexOf(';')).trim();
+        }
+        if (mime == null || mime.isEmpty()) {
+            mime = "application/octet-stream";
+        }
 
         String data = call.getString("data");
 

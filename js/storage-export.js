@@ -77,178 +77,61 @@ function escapeXML(value) {
 }
 
 export async function downloadBlob(blob, filename) {
-  if (!(blob instanceof Blob)) {
-    throw new TypeError("Invalid export Blob");
-  }
+  if (!(blob instanceof Blob)) throw new TypeError("Invalid export Blob");
 
-  // Helper to determine mime and extension description
-  let description = "ملف تصدير";
-  const ext = filename.split(".").pop()?.toLowerCase() || "";
-  if (ext === "png") description = "صورة PNG عالية الدقة";
-  else if (ext === "svg") description = "رسم شعاعي SVG";
-  else if (ext === "pdf") description = "مستند PDF";
-  else if (ext === "rasem" || ext === "json") description = "مشروع رسم";
+  const safeName = String(filename || "rasem-drawing-" + Date.now())
+    .replace(/[\\/:*?"<>|]/g, "-").trim() || "rasem-export";
+  const extension = safeName.split(".").pop()?.toLowerCase() || "";
+  const mimeType = (blob.type || "application/octet-stream")
+    .split(";")[0].trim() || "application/octet-stream";
 
-  // Native Android APK: call the registered Capacitor Downloads plugin.
-  // Android WebView anchor downloads are not reliable for generated Blob files.
+  // Android APK: native Save As picker. No ACTION_SEND or share chooser.
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
       const Downloads = registerPlugin("Downloads");
-      const data = await blobToBase64(blob);
       const result = await Downloads.save({
-        filename,
-        mimeType: blob.type || "application/octet-stream",
-        data
+        filename: safeName,
+        mimeType,
+        data: await blobToBase64(blob)
       });
-      return result?.cancelled === true ? false : result?.saved === true;
+      if (result?.cancelled === true) return false;
+      if (result?.saved !== true) throw new Error("لم يؤكد Android اكتمال حفظ الملف.");
+      return true;
     }
-  } catch (nativeError) {
-    console.error("Native Android export failed:", nativeError);
-    throw new Error("تعذر حفظ الملف على Android: " + (nativeError?.message || nativeError));
+  } catch (error) {
+    if (globalThis.Capacitor?.isNativePlatform?.()) {
+      console.error("Native Android save failed:", error);
+      throw new Error("تعذر حفظ الملف على Android: " + (error?.message || error));
+    }
   }
 
-  // 1. File System Access API: Opens the system File Manager / Save Dialog
-  // allowing the user to choose the exact directory/folder and save the file.
-  if (typeof window.showSaveFilePicker === "function") {
+  const description = extension === "png" ? "صورة PNG عالية الدقة"
+    : extension === "svg" ? "رسم متجهي SVG"
+    : extension === "pdf" ? "مستند PDF"
+    : extension === "rasem" || extension === "json" ? "ملف مشروع رسم"
+    : "ملف";
+
+  // Browser/PWA Save As picker.
+  if (typeof window !== "undefined" && typeof window.showSaveFilePicker === "function") {
     try {
-      const acceptTypes = {};
-      acceptTypes[blob.type || "application/octet-stream"] = [`.${ext}`];
-
+      const accept = {};
+      accept[mimeType] = extension ? [`.${extension}`] : [];
       const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [
-          {
-            description,
-            accept: acceptTypes
-          }
-        ]
+        suggestedName: safeName,
+        types: [{ description, accept }]
       });
-
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
       return true;
-    } catch (pickerErr) {
-      // If user deliberately pressed Cancel in the file manager, stop gracefully
-      if (pickerErr.name === "AbortError") {
-        return false;
-      }
-      console.info("showSaveFilePicker unsupported or blocked in this context, trying next export path", pickerErr);
-    }
-  }
-
-  // 2. Android APK bridge check (e.g. Capacitor, Cordova, custom JS interface)
-  if (window.AndroidBridge && typeof window.AndroidBridge.saveFile === "function") {
-    try {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result.split(",")[1];
-        window.AndroidBridge.saveFile(base64, filename, blob.type);
-      };
-      reader.readAsDataURL(blob);
-      return true;
-    } catch (e) {
-      console.warn("AndroidBridge save failed, falling back", e);
-    }
-  }
-
-  // 3. Web Share API with Files support (Opens Android native file save / app picker on mobile)
-  if (navigator.share && navigator.canShare) {
-    try {
-      const file = new File([blob], filename, { type: blob.type, lastModified: Date.now() });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: filename
-        });
-        return true;
-      }
-    } catch (shareErr) {
-      if (shareErr.name === "AbortError") {
-        return false;
-      }
-      console.info("Web Share not completed, proceeding with standard download", shareErr);
-    }
-  }
-
-  // 4. Standard Fallback: Anchor download
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.style.display = "none";
-  link.href = url;
-  link.download = filename;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-
-  document.body.appendChild(link);
-  link.click();
-
-  setTimeout(() => {
-    link.remove();
-    URL.revokeObjectURL(url);
-  }, 1500);
-
-  return true;
-}
-
-
-// =========================================================
-// SHARE FILE - Android Capacitor 8 + Web Share fallback
-// =========================================================
-
-export async function shareBlob(blob, filename) {
-  if (!(blob instanceof Blob)) {
-    throw new TypeError("Invalid share Blob");
-  }
-
-  const safeName = String(filename || "rasem-" + Date.now())
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .trim() || "rasem-export";
-
-  // Native Android: use our own ACTION_SEND + FileProvider bridge.
-  // This avoids relying on WebView's download handling or a plugin fallback
-  // that silently opens the Save As dialog instead of the share sheet.
-  const { Capacitor, registerPlugin } = await import("@capacitor/core");
-  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
-    const NativeShare = registerPlugin("NativeShare");
-    const data = await blobToBase64(blob);
-    const result = await NativeShare.share({
-      filename: safeName,
-      mimeType: blob.type || "application/octet-stream",
-      title: "مشاركة الرسم",
-      data
-    });
-
-    if (result?.shared !== true) {
-      throw new Error("لم يؤكد Android فتح قائمة المشاركة.");
-    }
-    return true;
-  }
-
-  // Browser/PWA fallback: use the native Web Share sheet when file sharing
-  // is supported, otherwise download the generated file.
-  if (typeof navigator !== "undefined" &&
-      typeof navigator.share === "function" &&
-      typeof navigator.canShare === "function") {
-    try {
-      const file = new File([blob], safeName, {
-        type: blob.type || "application/octet-stream",
-        lastModified: Date.now()
-      });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: safeName
-        });
-        return true;
-      }
     } catch (error) {
       if (error?.name === "AbortError") return false;
-      console.warn("Web Share API failed; using file download.", error);
+      console.info("Save As picker unavailable; using browser download.", error);
     }
   }
 
+  // Browser fallback: direct file download only.
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
