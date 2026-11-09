@@ -1020,7 +1020,7 @@ export class DrawingEngine {
     this.history = history;
     this.coordinates = coordinates;
 
-    this.smartDrawing = { enabled: false, smoothness: 0, correction: 0, recognition: 0 };
+    this.smartDrawing = { enabled: true, smoothness: 0, correction: 20, recognition: 0 };
     this.settings = {
       tool: "pencil",
       color: "#111111",
