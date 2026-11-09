@@ -208,20 +208,9 @@ export class Pressure {
 }
 
 function smoothSmartStrokePoints(source, amount = 0) {
-  if (!Array.isArray(source) || source.length < 3 || amount <= 0) return source;
-  const strength = Math.max(0, Math.min(1, amount / 100)) * 0.42;
-  const result = source.map(point => ({ ...point }));
-  for (let pass = 0; pass < Math.max(1, Math.ceil(amount / 35)); pass++) {
-    const previous = result.map(point => ({ ...point }));
-    for (let i = 1; i < result.length - 1; i++) {
-      const a = previous[i - 1], p = previous[i], b = previous[i + 1];
-      result[i] = { ...p,
-        x: p.x * (1 - strength) + (a.x + b.x) * 0.5 * strength,
-        y: p.y * (1 - strength) + (a.y + b.y) * 0.5 * strength
-      };
-    }
-  }
-  return result;
+  // Keep the separate smoothness control, but route it through the same
+  // corner-aware adaptive filter instead of a blind three-point average.
+  return correctStrokePoints(source, amount);
 }
 
 function supportsAutomaticCorrection(builder) {
