@@ -1151,7 +1151,7 @@ export class DrawingEngine {
         calligraphyEndStyle: ["none", "thin", "wide", "pointed", "crescent"].includes(settings.brushStyle.calligraphyEndStyle)
           ? settings.brushStyle.calligraphyEndStyle
           : "none",
-        featherDensity: EngineUtils.clamp(Math.round(EngineUtils.number(settings.brushStyle.featherDensity, 10)), 3, 32),
+        featherDensity: EngineUtils.clamp(Math.round(EngineUtils.number(settings.brushStyle.featherDensity, 10)), 3, 48),
         featherGlow: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherGlow, 0), 0, 1),
         featherSpacing: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpacing, 1), 0.25, 2.5),
         featherSpread: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpread, 0.45), 0, 1),
