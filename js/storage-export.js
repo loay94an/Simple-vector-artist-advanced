@@ -614,13 +614,15 @@ export class StorageManager {
             this.storage.setItem(this.key, json);
             return true;
           } catch (quotaErr) {
-            console.warn("Storage quota exceeded in browser, state preserved in memory cache:", quotaErr);
-            return true;
+            console.error("Persistent storage failed; document remains only in memory:", quotaErr);
+            return false;
           }
         }
       }
 
-      return true;
+      // Do not report success when there is no persistent storage backend.
+      console.error("Persistent storage is unavailable; document was not saved to disk.");
+      return false;
 
     } catch (error) {
       console.warn("Rasem save serialization failed:", error);
