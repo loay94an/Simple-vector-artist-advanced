@@ -576,7 +576,10 @@
       if (!menu.contains(event.target) && !btn.contains(event.target)) closeComplementaryColorsMenu();
     });
     window.addEventListener("resize", closeComplementaryColorsMenu);
-    window.addEventListener("scroll", closeComplementaryColorsMenu, true);
+    // Ignore scroll events originating inside the horizontal palette itself.
+    window.addEventListener("scroll", event => {
+      if (event.target !== menu) closeComplementaryColorsMenu();
+    }, true);
     updateComplementaryColorsMenu();
   }
   function applyColor(color, saveHistory = false, refreshComplementaryMenu = true) {
