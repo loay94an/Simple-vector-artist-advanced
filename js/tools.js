@@ -310,20 +310,70 @@ export class Eraser extends BaseTool {
     }
   }
 
+  updateCursor(event) {
+    const point = ToolUtils.eventPoint(this.engine, event);
+    const viewport = this.engine.renderer?.viewport;
+    if (!point || !viewport) return;
+
+    let overlay = viewport.querySelector("#eraserCursorOverlay");
+    if (!overlay) {
+      overlay = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      overlay.id = "eraserCursorOverlay";
+      overlay.setAttribute("pointer-events", "none");
+      overlay.innerHTML = `
+        <circle class="eraser-cursor-fill" r="16"/>
+        <circle class="eraser-cursor-ring" r="16"/>
+        <path class="eraser-cursor-center" d="M-4 0H4 M0 -4V4"/>
+      `;
+      viewport.appendChild(overlay);
+    }
+
+    const zoom = Number(this.engine.coordinates?.camera?.zoom ??
+      this.engine.coordinates?.camera?.scale ?? 1);
+    const radius = this.engine.getEraserTolerance?.() ??
+      (this.engine.settings.eraserSize / Math.max(0.01, zoom));
+    overlay.setAttribute("transform", `translate(${point.x} ${point.y})`);
+    for (const ring of overlay.querySelectorAll("circle")) {
+      ring.setAttribute("r", String(radius));
+    }
+    overlay.querySelector(".eraser-cursor-center")?.setAttribute(
+      "transform", `scale(${Math.max(0.45, radius / 16)})`
+    );
+  }
+
+  hideCursor() {
+    this.engine.renderer?.viewport?.querySelector("#eraserCursorOverlay")?.remove();
+  }
+
+  deactivate() {
+    super.deactivate();
+    this.hideCursor();
+  }
+
   down(event) {
+    this.updateCursor(event);
     return this.engine.start(event);
   }
 
   move(event) {
+    this.updateCursor(event);
     return this.engine.move(event);
   }
 
   up(event) {
+    this.updateCursor(event);
     return this.engine.end(event);
   }
 
   cancel() {
-    return this.engine.cancel();
+    const result = this.engine.cancel();
+    this.hideCursor();
+    return result;
+  }
+
+  destroy() {
+    this.hideCursor();
+    super.destroy();
   }
 }
 
