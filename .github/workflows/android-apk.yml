@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/handwriting-performance-pipeline
+      - fix/reliable-storage-export-android
 
 jobs:
   build:

@@ -86,15 +86,60 @@ export async function downloadBlob(blob, filename) {
   const extension = safeName.includes(".") ? safeName.split(".").pop().toLowerCase() : "";
   const mimeType = (blob.type || "application/octet-stream").split(";")[0].trim() || "application/octet-stream";
 
-  // Native Android uses the system Storage Access Framework picker.
+  // Android SAF: choose the destination first, then stream small chunks
+  // through the native bridge instead of sending one large Base64 payload.
   if (Capacitor.isNativePlatform()) {
     if (Capacitor.getPlatform() !== "android") throw new Error("الحفظ الأصلي مدعوم حالياً على Android فقط.");
+    let sessionId = null;
     try {
-      const result = await NativeDownloads.save({ filename: safeName, mimeType, data: await blobToBase64(blob) });
-      if (result?.cancelled === true) return false;
-      if (result?.saved !== true) throw new Error("لم يؤكد Android اكتمال كتابة الملف.");
+      const started = await NativeDownloads.beginSave({ filename: safeName, mimeType });
+      if (started?.cancelled === true) return false;
+      if (!started?.sessionId) throw new Error("لم يتم إنشاء جلسة حفظ صالحة.");
+      sessionId = started.sessionId;
+
+      let totalBytes = 0;
+      const sendChunk = async chunk => {
+        for (let offset = 0; offset < chunk.length; offset += 48 * 1024) {
+          const part = chunk.subarray(offset, Math.min(offset + 48 * 1024, chunk.length));
+          let binary = "";
+          for (let i = 0; i < part.length; i += 0x8000) {
+            binary += String.fromCharCode(...part.subarray(i, i + 0x8000));
+          }
+          await NativeDownloads.writeChunk({ sessionId, data: btoa(binary) });
+          totalBytes += part.length;
+        }
+      };
+
+      if (typeof blob.stream === "function") {
+        const reader = blob.stream().getReader();
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            await sendChunk(value);
+          }
+        } catch (error) {
+          try { await reader.cancel(); } catch {}
+          throw error;
+        }
+      } else {
+        // Compatibility fallback for older Android WebViews.
+        for (let offset = 0; offset < blob.size; offset += 48 * 1024) {
+          const bytes = new Uint8Array(await blob.slice(offset, offset + 48 * 1024).arrayBuffer());
+          await sendChunk(bytes);
+        }
+      }
+
+      const finished = await NativeDownloads.finishSave({ sessionId });
+      sessionId = null;
+      if (finished?.saved !== true || finished?.bytesWritten !== totalBytes) {
+        throw new Error("لم يؤكد Android اكتمال كتابة جميع بيانات الملف.");
+      }
       return true;
     } catch (error) {
+      if (sessionId) {
+        try { await NativeDownloads.cancelSave({ sessionId }); } catch {}
+      }
       console.error("Native Android save failed:", error);
       throw new Error("تعذر حفظ الملف على Android: " + (error?.message || error));
     }
@@ -454,16 +499,11 @@ export class StorageManager {
           }
           this.storage.setItem(this.key, json);
           return true;
-        } catch (firstErr) {
-          // Fallback if quota exceeded: remove backup and retry once
-          try {
-            this.storage.removeItem(this.backupKey);
-            this.storage.setItem(this.key, json);
-            return true;
-          } catch (quotaErr) {
-            console.error("Persistent storage failed; document remains only in memory:", quotaErr);
-            return false;
-          }
+        } catch (storageErr) {
+          // Never delete the last known-good backup to make room for a new save.
+          // Keep the current document in memory and report that persistence failed.
+          console.error("Persistent storage failed; previous backup was preserved:", storageErr);
+          return false;
         }
       }
 
@@ -1189,14 +1229,15 @@ export class PDFExport {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      // Convert to JPEG data for standard PDF 1.4 embedding
-      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      const base64Data = jpegDataUrl.split(",")[1];
-      const binaryString = atob(base64Data);
-      const imgBytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        imgBytes[i] = binaryString.charCodeAt(i);
-      }
+      // Encode directly to Blob; avoid the large Base64 data URL copy.
+      const jpegBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          result => result ? resolve(result) : reject(new Error("JPEG encoding failed")),
+          "image/jpeg",
+          0.95
+        );
+      });
+      const imgBytes = new Uint8Array(await jpegBlob.arrayBuffer());
 
       // Build valid standard PDF 1.4 document
       const ptWidth = bounds.width * 0.75;

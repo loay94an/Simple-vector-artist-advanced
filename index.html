@@ -876,24 +876,22 @@
       app?.setTwoFingerPan?.(e.target.checked, true);
     });
 
-    // Save document action: only show success after persistent storage confirms it.
+    // Internal persistence and external export are independent operations.
+    // A failed local save must never prevent the user from exporting a recovery copy.
     saveBtn?.addEventListener("click", () => {
       closeSettings();
-      const saved = window.rasem?.save?.();
-      if (saved !== true) {
-        const toast = document.getElementById("toast");
-        if (toast) {
-          toast.textContent = "تعذر حفظ المستند. تحقق من مساحة التخزين ثم حاول مجدداً.";
-          toast.classList.add("show");
-          setTimeout(() => toast.classList.remove("show"), 3500);
-        } else {
-          alert("تعذر حفظ المستند. تحقق من مساحة التخزين ثم حاول مجدداً.");
-        }
-        return;
-      }
+      const saved = window.rasem?.save?.() === true;
       if (saveModal) {
         saveModal.hidden = false;
         if (saveModalBackdrop) saveModalBackdrop.hidden = false;
+      }
+      const toast = document.getElementById("toast");
+      if (toast) {
+        toast.textContent = saved
+          ? "تم حفظ المستند داخلياً. يمكنك أيضاً تصدير نسخة إلى الجهاز."
+          : "تعذر الحفظ الداخلي؛ يمكنك الآن تصدير نسخة من الرسم إلى الجهاز.";
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 3500);
       }
     });
 
