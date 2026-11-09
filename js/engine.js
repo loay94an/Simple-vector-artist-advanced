@@ -430,11 +430,11 @@ export class StrokeBuilder {
     };
     const poly = pts => pts.map((p,i)=>`${i?"L":"M"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ")+" Z";
     if (feather) {
-      const density=EngineUtils.clamp(Math.round(EngineUtils.number(this.brushStyle?.featherDensity,10)),3,48),spread=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpread,.45),0,1),spacing=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpacing,1),.25,2.5),gap=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherGap,.35),0,1.5),taper=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTaper,.7),0,1),texture=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTexture,.35),0,1),headAngle=EngineUtils.number(this.brushStyle?.featherAngle,0)*Math.PI/180;
+      const density=EngineUtils.clamp(Math.round(EngineUtils.number(this.brushStyle?.featherDensity,10)),3,48),spread=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpread,.45),0,1),spacing=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpacing,1),.25,2.5),gap=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherGap,.35),0,1.5),taper=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTaper,.7),0,1),balancedFade=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherFade,0),0,1),texture=EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherTexture,.35),0,1),headAngle=EngineUtils.number(this.brushStyle?.featherAngle,0)*Math.PI/180;
       const lanes=preset==="feather-fan"?density:preset==="feather-flat"?Math.max(4,density):preset==="feather-soft"?Math.max(6,density):preset==="feather-dry"?Math.max(4,density):preset==="feather-quill"?Math.max(3,Math.min(9,density)):Math.max(5,density);
       if(points.length===1){const p=points[0],r=radiusAt(p,0);return `M ${(p.x-r).toFixed(2)} ${p.y.toFixed(2)} a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(r*2).toFixed(2)} 0 a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(-r*2).toFixed(2)} 0`;}
       const paths=[];for(let lane=0;lane<lanes;lane++){const t=lane/(lanes-1)*2-1;let dist=t;if(preset==="feather-fan")dist=Math.sign(t)*Math.pow(Math.abs(t),.72);if(preset==="feather-pointed"||preset==="feather-quill")dist=Math.sign(t)*Math.pow(Math.abs(t),1.55);if(preset==="feather-round"||preset==="feather-soft")dist=Math.sin(t*Math.PI/2);const left=[],right=[];
-        for(let i=0;i<points.length;i++){const pt=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;if(headAngle!==0){const ox=nx,oy=ny,c=Math.cos(headAngle),sn=Math.sin(headAngle);nx=ox*c-oy*sn;ny=ox*sn+oy*c;}const progress=i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5))),r=radiusAt(pt,i)*fade;let weight=1;if(preset==="feather-pointed"||preset==="feather-quill")weight=.35+.65*Math.pow(Math.max(0,1-Math.abs(t)),.65);if(preset==="feather-round")weight=.55+.45*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-soft")weight=.72+.28*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-fan")weight=.8+.2*(1-Math.abs(t));if(preset==="feather-dry")weight=.55+.45*(lane%3===0?1:.72);const off=dist*spread*spacing*r*(1+gap*.65),variation=1-texture*.22+texture*.44*(.5+.5*Math.sin((lane+1)*12.9898+(i+1)*7.233)),lr=Math.max(.12,r*(preset==="feather-fan"?.075:preset==="feather-flat"?.22:preset==="feather-dry"?.075:preset==="feather-soft"?.24:.17)*weight*variation*(1-gap*.35)),cx=pt.x+nx*off,cy=pt.y+ny*off;left.push({x:cx+nx*lr,y:cy+ny*lr});right.push({x:cx-nx*lr,y:cy-ny*lr});}
+        for(let i=0;i<points.length;i++){const pt=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;if(headAngle!==0){const ox=nx,oy=ny,c=Math.cos(headAngle),sn=Math.sin(headAngle);nx=ox*c-oy*sn;ny=ox*sn+oy*c;}const progress=i/(points.length-1),edge=Math.max(0,1-Math.min(1,Math.min(progress,1-progress)*5)),taperFactor=Math.max(.06,1-taper*edge),balancedFactor=1-balancedFade*.72*edge,r=radiusAt(pt,i)*taperFactor*balancedFactor;let weight=1;if(preset==="feather-pointed"||preset==="feather-quill")weight=.35+.65*Math.pow(Math.max(0,1-Math.abs(t)),.65);if(preset==="feather-round")weight=.55+.45*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-soft")weight=.72+.28*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-fan")weight=.8+.2*(1-Math.abs(t));if(preset==="feather-dry")weight=.55+.45*(lane%3===0?1:.72);const off=dist*spread*spacing*r*(1+gap*.65),variation=1-texture*.22+texture*.44*(.5+.5*Math.sin((lane+1)*12.9898+(i+1)*7.233)),lr=Math.max(.12,r*(preset==="feather-fan"?.075:preset==="feather-flat"?.22:preset==="feather-dry"?.075:preset==="feather-soft"?.24:.17)*weight*variation*(1-gap*.35)),cx=pt.x+nx*off,cy=pt.y+ny*off;left.push({x:cx+nx*lr,y:cy+ny*lr});right.push({x:cx-nx*lr,y:cy-ny*lr});}
         paths.push(poly([...left,...right.reverse()]));}return paths.join(" ");
     }
 
@@ -734,7 +734,7 @@ export class StrokeBuilder {
         featherSpread: this.brushStyle?.featherSpread ?? 0.45,
         featherSoftness: this.brushStyle?.featherSoftness ?? 0.35,
         featherTaper: this.brushStyle?.featherTaper ?? 0.7,
-        featherFade: this.brushStyle?.featherFade === true,
+        featherFade: EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherFade, 0), 0, 1),
         featherGap:this.brushStyle?.featherGap??.35,featherPressure:this.brushStyle?.featherPressure??.75,featherSpeed:this.brushStyle?.featherSpeed??.25,featherAngle:this.brushStyle?.featherAngle??0,featherTexture:this.brushStyle?.featherTexture??.35
       }
     };
@@ -1132,7 +1132,7 @@ export class DrawingEngine {
         featherSpread: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpread, 0.45), 0, 1),
         featherSoftness: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSoftness, 0.35), 0, 1),
         featherTaper: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherTaper, 0.7), 0, 1),
-        featherFade: settings.brushStyle.featherFade === true,
+        featherFade: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherFade, 0), 0, 1),
         featherGap:EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherGap,.35),0,1.5),featherPressure:EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherPressure,.75),0,1),featherSpeed:EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpeed,.25),0,1),featherAngle:EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherAngle,0),0,180),featherTexture:EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherTexture,.35),0,1)
       };
     }
@@ -1425,6 +1425,7 @@ export class DrawingEngine {
         featherSpread: brushStyle.featherSpread ?? 0.45,
         featherSoftness: brushStyle.featherSoftness ?? 0.35,
         featherTaper: brushStyle.featherTaper ?? 0.7,
+        featherFade: EngineUtils.clamp(EngineUtils.number(brushStyle.featherFade, 0), 0, 1),
         featherGap: brushStyle.featherGap ?? .35,
         featherPressure: brushStyle.featherPressure ?? .75,
         featherSpeed: brushStyle.featherSpeed ?? .25,
@@ -1449,6 +1450,7 @@ export class DrawingEngine {
           featherSpread: brushStyle.featherSpread,
           featherSoftness: brushStyle.featherSoftness,
           featherTaper: brushStyle.featherTaper,
+          featherFade: brushStyle.featherFade,
           featherGap: brushStyle.featherGap,
           featherPressure: brushStyle.featherPressure,
           featherSpeed: brushStyle.featherSpeed,
