@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#2563eb">
-  <title>رسام - برنامج رسم فيكتور | Rasem Vector</title>
-  <meta name="description" content="تطبيق رسم وتصميم فيكتور رقمي احترافي متكامل يدعم الطبقات وأدوات الهندسة والتصدير بصيغ SVG و PNG و PDF والتحكم الدقيق." />
-  <meta property="og:title" content="رسام - برنامج رسم فيكتور | Rasem Vector" />
-  <meta property="og:description" content="تطبيق رسم وتصميم فيكتور رقمي احترافي متكامل يدعم الطبقات وأدوات الهندسة والتصدير بصيغ SVG و PNG و PDF والتحكم الدقيق." />
+  <meta name="theme-color" content="#c58a24">
+  <title>رسام الخط العربي</title>
+  <meta name="description" content="رسام الخط العربي: تطبيق احترافي للرسم المتجهي والخط العربي، مع أدوات الأقلام والريش والفرش والتصميم." />
+  <meta property="og:title" content="رسام الخط العربي" />
+  <meta property="og:description" content="تطبيق احترافي للرسم المتجهي والخط العربي." />
   <meta property="og:type" content="website" />
   <link rel="manifest" href="./manifest.json" />
-  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="./icons/brand-icon.svg" />
+  <link rel="alternate icon" type="image/png" href="./icons/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/brand-icon.svg">
 
   <link rel="stylesheet" href="./css/app.css?v=20261109-18">
   <style>
@@ -1224,6 +1225,11 @@
       if (pwaBtn) pwaBtn.style.display = "inline-flex";
     });
 
+    window.addEventListener("appinstalled", () => {
+      deferredPrompt = null;
+      if (pwaBtn) pwaBtn.style.display = "none";
+    });
+
     pwaBtn?.addEventListener("click", async () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
@@ -1252,7 +1258,7 @@
     if ("caches" in window) {
       caches.keys().then(keys => {
         keys.forEach(k => {
-          if (k !== "rasem-pwa-v10-flex-centered-overlay") {
+          if (k !== "rasem-arabic-calligraphy-pwa-v1") {
             caches.delete(k);
           }
         });
@@ -1262,7 +1268,7 @@
       navigator.serviceWorker.register("./service-worker.js")
         .then(reg => {
           reg.update();
-          console.log("Rasem PWA: Service Worker updated to v10");
+          console.log("رسام الخط العربي: PWA service worker updated");
         })
         .catch(err => console.warn("PWA registration failed:", err));
     });
