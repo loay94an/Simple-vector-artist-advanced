@@ -18,6 +18,23 @@ function circle(cx, cy, rx, ry, count = 120) {
   });
 }
 
+
+function openStroke(vertices, samplesPerEdge = 24) {
+  const points = [];
+  for (let edge = 0; edge < vertices.length - 1; edge++) {
+    const a = vertices[edge], b = vertices[edge + 1];
+    for (let i = 0; i < samplesPerEdge; i++) {
+      const t = i / samplesPerEdge;
+      const seed = edge * samplesPerEdge + i;
+      points.push({ x: jitter(a.x + (b.x - a.x) * t, seed),
+        y: jitter(a.y + (b.y - a.y) * t, seed + 13),
+        pressure: 0.5, time: seed * 5 });
+    }
+  }
+  points.push({ ...vertices.at(-1), pressure: 0.5, time: points.length * 5 });
+  return points;
+}
+
 function polygon(vertices, samplesPerEdge = 24) {
   const points = [];
   for (let edge = 0; edge < vertices.length; edge++) {
@@ -165,6 +182,6 @@ test("distinguishes a zigzag from an ordinary broken line", () => {
     { x: 20, y: 120 }, { x: 75, y: 45 }, { x: 125, y: 80 },
     { x: 180, y: 25 }
   ];
-  assert.equal(recognizeShape(polygon(zigzagVertices))?.type, "zigzag");
-  assert.equal(recognizeShape(brokenVertices.map((p, i) => ({ ...p, pressure: 0.5, time: i * 20 })))?.type, "polyline");
+  assert.equal(recognizeShape(openStroke(zigzagVertices))?.type, "zigzag");
+  assert.equal(recognizeShape(openStroke(brokenVertices))?.type, "polyline");
 });
