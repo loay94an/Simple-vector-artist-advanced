@@ -56,7 +56,9 @@ public class NativeSharePlugin extends Plugin {
             );
 
             Intent sendIntent = new Intent(Intent.ACTION_SEND);
-            sendIntent.setType(mimeType);
+            String androidMimeType = mimeType.split(";")[0].trim();
+            if (androidMimeType.isEmpty()) androidMimeType = "application/octet-stream";
+            sendIntent.setType(androidMimeType);
             sendIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
             sendIntent.setClipData(ClipData.newUri(
                 getContext().getContentResolver(),
