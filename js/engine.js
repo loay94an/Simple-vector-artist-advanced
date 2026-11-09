@@ -962,6 +962,8 @@ export class DrawingEngine {
 
     this.erasedIds = new Set();
     this.previousEraserPoint = null;
+    this.eraserRenderFrameId = null;
+    this.eraserRenderUsesTimeout = false;
     this.destroyed = false;
     this.shapeRecognitionTimer = null;
     this.renderFrameId = null;
@@ -1478,9 +1480,9 @@ export class DrawingEngine {
       return false;
     }
 
-    // Flush the last queued frame before finalizing so pointerup geometry
-    // and the committed SVG can never lag behind the collected samples.
+    // Flush pending drawing and eraser frames before committing the gesture.
     this.cancelScheduledRender();
+    this.cancelScheduledEraserRender();
 
     // رفع القلم هو الحدث الحاسم لنهاية الضربة:
     // نلتقط إحداثيات pointerup نفسها قبل بناء المسار النهائي،
@@ -1604,6 +1606,7 @@ export class DrawingEngine {
 
   cancel() {
     this.cancelScheduledRender();
+    this.cancelScheduledEraserRender();
     this.clearShapeRecognitionTimer();
     if (!this.drawing) return false;
 
@@ -1634,6 +1637,32 @@ export class DrawingEngine {
     }
 
     return this.cancel();
+  }
+
+  scheduleEraserRender() {
+    if (this.eraserRenderFrameId !== null) return;
+    const render = () => {
+      this.eraserRenderFrameId = null;
+      this.eraserRenderUsesTimeout = false;
+      if (!this.destroyed && this.settings.tool === "eraser") {
+        const layer = this.activeLayer;
+        if (layer) this.renderer.renderActiveLayer(layer);
+      }
+    };
+    if (typeof requestAnimationFrame === "function") {
+      this.eraserRenderFrameId = requestAnimationFrame(render);
+    } else {
+      this.eraserRenderUsesTimeout = true;
+      this.eraserRenderFrameId = setTimeout(render, 16);
+    }
+  }
+
+  cancelScheduledEraserRender() {
+    if (this.eraserRenderFrameId === null) return;
+    if (this.eraserRenderUsesTimeout) clearTimeout(this.eraserRenderFrameId);
+    else if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(this.eraserRenderFrameId);
+    this.eraserRenderFrameId = null;
+    this.eraserRenderUsesTimeout = false;
   }
 
   getEraserTolerance() {
@@ -1673,7 +1702,7 @@ export class DrawingEngine {
     // not once per interpolated eraser dab.
     if (changed) {
       this.document.touch?.();
-      this.renderer.renderActiveLayer(this.activeLayer);
+      this.scheduleEraserRender();
     }
     return changed;
   }
@@ -1846,6 +1875,7 @@ export class DrawingEngine {
 
   reset() {
     this.cancelScheduledRender();
+    this.cancelScheduledEraserRender();
     this.clearShapeRecognitionTimer();
     this.renderer?.clearCanvasPreview?.();
     this.canvasPreviewPointCount = 0;
