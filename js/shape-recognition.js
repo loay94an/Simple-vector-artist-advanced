@@ -448,9 +448,10 @@ function fitOpenSpiral(points) {
   const minR=Math.min(...radii),maxR=Math.max(...radii);
   if(turns<1.35||turns>8||reversals>Math.max(3,points.length*.025)||
     maxR-minR<diag*.075||minR<diag*.008)return null;
+  const radialTrend=Math.sign(radii.at(-1)-radii[0]);
   let consistent=0,usable=0;
-  for(let i=1;i<radii.length;i++){const d=radii[i]-radii[i-1];if(Math.abs(d)>diag*.0008){usable++;if(Math.sign(d)===Math.sign(sweep))consistent++;}}
-  if(!usable||consistent/usable<.70)return null;
+  for(let i=1;i<radii.length;i++){const d=radii[i]-radii[i-1];if(Math.abs(d)>diag*.0008){usable++;if(Math.sign(d)===radialTrend)consistent++;}}
+  if(!usable||!radialTrend||consistent/usable<.70)return null;
   const ma=angles.reduce((a,b)=>a+b,0)/angles.length,mr=radii.reduce((a,b)=>a+b,0)/radii.length;
   let cov=0,va=0,vr=0;
   for(let i=0;i<angles.length;i++){const da=angles[i]-ma,dr=radii[i]-mr;cov+=da*dr;va+=da*da;vr+=dr*dr;}
@@ -779,7 +780,12 @@ function classifyShapeVariant(points,result,labels) {
     const logarithmic=modelError(r.map(v=>Math.log(Math.max(1,v))));
     const fermat=modelError(r.map(v=>v*v));
     const hyperbolic=modelError(r.map(v=>1/Math.max(1,v)));
-    const quadratic=modelError(r.map((v,i)=>v+0.0));
+    const radialRatio=Math.max(...r)/Math.max(1,Math.min(...r));
+    const curvature=points.slice(1,-1).map((p,i)=>{
+      const a=points[i],b=points[i+2],u={x:p.x-a.x,y:p.y-a.y},v={x:b.x-p.x,y:b.y-p.y};
+      return Math.atan2(cross(u,v),Math.max(EPSILON,dot(u,v)));
+    });
+    const curvatureTrend=curvature.length>2?Math.abs(curvature.at(-1)-curvature[0])/Math.max(EPSILON,Math.max(...curvature)-Math.min(...curvature)):0;
     if(logarithmic+.035<linear&&logarithmic<fermat)family="spiral-logarithmic";
     else if(fermat+.035<linear)family="spiral-fermat";
     else if(hyperbolic+.035<linear)family="spiral-hyperbolic";
@@ -787,7 +793,8 @@ function classifyShapeVariant(points,result,labels) {
     else if(turns<1.85)family="spiral-partial";
     else if(growth>.48)family="spiral-loose";
     else if(turns>2.7)family="spiral-multi-turn";
-    else if(quadratic<linear*.82)family="spiral-clothoid";
+    else if(radialRatio>3.2&&growth<.48)family="spiral-involute";
+    else if(curvatureTrend>.72)family="spiral-clothoid";
     else family="spiral-archimedean";
     levelMetric=turns;
     labels.push("spiral");
