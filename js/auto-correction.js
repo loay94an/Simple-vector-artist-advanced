@@ -87,9 +87,9 @@ export function correctStrokePoints(source, strength = 35) {
       // at high strength as requested by the user.
       const angle = turningAngle(previous, i, Math.min(2, radius));
       if (angle > 0.52) {
-        const cornerRetention = Math.pow(1 - power, 1.35);
-        dx *= cornerRetention;
-        dy *= cornerRetention;
+        const cornerMovement = Math.pow(power, 1.35);
+        dx *= cornerMovement;
+        dy *= cornerMovement;
       }
 
       const maxShift = bounds * (0.001 + power * 0.045);
