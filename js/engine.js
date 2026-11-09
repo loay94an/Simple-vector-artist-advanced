@@ -754,7 +754,8 @@ export class StrokeBuilder {
         featherSpacing: this.brushStyle?.featherSpacing ?? 1,
         featherSpread: this.brushStyle?.featherSpread ?? 0.45,
         featherSoftness: this.brushStyle?.featherSoftness ?? 0.35,
-        featherTaper: this.brushStyle?.featherTaper ?? 0.7
+        featherTaper: this.brushStyle?.featherTaper ?? 0.7,
+        featherFade: this.brushStyle?.featherFade === true
       }
     };
   }
@@ -1150,7 +1151,8 @@ export class DrawingEngine {
         featherSpacing: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpacing, 1), 0.25, 2.5),
         featherSpread: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSpread, 0.45), 0, 1),
         featherSoftness: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherSoftness, 0.35), 0, 1),
-        featherTaper: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherTaper, 0.7), 0, 1)
+        featherTaper: EngineUtils.clamp(EngineUtils.number(settings.brushStyle.featherTaper, 0.7), 0, 1),
+        featherFade: settings.brushStyle.featherFade === true
       };
     }
 
