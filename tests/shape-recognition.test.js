@@ -187,9 +187,12 @@ test("distinguishes a zigzag from an ordinary broken line", () => {
 });
 
 
-test("exposes exactly 62 unique shape classifications", () => {
-  assert.equal(SHAPE_CLASSIFICATIONS.length, 62);
-  assert.equal(new Set(SHAPE_CLASSIFICATIONS).size, 62);
+test("preserves the original 62 classifications and adds 500 spiral plus 500 special-open variants", () => {
+  assert.equal(SHAPE_CLASSIFICATIONS.length, 1062);
+  assert.equal(new Set(SHAPE_CLASSIFICATIONS).size, 1062);
+  assert.equal(SHAPE_CLASSIFICATIONS.filter(x => x.startsWith("spiral-")).length, 500);
+  assert.equal(SHAPE_CLASSIFICATIONS.filter(x => x.startsWith("open-")).length, 500);
+  assert.equal(SHAPE_CLASSIFICATIONS.some(x => x.startsWith("closed-")), false);
 });
 
 test("adds triangle subtype classifications without changing renderer base type", () => {
@@ -215,4 +218,31 @@ test("returns multiple semantic labels for triangle geometry", () => {
   ]));
   assert.ok(result?.classifications.includes("triangle-right"));
   assert.ok(result?.classifications.includes("triangle-isosceles"));
+});
+
+
+test("assigns a special-open-path variant to a recognized angular stroke", () => {
+  const open = recognizeShape(openStroke([
+    { x: 20, y: 40 }, { x: 100, y: 40 }, { x: 100, y: 130 }
+  ]));
+  assert.ok(open?.variantClassification?.startsWith("open-"));
+  assert.ok(SHAPE_CLASSIFICATIONS.includes(open.variantClassification));
+});
+
+test("recognizes a multi-turn outward spiral as an open spiral", () => {
+  const points = Array.from({ length: 240 }, (_, i) => {
+    const t = i / 239;
+    const angle = t * Math.PI * 5;
+    const radius = 12 + t * 48;
+    return {
+      x: 130 + Math.cos(angle) * radius,
+      y: 120 + Math.sin(angle) * radius,
+      pressure: 0.5,
+      time: i * 8
+    };
+  });
+  const result = recognizeShape(points);
+  assert.equal(result?.type, "spiral");
+  assert.ok(result?.variantClassification?.startsWith("spiral-"));
+  assert.ok(SHAPE_CLASSIFICATIONS.includes(result.variantClassification));
 });

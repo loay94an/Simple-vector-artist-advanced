@@ -1,12 +1,8 @@
 name: Build Rasem Android APK
 
 on:
+  # APK builds are manual so web-only recognition changes never create an APK.
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - feature/handwriting-performance-pipeline
-      - fix/reliable-storage-export-android
 
 jobs:
   build:
