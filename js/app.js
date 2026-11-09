@@ -32,7 +32,7 @@ import {
 
 import {
   ToolManager
-} from "./tools.js?v=20261109-05";
+} from "./tools.js?v=20261109-06";
 
 import {
   HistoryManager
