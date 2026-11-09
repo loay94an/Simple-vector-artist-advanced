@@ -332,12 +332,8 @@ export class Eraser extends BaseTool {
       this.engine.coordinates?.camera?.scale ?? 1);
     const radius = this.engine.getEraserTolerance?.() ??
       (this.engine.settings.eraserSize / Math.max(0.01, zoom));
-    // Move only the visual cursor above a touch contact; eraseAt still uses the real finger point.
-    const previewPoint = event.pointerType === "touch"
-      ? this.engine.coordinates.screenToWorld(event.clientX, event.clientY - 58)
-      : point;
-    const visiblePoint = ToolUtils.validPoint(previewPoint) ? previewPoint : point;
-    overlay.setAttribute("transform", `translate(${visiblePoint.x} ${visiblePoint.y})`);
+    // Keep the visual cursor exactly over the real erase contact point.
+    overlay.setAttribute("transform", `translate(${point.x} ${point.y})`);
     for (const ring of overlay.querySelectorAll("circle")) {
       ring.setAttribute("r", String(radius));
     }
