@@ -142,21 +142,19 @@
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // Hue ring with a central HSV square (hue around, saturation/value inside).
+    // Circular hue ring with a live selected-color preview in the center.
     const geometry = () => {
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
       const outer = canvas.width / 2 - 5;
-      const inner = outer - 28;
-      const square = 112;
-      return { cx, cy, outer, inner, square, left: cx - square / 2, top: cy - square / 2 };
+      const inner = outer - 30;
+      const centerRadius = inner - 8;
+      return { cx, cy, outer, inner, centerRadius };
     };
 
     function drawWheel() {
-      const w = canvas.width;
-      const h = canvas.height;
-      const { cx, cy, outer, inner, square, left, top } = geometry();
-      ctx.clearRect(0, 0, w, h);
+      const { cx, cy, outer, inner, centerRadius } = geometry();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Smooth continuous hue ring.
       const segments = 360;
@@ -171,45 +169,21 @@
         ctx.fill();
       }
 
-      // Central saturation/value square: pure hue -> white, then black vertically.
-      ctx.save();
+      // Center circle previews the currently selected color.
       ctx.beginPath();
-      ctx.roundRect(left, top, square, square, 3);
-      ctx.clip();
-      ctx.fillStyle = hsvToHex(activeHue, 1, 1);
-      ctx.fillRect(left, top, square, square);
-
-      const white = ctx.createLinearGradient(left, top, left + square, top);
-      white.addColorStop(0, "#ffffff");
-      white.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = white;
-      ctx.fillRect(left, top, square, square);
-
-      const black = ctx.createLinearGradient(left, top, left, top + square);
-      black.addColorStop(0, "rgba(0,0,0,0)");
-      black.addColorStop(1, "#000000");
-      ctx.fillStyle = black;
-      ctx.fillRect(left, top, square, square);
-      ctx.restore();
-
-      ctx.strokeStyle = "rgba(255,255,255,.95)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(left, top, square, square);
-
-      // Selection marker inside the square.
-      const markerX = left + activeSat * square;
-      const markerY = top + (1 - activeVal) * square;
-      ctx.beginPath();
-      ctx.arc(markerX, markerY, 7, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(15,23,42,.28)";
+      ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
+      ctx.fillStyle = currentColor;
       ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = "rgba(255,255,255,.96)";
       ctx.stroke();
+
+      // Subtle inner rim for a clean, distinct circular center.
       ctx.beginPath();
-      ctx.arc(markerX, markerY, 2, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
+      ctx.arc(cx, cy, centerRadius - 4, 0, Math.PI * 2);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(15,23,42,.16)";
+      ctx.stroke();
 
       // Hue selector on the ring.
       const angle = (activeHue * Math.PI) / 180 - Math.PI / 2;
@@ -231,22 +205,16 @@
       const scaleY = canvas.height / rect.height;
       const px = (x - rect.left) * scaleX;
       const py = (y - rect.top) * scaleY;
-      const { cx, cy, outer, inner, square, left, top } = geometry();
+      const { cx, cy, outer, inner } = geometry();
+      const dx = px - cx;
+      const dy = py - cy;
+      const dist = Math.hypot(dx, dy);
 
-      // Square controls saturation (horizontal) and value (vertical).
-      if (px >= left && px <= left + square && py >= top && py <= top + square) {
-        activeSat = Math.max(0, Math.min(1, (px - left) / square));
-        activeVal = Math.max(0, Math.min(1, 1 - (py - top) / square));
-      } else {
-        // Hue ring controls hue only.
-        const dx = px - cx;
-        const dy = py - cy;
-        const dist = Math.hypot(dx, dy);
-        if (dist < inner - 3 || dist > outer + 3) return;
-        let angle = Math.atan2(dy, dx) + Math.PI / 2;
-        if (angle < 0) angle += Math.PI * 2;
-        activeHue = (angle * 180 / Math.PI + 360) % 360;
-      }
+      // Only the outer ring changes hue; the center is a live color preview.
+      if (dist < inner - 3 || dist > outer + 3) return;
+      let angle = Math.atan2(dy, dx) + Math.PI / 2;
+      if (angle < 0) angle += Math.PI * 2;
+      activeHue = (angle * 180 / Math.PI + 360) % 360;
 
       const hex = hsvToHex(activeHue, activeSat, activeVal);
       applyColor(hex, false);
