@@ -776,6 +776,57 @@ export class HitTesting {
     return points;
   }
 
+  static boundsCache = new WeakMap();
+
+  static getElementBounds(element) {
+    if (!element || typeof element !== "object") return null;
+    const pointsRef = element.points;
+    const geometryRef = element.geometry;
+    const cached = this.boundsCache.get(element);
+    if (cached && cached.pointsRef === pointsRef && cached.geometryRef === geometryRef) {
+      return cached.bounds;
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    if (Array.isArray(pointsRef) && pointsRef.length) {
+      for (const point of pointsRef) {
+        if (!EngineUtils.validPoint(point)) continue;
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+    } else if (geometryRef) {
+      const g = geometryRef;
+      if ([g.x, g.y, g.width, g.height].every(v => Number.isFinite(Number(v)))) {
+        minX = Number(g.x); minY = Number(g.y);
+        maxX = minX + Number(g.width); maxY = minY + Number(g.height);
+      } else if (Number.isFinite(g.cx) && Number.isFinite(g.cy)) {
+        const rx = Math.abs(EngineUtils.number(g.rx ?? g.r, 0));
+        const ry = Math.abs(EngineUtils.number(g.ry ?? g.r, rx));
+        minX = g.cx - rx; minY = g.cy - ry;
+        maxX = g.cx + rx; maxY = g.cy + ry;
+      } else if ([g.x1, g.y1, g.x2, g.y2].every(v => Number.isFinite(Number(v)))) {
+        minX = Math.min(Number(g.x1), Number(g.x2));
+        minY = Math.min(Number(g.y1), Number(g.y2));
+        maxX = Math.max(Number(g.x1), Number(g.x2));
+        maxY = Math.max(Number(g.y1), Number(g.y2));
+      } else if (typeof g.points === "string") {
+        const values = g.points.match(/-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[-+]?\\d+)?/gi)?.map(Number) || [];
+        for (let i = 0; i + 1 < values.length; i += 2) {
+          minX = Math.min(minX, values[i]); maxX = Math.max(maxX, values[i]);
+          minY = Math.min(minY, values[i + 1]); maxY = Math.max(maxY, values[i + 1]);
+        }
+      }
+    }
+
+    const bounds = Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)
+      ? { minX, minY, maxX, maxY }
+      : null;
+    this.boundsCache.set(element, { pointsRef, geometryRef, bounds });
+    return bounds;
+  }
+
   static getElementDistance(element, point) {
     if (!element || !EngineUtils.validPoint(point)) return Infinity;
 
@@ -1756,6 +1807,14 @@ export class DrawingEngine {
       // getElementDistance already subtracts the ordinary half stroke width.
       // Add only the extra nib width for broad Arabic calligraphy presets.
       const extraNibReach = size * Math.max(0, (calligraphyWidths[preset] || 1) - 1) * 0.5;
+      const bounds = HitTesting.getElementBounds(element);
+      const broadPhaseReach = radius + extraNibReach + size * 0.5;
+      if (bounds && (
+        point.x < bounds.minX - broadPhaseReach ||
+        point.x > bounds.maxX + broadPhaseReach ||
+        point.y < bounds.minY - broadPhaseReach ||
+        point.y > bounds.maxY + broadPhaseReach
+      )) continue;
       const distance = HitTesting.getElementDistance(element, point);
 
       // Hit-test the visible footprint, but erase only the actual circular
