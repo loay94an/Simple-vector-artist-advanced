@@ -4032,3 +4032,12 @@ body.dark .canvas-area {
   .concepts-wheel-card { padding: 12px; gap: 9px; }
   .concepts-canvas-wrap { width: min(278px, calc(100vw - 52px)); }
 }
+
+
+/* Touch-safe separation between hue ring and inner saturation/value disk */
+#conceptsCanvas {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
