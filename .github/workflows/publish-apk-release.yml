@@ -38,7 +38,7 @@ jobs:
           APK_PATH="$(find release-files -type f -name '*.apk' -print -quit)"
           test -n "$APK_PATH"
           TAG="rasem-android-build-${RUN_NUMBER}"
-          cp "$APK_PATH" "رسام-الخط-العربي.apk"
-          gh release create "$TAG" "رسام-الخط-العربي.apk" \
+          cp "$APK_PATH" "Rasem-Vector-Artist.apk"
+          gh release create "$TAG" "Rasem-Vector-Artist.apk" \
             --title "رسام الخط العربي - Android APK #${RUN_NUMBER}" \
-            --notes "نسخة Android APK مبنية تلقائياً من commit ${COMMIT_SHA}.\n\nيمكن تنزيل ملف APK من أصول هذا الإصدار."
+            --notes "نسخة Android مستقلة يمكن تثبيتها بجانب التطبيق السابق. مبنية من commit ${COMMIT_SHA}."
