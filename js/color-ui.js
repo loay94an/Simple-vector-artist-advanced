@@ -272,27 +272,30 @@
       updateHarmonies();
     }
 
-    let isDragging = false;
+    if (canvas.dataset.wheelBound !== "true") {
+      canvas.dataset.wheelBound = "true";
+      let isDragging = false;
 
-    canvas.addEventListener("pointerdown", e => {
-      isDragging = true;
-      canvas.setPointerCapture(e.pointerId);
-      pickFromCoords(e.clientX, e.clientY);
-    });
+      canvas.addEventListener("pointerdown", e => {
+        isDragging = true;
+        canvas.setPointerCapture(e.pointerId);
+        pickFromCoords(e.clientX, e.clientY);
+      });
 
-    canvas.addEventListener("pointermove", e => {
-      if (!isDragging) return;
-      pickFromCoords(e.clientX, e.clientY);
-    });
+      canvas.addEventListener("pointermove", e => {
+        if (!isDragging) return;
+        pickFromCoords(e.clientX, e.clientY);
+      });
 
-    const finishWheelDrag = e => {
-      if (!isDragging) return;
-      isDragging = false;
-      try { canvas.releasePointerCapture(e.pointerId); } catch {}
-      saveToHistory(currentColor);
-    };
-    canvas.addEventListener("pointerup", finishWheelDrag);
-    canvas.addEventListener("pointercancel", finishWheelDrag);
+      const finishWheelDrag = e => {
+        if (!isDragging) return;
+        isDragging = false;
+        try { canvas.releasePointerCapture(e.pointerId); } catch {}
+        saveToHistory(currentColor);
+      };
+      canvas.addEventListener("pointerup", finishWheelDrag);
+      canvas.addEventListener("pointercancel", finishWheelDrag);
+    }
 
     // Eyedropper
     const eyeBtn = $("conceptsEyedropper");
@@ -500,14 +503,15 @@
     if (typeof window.rasemCloseAllModals === "function") {
       window.rasemCloseAllModals();
     }
-    initConceptsWheelUI();
-    const container = $("conceptsWheelContainer");
-    if (!container) return;
-
     const hsv = hexToHsv(currentColor);
     activeHue = hsv.h;
     activeSat = hsv.s;
     activeVal = hsv.v;
+
+    // Repaint from the current color before showing; initialization is idempotent.
+    initConceptsWheelUI();
+    const container = $("conceptsWheelContainer");
+    if (!container) return;
 
     container.classList.add("open");
     isWheelExpanded = true;
