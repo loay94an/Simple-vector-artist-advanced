@@ -53,7 +53,7 @@ const EngineUtils = {
 ========================================================= */
 
 // Preserve raw samples for ordinary tools. Arabic calligraphy uses a
-// dedicated low-pass + Catmull-Rom pipeline so only that tool gets fluid curves.
+// dedicated low-pass + distance-resampling pipeline to calm pointer tremor without spline overshoot.
 function pointsToPath(points) {
   if (!Array.isArray(points) || !points.length) return "";
   if (points.length === 1) {
