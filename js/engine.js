@@ -214,13 +214,10 @@ function smoothSmartStrokePoints(source, amount = 0) {
 }
 
 function supportsAutomaticCorrection(builder) {
-  if (!builder || builder.tool === "calligraphy" || builder.tool === "feather") return false;
-  const preset = String(builder.brushStyle?.preset || "round");
-  // Geometric edits are limited to plain round strokes. Special nibs,
-  // textured brushes, stamps and custom artwork must retain their geometry.
-  return ["pencil", "pen", "marker"].includes(builder.tool) &&
-    ["", "round"].includes(preset) &&
-    !builder.brushStyle?.image;
+  if (!builder) return false;
+  // Apply correction to every actual drawing tool and brush preset. The
+  // user's correction strength explicitly authorizes aggressive reshaping.
+  return !["eraser", "hand", "selector", "shapes"].includes(builder.tool);
 }
 
 function recognizeSmartStroke(source, level = 0) {
@@ -265,7 +262,7 @@ export class StrokeBuilder {
     this.active = false;
     // أثناء الضربة نعرض العينات الخام؛ لا يبدأ التنعيم إلا بعد سكون الإصبع.
     this.deferSmoothing = false;
-    this.smartDrawing = { enabled: false, smoothness: 0, correction: 0, recognition: 0 };
+    this.smartDrawing = { enabled: true, smoothness: 0, correction: 20, recognition: 0 };
 
     // Incremental live calligraphy outline cache. It is reset with each stroke.
     this.calligraphyPreviewPointCount = 0;
@@ -301,6 +298,9 @@ export class StrokeBuilder {
     this.tool = settings.tool || "pen";
     this.calligraphyAngle = settings.calligraphyAngle ?? 45;
     this.brushStyle = settings.brushStyle || null;
+    this.smartDrawing = settings.smartDrawing && typeof settings.smartDrawing === "object"
+      ? { ...settings.smartDrawing }
+      : { enabled: true, smoothness: 0, correction: 20, recognition: 0 };
 
     this.sensitivity = EngineUtils.clamp(
       EngineUtils.number(settings.sensitivity, 0.8),
@@ -1385,7 +1385,7 @@ export class DrawingEngine {
   }
 
   scheduleShapeRecognition() {
-    // Automatic correction and geometric recognition are intentionally off.
+    // Shape fitting is committed on pen-up; never replace the live pointer path.
     this.clearShapeRecognitionTimer();
     return false;
   }
