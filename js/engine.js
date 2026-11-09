@@ -408,6 +408,7 @@ export class StrokeBuilder {
     const kind = profiles[preset];
     if (!kind || preset === "dash" || preset === "custom") return "";
     const feather = preset.startsWith("feather-");
+    const featherAngle = feather ? EngineUtils.number(this.brushStyle?.featherAngle,0)*Math.PI/180 : angle;
     const featherPressure=feather?EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherPressure,.75),0,1):0;
     const featherSpeed=feather?EngineUtils.clamp(EngineUtils.number(this.brushStyle?.featherSpeed,.25),0,1):0;
     const pressureAt = p => {const raw=EngineUtils.clamp(.35+EngineUtils.number(p.pressure,.5)*.65,.25,1.15);return this.pressureEnabled?(feather?1-featherPressure+raw*featherPressure:raw):1;};
@@ -423,7 +424,7 @@ export class StrokeBuilder {
       const speedFactor=EngineUtils.clamp(1.12-speed*.22,.78,1.12);r*=feather?1-featherSpeed+speedFactor*featherSpeed:speedFactor;
       if (kind === "flat") {
         const a=points[Math.max(0,i-1)], b=points[Math.min(points.length-1,i+1)];
-        r *= 0.12 + Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-angle))*0.88;
+        r *= 0.12 + Math.abs(Math.sin(Math.atan2(b.y-a.y,b.x-a.x)-(feather?featherAngle:angle)))*0.88;
       }
       return Math.max(0.35,r);
     };
@@ -433,7 +434,7 @@ export class StrokeBuilder {
       const lanes=preset==="feather-fan"?density:preset==="feather-flat"?Math.max(4,density):preset==="feather-soft"?Math.max(6,density):preset==="feather-dry"?Math.max(4,density):preset==="feather-quill"?Math.max(3,Math.min(9,density)):Math.max(5,density);
       if(points.length===1){const p=points[0],r=radiusAt(p,0);return `M ${(p.x-r).toFixed(2)} ${p.y.toFixed(2)} a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(r*2).toFixed(2)} 0 a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(-r*2).toFixed(2)} 0`;}
       const paths=[];for(let lane=0;lane<lanes;lane++){const t=lane/(lanes-1)*2-1;let dist=t;if(preset==="feather-fan")dist=Math.sign(t)*Math.pow(Math.abs(t),.72);if(preset==="feather-pointed"||preset==="feather-quill")dist=Math.sign(t)*Math.pow(Math.abs(t),1.55);if(preset==="feather-round"||preset==="feather-soft")dist=Math.sin(t*Math.PI/2);const left=[],right=[];
-        for(let i=0;i<points.length;i++){const pt=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;if(preset==="feather-script"){const ox=nx,oy=ny,c=Math.cos(headAngle),sn=Math.sin(headAngle);nx=ox*c-oy*sn;ny=ox*sn+oy*c;}const progress=i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5))),r=radiusAt(pt,i)*fade;let weight=1;if(preset==="feather-pointed"||preset==="feather-quill")weight=.35+.65*Math.pow(Math.max(0,1-Math.abs(t)),.65);if(preset==="feather-round")weight=.55+.45*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-soft")weight=.72+.28*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-fan")weight=.8+.2*(1-Math.abs(t));if(preset==="feather-dry")weight=.55+.45*(lane%3===0?1:.72);const off=dist*spread*spacing*r*(1+gap*.65),variation=1-texture*.22+texture*.44*(.5+.5*Math.sin((lane+1)*12.9898+(i+1)*7.233)),lr=Math.max(.12,r*(preset==="feather-fan"?.075:preset==="feather-flat"?.22:preset==="feather-dry"?.075:preset==="feather-soft"?.24:.17)*weight*variation*(1-gap*.35)),cx=pt.x+nx*off,cy=pt.y+ny*off;left.push({x:cx+nx*lr,y:cy+ny*lr});right.push({x:cx-nx*lr,y:cy-ny*lr});}
+        for(let i=0;i<points.length;i++){const pt=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next.x-prev.x,dy=next.y-prev.y,len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;if(headAngle!==0){const ox=nx,oy=ny,c=Math.cos(headAngle),sn=Math.sin(headAngle);nx=ox*c-oy*sn;ny=ox*sn+oy*c;}const progress=i/(points.length-1),fade=Math.max(.06,1-taper*(1-Math.min(1,Math.min(progress,1-progress)*5))),r=radiusAt(pt,i)*fade;let weight=1;if(preset==="feather-pointed"||preset==="feather-quill")weight=.35+.65*Math.pow(Math.max(0,1-Math.abs(t)),.65);if(preset==="feather-round")weight=.55+.45*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-soft")weight=.72+.28*Math.sqrt(Math.max(0,1-t*t));if(preset==="feather-fan")weight=.8+.2*(1-Math.abs(t));if(preset==="feather-dry")weight=.55+.45*(lane%3===0?1:.72);const off=dist*spread*spacing*r*(1+gap*.65),variation=1-texture*.22+texture*.44*(.5+.5*Math.sin((lane+1)*12.9898+(i+1)*7.233)),lr=Math.max(.12,r*(preset==="feather-fan"?.075:preset==="feather-flat"?.22:preset==="feather-dry"?.075:preset==="feather-soft"?.24:.17)*weight*variation*(1-gap*.35)),cx=pt.x+nx*off,cy=pt.y+ny*off;left.push({x:cx+nx*lr,y:cy+ny*lr});right.push({x:cx-nx*lr,y:cy-ny*lr});}
         paths.push(poly([...left,...right.reverse()]));}return paths.join(" ");
     }
 
