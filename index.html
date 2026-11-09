@@ -509,6 +509,11 @@
             <input id="featherSoftness" data-setting="featherSoftness" type="range" min="0" max="1" step="0.05" value="0.35">
             <div class="tool-setting-row"><label for="featherTaper">التلاشي عند البداية والنهاية</label><output id="featherTaperValue">70%</output></div>
             <input id="featherTaper" data-setting="featherTaper" type="range" min="0" max="1" step="0.05" value="0.7">
+            <label class="tool-setting-row" for="featherFade" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+              <span>تلاشي متوازن من الوسط</span>
+              <input id="featherFade" data-setting="featherFade" type="checkbox" style="width:20px;height:20px;accent-color:var(--accent);">
+            </label>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:-5px;">يكون اللون أقوى في منتصف أثر الريشة ويخف تدريجياً وبالتساوي نحو الجانبين.</div>
             <div class="tool-setting-row"><label for="featherSpacing">التباعد بين الشعيرات</label><output id="featherSpacingValue">100%</output></div>
             <input id="featherSpacing" data-setting="featherSpacing" type="range" min="0.25" max="2.5" step="0.05" value="1">
           </div>
@@ -1218,7 +1223,7 @@
   <!-- MODULE SCRIPTS -->
   <script type="module" src="./js/color-ui.js?v=20261108-02"></script>
   <script type="module" src="./js/shapes-ui.js"></script>
-  <script type="module" src="./js/tool-settings-popup.js?v=20261109-04"></script>
+  <script type="module" src="./js/tool-settings-popup.js?v=20261109-05"></script>
   <script type="module" src="./js/brush-library.js"></script>
 
   <!-- PWA REGISTRATION & CACHE PURGE -->
