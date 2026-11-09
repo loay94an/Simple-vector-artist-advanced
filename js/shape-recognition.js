@@ -433,6 +433,34 @@ function fitOpenPolyline(points, strength) {
   };
 }
 
+function fitOpenSpiral(points) {
+  const box=boundsOf(points),diag=Math.hypot(box.width,box.height);
+  if(points.length<30||diag<30)return null;
+  const center=points.reduce((s,p)=>({x:s.x+p.x/points.length,y:s.y+p.y/points.length}),{x:0,y:0});
+  const polar=points.map(p=>({a:Math.atan2(p.y-center.y,p.x-center.x),r:distance(p,center)}));
+  const angles=[polar[0].a];let sweep=0,dir=0,reversals=0;
+  for(let i=1;i<polar.length;i++){
+    let d=polar[i].a-polar[i-1].a;while(d>Math.PI)d-=2*Math.PI;while(d< -Math.PI)d+=2*Math.PI;
+    if(Math.abs(d)>.0005){const sign=Math.sign(d);if(dir&&sign!==dir)reversals++;dir=sign;}
+    sweep+=d;angles.push(angles[i-1]+d);
+  }
+  const turns=Math.abs(sweep)/(2*Math.PI),radii=polar.map(p=>p.r);
+  const minR=Math.min(...radii),maxR=Math.max(...radii);
+  if(turns<1.35||turns>8||reversals>Math.max(3,points.length*.025)||
+    maxR-minR<diag*.075||minR<diag*.008)return null;
+  let consistent=0,usable=0;
+  for(let i=1;i<radii.length;i++){const d=radii[i]-radii[i-1];if(Math.abs(d)>diag*.0008){usable++;if(Math.sign(d)===Math.sign(sweep))consistent++;}}
+  if(!usable||consistent/usable<.70)return null;
+  const ma=angles.reduce((a,b)=>a+b,0)/angles.length,mr=radii.reduce((a,b)=>a+b,0)/radii.length;
+  let cov=0,va=0,vr=0;
+  for(let i=0;i<angles.length;i++){const da=angles[i]-ma,dr=radii[i]-mr;cov+=da*dr;va+=da*da;vr+=dr*dr;}
+  const correlation=cov/Math.sqrt(Math.max(EPSILON,va*vr));
+  if(Math.abs(correlation)<.78)return null;
+  return {type:"spiral",points:resample(points,Math.max(1.5,diag/100),false),
+    confidence:clamp(.72+Math.abs(correlation)*.25,.72,.97),corners:[],
+    spiralTurns:turns,spiralGrowth:(maxR-minR)/Math.max(1,diag)};
+}
+
 function recognizeShapeBase(sourcePoints, options = {}) {
   if (!Array.isArray(sourcePoints) || sourcePoints.length < 8) return null;
   const points = sourcePoints.filter(valid);
@@ -462,6 +490,9 @@ function recognizeShapeBase(sourcePoints, options = {}) {
     }
     return null;
   }
+
+  const spiral = fitOpenSpiral(points);
+  if (spiral) return spiral;
 
   const line = fitLine(points, strength);
   if (line) return line;
@@ -494,23 +525,23 @@ const BASE_SHAPE_CLASSIFICATIONS = Object.freeze([
   "s-curve","wavy-line","orthogonal-polyline","compound-curve"
 ]);
 
-const OPEN_VARIANT_FAMILIES = Object.freeze([
-  "open-line", "open-arc", "open-curve", "open-polyline", "open-zigzag",
-  "open-spiral", "open-wave", "open-s-curve", "open-orthogonal-polyline",
-  "open-compound-curve"
+const SPIRAL_VARIANT_FAMILIES = Object.freeze([
+  "spiral-archimedean","spiral-logarithmic","spiral-fermat","spiral-hyperbolic",
+  "spiral-involute","spiral-clothoid","spiral-multi-turn","spiral-tight",
+  "spiral-loose","spiral-partial"
 ]);
-const CLOSED_VARIANT_FAMILIES = Object.freeze([
-  "closed-triangle", "closed-quadrilateral", "closed-polygon", "closed-circle",
-  "closed-ellipse", "closed-star", "closed-concave-polygon",
-  "closed-regular-polygon", "closed-annulus", "closed-crescent"
+const OPEN_SPECIAL_VARIANT_FAMILIES = Object.freeze([
+  "open-hook","open-serpentine","open-cusp","open-loop","open-u-shape",
+  "open-s-curve","open-c-curve","open-j-curve","open-l-path","open-compound-path"
+]);
+const OPEN_VARIANT_FAMILIES = Object.freeze([
+  ...SPIRAL_VARIANT_FAMILIES,...OPEN_SPECIAL_VARIANT_FAMILIES
 ]);
 const SHAPE_VARIANT_CLASSIFICATIONS = Object.freeze(
-  [...OPEN_VARIANT_FAMILIES, ...CLOSED_VARIANT_FAMILIES].flatMap(family =>
-    Array.from({ length: 50 }, (_, index) =>
-      family + "-axis-" + String(Math.floor(index / 5) + 1).padStart(2, "0") +
-      "-ratio-" + String(index % 5 + 1).padStart(2, "0")
-    )
-  )
+  OPEN_VARIANT_FAMILIES.flatMap(family=>Array.from({length:50},(_,index)=>
+    family+"-level-"+String(Math.floor(index/10)+1).padStart(2,"0")+
+    "-direction-"+String(index%10+1).padStart(2,"0")
+  ))
 );
 export const SHAPE_CLASSIFICATIONS = Object.freeze([
   ...BASE_SHAPE_CLASSIFICATIONS,
