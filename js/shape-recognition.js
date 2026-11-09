@@ -478,7 +478,7 @@ function recognizeShapeBase(sourcePoints, options = {}) {
  * specific classifications. The base type remains stable for renderer
  * compatibility; classifications are additional semantic labels.
  */
-export const SHAPE_CLASSIFICATIONS = Object.freeze([
+const BASE_SHAPE_CLASSIFICATIONS = Object.freeze([
   "triangle","square","rectangle","rhombus","parallelogram","trapezoid",
   "quadrilateral","pentagon","hexagon","heptagon","octagon","nonagon",
   "decagon","hendecagon","dodecagon","polygon","circle","ellipse","line",
@@ -492,6 +492,29 @@ export const SHAPE_CLASSIFICATIONS = Object.freeze([
   "parabola","hyperbola","sine-wave","spiral","cardioid","limacon",
   "lemniscate","rose-curve","astroid","cycloid","catenary","lissajous",
   "s-curve","wavy-line","orthogonal-polyline","compound-curve"
+]);
+
+const OPEN_VARIANT_FAMILIES = Object.freeze([
+  "open-line", "open-arc", "open-curve", "open-polyline", "open-zigzag",
+  "open-spiral", "open-wave", "open-s-curve", "open-orthogonal-polyline",
+  "open-compound-curve"
+]);
+const CLOSED_VARIANT_FAMILIES = Object.freeze([
+  "closed-triangle", "closed-quadrilateral", "closed-polygon", "closed-circle",
+  "closed-ellipse", "closed-star", "closed-concave-polygon",
+  "closed-regular-polygon", "closed-annulus", "closed-crescent"
+]);
+const SHAPE_VARIANT_CLASSIFICATIONS = Object.freeze(
+  [...OPEN_VARIANT_FAMILIES, ...CLOSED_VARIANT_FAMILIES].flatMap(family =>
+    Array.from({ length: 50 }, (_, index) =>
+      family + "-axis-" + String(Math.floor(index / 5) + 1).padStart(2, "0") +
+      "-ratio-" + String(index % 5 + 1).padStart(2, "0")
+    )
+  )
+);
+export const SHAPE_CLASSIFICATIONS = Object.freeze([
+  ...BASE_SHAPE_CLASSIFICATIONS,
+  ...SHAPE_VARIANT_CLASSIFICATIONS
 ]);
 
 const EPSILON = 1e-6;
@@ -667,11 +690,64 @@ function classifyExtended(points,result) {
   return [...labels];
 }
 
+function classifyShapeVariant(points, result, labels) {
+  const box = boundsOf(points);
+  const diagonal = Math.hypot(box.width, box.height);
+  if (!diagonal) return null;
+  const isClosed = distance(points[0], points.at(-1)) <= Math.max(10, diagonal * 0.14) &&
+    pathLength(points) > diagonal * 2.1;
+  let family = null;
+  if (!isClosed) {
+    if (labels.includes("spiral")) family = "open-spiral";
+    else if (labels.includes("sine-wave") || labels.includes("wavy-line")) family = "open-wave";
+    else if (labels.includes("s-curve")) family = "open-s-curve";
+    else if (labels.includes("orthogonal-polyline")) family = "open-orthogonal-polyline";
+    else if (labels.includes("compound-curve")) family = "open-compound-curve";
+    else if (result.type === "line") family = "open-line";
+    else if (result.type === "arc") family = "open-arc";
+    else if (result.type === "zigzag") family = "open-zigzag";
+    else if (result.type === "polyline") family = "open-polyline";
+    else if (result.type === "curve") family = "open-curve";
+  } else {
+    if (labels.includes("annulus")) family = "closed-annulus";
+    else if (labels.includes("crescent")) family = "closed-crescent";
+    else if (labels.includes("polygon-star")) family = "closed-star";
+    else if (labels.includes("polygon-concave")) family = "closed-concave-polygon";
+    else if (labels.includes("polygon-regular")) family = "closed-regular-polygon";
+    else if (result.type === "triangle") family = "closed-triangle";
+    else if (result.type === "circle") family = "closed-circle";
+    else if (result.type === "ellipse") family = "closed-ellipse";
+    else if (["square", "rectangle", "rhombus", "parallelogram", "trapezoid", "quadrilateral", "kite", "dart"].includes(result.type)) family = "closed-quadrilateral";
+    else if (result.corners?.length >= 3) family = "closed-polygon";
+  }
+  if (!family) return null;
+  const mean = points.reduce((sum, p) => ({
+    x: sum.x + p.x / points.length,
+    y: sum.y + p.y / points.length
+  }), { x: 0, y: 0 });
+  let xx = 0, xy = 0, yy = 0;
+  for (const p of points) {
+    const dx = p.x - mean.x, dy = p.y - mean.y;
+    xx += dx * dx; xy += dx * dy; yy += dy * dy;
+  }
+  const angle = ((0.5 * Math.atan2(2 * xy, xx - yy) % Math.PI) + Math.PI) % Math.PI;
+  const axisBin = Math.min(9, Math.floor(angle / Math.PI * 10));
+  const ratio = Math.max(box.width, box.height) / Math.max(1, Math.min(box.width, box.height));
+  const ratioBin = ratio < 1.15 ? 0 : ratio < 1.35 ? 1 : ratio < 1.7 ? 2 : ratio < 2.4 ? 3 : 4;
+  return family + "-axis-" + String(axisBin + 1).padStart(2, "0") +
+    "-ratio-" + String(ratioBin + 1).padStart(2, "0");
+}
+
 export function recognizeShape(sourcePoints, options = {}) {
   const result=recognizeShapeBase(sourcePoints,options);
   if(!result) return null;
-  const labels=classifyExtended(sourcePoints.filter(valid),result);
-  result.classifications=labels;
-  result.classification=labels.find(label=>label!==result.type)||result.type;
+  const points = sourcePoints.filter(valid);
+  const labels = classifyExtended(points, result);
+  const variantClassification = classifyShapeVariant(points, result, labels);
+  if (variantClassification) labels.push(variantClassification);
+  result.classifications = labels;
+  result.variantClassification = variantClassification;
+  result.classification = labels.find(label => label !== result.type &&
+    !SHAPE_VARIANT_CLASSIFICATIONS.includes(label)) || result.type;
   return result;
 }

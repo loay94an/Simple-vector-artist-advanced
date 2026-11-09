@@ -187,9 +187,11 @@ test("distinguishes a zigzag from an ordinary broken line", () => {
 });
 
 
-test("exposes exactly 62 unique shape classifications", () => {
-  assert.equal(SHAPE_CLASSIFICATIONS.length, 62);
-  assert.equal(new Set(SHAPE_CLASSIFICATIONS).size, 62);
+test("preserves the original 62 classifications and adds 1,000 unique variants", () => {
+  assert.equal(SHAPE_CLASSIFICATIONS.length, 1062);
+  assert.equal(new Set(SHAPE_CLASSIFICATIONS).size, 1062);
+  assert.equal(SHAPE_CLASSIFICATIONS.filter(x => x.startsWith("open-")).length, 500);
+  assert.equal(SHAPE_CLASSIFICATIONS.filter(x => x.startsWith("closed-")).length, 500);
 });
 
 test("adds triangle subtype classifications without changing renderer base type", () => {
@@ -215,4 +217,19 @@ test("returns multiple semantic labels for triangle geometry", () => {
   ]));
   assert.ok(result?.classifications.includes("triangle-right"));
   assert.ok(result?.classifications.includes("triangle-isosceles"));
+});
+
+
+test("assigns an additional geometry-aware variant to recognized open and closed strokes", () => {
+  const open = recognizeShape(openStroke([
+    { x: 20, y: 40 }, { x: 100, y: 40 }, { x: 180, y: 95 }
+  ]));
+  const closed = recognizeShape(polygon([
+    { x: 40, y: 40 }, { x: 150, y: 40 },
+    { x: 150, y: 150 }, { x: 40, y: 150 }
+  ]));
+  assert.ok(open?.variantClassification?.startsWith("open-"));
+  assert.ok(closed?.variantClassification?.startsWith("closed-"));
+  assert.ok(SHAPE_CLASSIFICATIONS.includes(open.variantClassification));
+  assert.ok(SHAPE_CLASSIFICATIONS.includes(closed.variantClassification));
 });
