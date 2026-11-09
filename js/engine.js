@@ -84,27 +84,20 @@ function smoothCalligraphyPoints(source) {
     filtered = next;
   }
 
-  // Resample with a centripetal-style Catmull-Rom curve for a continuous nib path.
+  // Linear resampling after low-pass filtering avoids Catmull-Rom overshoot.
+  // Overshooting between sharp direction changes can create hooks and spikes
+  // that are especially visible with a fixed-angle calligraphy nib.
   const result = [filtered[0]];
   const subdivisions = 3;
   for (let i = 0; i < filtered.length - 1; i++) {
-    const p0 = filtered[Math.max(0, i - 1)];
-    const p1 = filtered[i];
-    const p2 = filtered[i + 1];
-    const p3 = filtered[Math.min(filtered.length - 1, i + 2)];
+    const a = filtered[i], b = filtered[i + 1];
     for (let step = 1; step <= subdivisions; step++) {
-      const t = step / subdivisions, t2 = t * t, t3 = t2 * t;
-      const interpolate = key => 0.5 * (
-        2 * p1[key] +
-        (-p0[key] + p2[key]) * t +
-        (2*p0[key] - 5*p1[key] + 4*p2[key] - p3[key]) * t2 +
-        (-p0[key] + 3*p1[key] - 3*p2[key] + p3[key]) * t3
-      );
+      const t = step / subdivisions;
       result.push({
-        x: interpolate("x"),
-        y: interpolate("y"),
-        pressure: Math.max(0, Math.min(1, interpolate("pressure"))),
-        time: p1.time + (p2.time - p1.time) * t
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        pressure: Math.max(0, Math.min(1, a.pressure + (b.pressure - a.pressure) * t)),
+        time: a.time + (b.time - a.time) * t
       });
     }
   }
@@ -526,103 +519,35 @@ export class StrokeBuilder {
       else if (preset==="cal-maghribi") profile=0.92+0.08*Math.abs(Math.sin(nibAngle));
       else if (preset==="cal-brush") profile=0.72+0.28*pressureMultiplier;
       else if (preset==="cal-fine" || preset==="cal-needle") profile=0.72+0.28*pressureMultiplier;
-      const elapsed=Math.max(1,EngineUtils.number(next.time,point.time)-EngineUtils.number(previous.time,point.time));
-      const speed=EngineUtils.distance(previous,next)/elapsed;
-      const speedFactor=EngineUtils.clamp(1.12-speed*0.22,0.78,1.12);
-      return radius * pressureMultiplier * contrast * profile * speedFactor;
+      // Keep nib width independent of event batching and pointer sampling rate.
+      // Pressure is already filtered; deriving width from instantaneous speed
+      // made identical hand motion render with visibly different thickness.
+      return radius * pressureMultiplier * contrast * profile;
     };
 
-    // كل مقطع يُرسم كمضلع مستقل داخل مسار واحد.
-    // توحيد اتجاه المضلعات يجعل تعبئتها غير الصفرية متصلة
-    // ويمنع تحوّل مناطق التقاطع الذاتي إلى ثقوب.
-    const makeSegment = (start, end, startRadius, endRadius) => {
-      const polygon = [
-        {
-          x: start.x + cosA * startRadius,
-          y: start.y + sinA * startRadius
-        },
-        {
-          x: end.x + cosA * endRadius,
-          y: end.y + sinA * endRadius
-        },
-        {
-          x: end.x - cosA * endRadius,
-          y: end.y - sinA * endRadius
-        },
-        {
-          x: start.x - cosA * startRadius,
-          y: start.y - sinA * startRadius
-        }
-      ];
-
-      let area = 0;
-      for (let i = 0; i < polygon.length; i++) {
-        const a = polygon[i];
-        const b = polygon[(i + 1) % polygon.length];
-        area += a.x * b.y - b.x * a.y;
-      }
-
-      if (area < 0) polygon.reverse();
-
-      return polygon.map((point, index) =>
-        `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`
-      ).join(" ") + " Z";
-    };
-
-    // While the pointer is down, append only the newly received segment.
-    // Rebuilding every previous quadrilateral on every frame made long
-    // calligraphy strokes approach quadratic work.
-    if (this.active && this.deferSmoothing && this.tool !== "calligraphy") {
-      let delta = "";
-      if (this.calligraphyPreviewPointCount > points.length) { this.calligraphyPreviewDelta = "";
-        this.calligraphyPreviewPointCount = 0;
-        this.calligraphyPreviewPath = "";
-      }
-
-      // لا ننشئ بصمة اصطناعية عند أول نقطة لمس؛ ننتظر أول مقطع
-      // حركة حقيقي حتى يتحدد اتجاه الضربة وتظهر هيئة السن كما ينبغي.
-      if (this.calligraphyPreviewPointCount === 0) {
-        this.calligraphyPreviewPath = "";
-        this.calligraphyPreviewDelta = "";
-        this.calligraphyPreviewPointCount = 1;
-      }
-
-      for (
-        let i = Math.max(1, this.calligraphyPreviewPointCount);
-        i < points.length;
-        i++
-      ) {
-        const segment = makeSegment(
-          points[i - 1],
-          points[i],
-          getRadius(points[i - 1], i - 1),
-          getRadius(points[i], i)
-        );
-        this.calligraphyPreviewPath += " " + segment;
-        delta += " " + segment;
-      }
-
-      this.calligraphyPreviewDelta = delta.trim();
-      this.calligraphyPreviewPointCount = points.length;
-      return this.calligraphyPreviewPath;
+    // Build one continuous ribbon from both nib edges instead of filling
+    // a separate quadrilateral for every pointer segment. Independent quads
+    // leave wedges at corners and can create visible seams/overdraw.
+    const left = [];
+    const right = [];
+    for (let i = 0; i < points.length; i++) {
+      const point = points[i];
+      const r = getRadius(point, i);
+      left.push({
+        x: point.x + cosA * r,
+        y: point.y + sinA * r
+      });
+      right.push({
+        x: point.x - cosA * r,
+        y: point.y - sinA * r
+      });
     }
 
-    this.calligraphyPreviewDelta = "";
-    const segments = [];
-
-    // The first real segment supplies the nib-shaped stroke head.
-    // Do not add a synthetic cap at the initial pointer-down coordinate.
-    const preset = String(this.brushStyle?.preset || "");
-
-    for (let i = 1; i < points.length; i++) {
-      const start = points[i - 1];
-      const end = points[i];
-      segments.push(
-        makeSegment(start, end, getRadius(start, i - 1), getRadius(end, i))
-      );
-    }
-
-    return segments.join(" ");
+    const outline = [...left, ...right.reverse()];
+    if (outline.length < 4) return "";
+    return outline.map((point, index) =>
+      `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`
+    ).join(" ") + " Z";
   }
 
   build(options = {}) {
@@ -1417,7 +1342,7 @@ export class DrawingEngine {
         featherTexture: brushStyle.featherTexture ?? .35
       };
 
-      if (screenPoints.length && this.renderer.appendCanvasPreview?.(
+      if (!isCalligraphy && screenPoints.length && this.renderer.appendCanvasPreview?.(
         this.currentElement.id,
         screenPoints,
         { ...this.currentElement.style, size: this.builder.baseSize * screenScale },
