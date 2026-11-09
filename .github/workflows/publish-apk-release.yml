@@ -1,0 +1,41 @@
+name: Publish Android APK Release
+
+on:
+  workflow_run:
+    workflows:
+      - Build Rasem Android APK
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK artifact from build run
+        uses: actions/download-artifact@v4
+        with:
+          name: Rasem-Vector-Simple-APK
+          path: release-files
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          APK_PATH="$(find release-files -type f -name '*.apk' -print -quit)"
+          test -n "$APK_PATH"
+          TAG="rasem-android-build-${RUN_NUMBER}"
+          cp "$APK_PATH" "رسام-الخط-العربي.apk"
+          gh release create "$TAG" "رسام-الخط-العربي.apk" \
+            --title "رسام الخط العربي - Android APK #${RUN_NUMBER}" \
+            --notes "نسخة Android APK مبنية تلقائياً من commit ${COMMIT_SHA}.\n\nيمكن تنزيل ملف APK من أصول هذا الإصدار."
