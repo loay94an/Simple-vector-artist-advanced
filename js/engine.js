@@ -1656,19 +1656,29 @@ export class DrawingEngine {
 
     const distance = EngineUtils.distance(previous, point);
     const radius = Math.max(1, this.getEraserTolerance());
-    const steps = Math.max(1, Math.ceil(distance / Math.max(1, radius * 0.4)));
+    // A slightly wider spacing keeps the erase path continuous while avoiding
+    // excessive full-layer scans for every pointer sample.
+    const spacing = Math.max(1, radius * 0.75);
+    const steps = Math.max(1, Math.ceil(distance / spacing));
     let changed = false;
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
       changed = this.eraseAt({
         x: previous.x + (point.x - previous.x) * t,
         y: previous.y + (point.y - previous.y) * t
-      }) || changed;
+      }, { deferRender: true }) || changed;
+    }
+
+    // The layer is rendered and the document touched once per pointer event,
+    // not once per interpolated eraser dab.
+    if (changed) {
+      this.document.touch?.();
+      this.renderer.renderActiveLayer(this.activeLayer);
     }
     return changed;
   }
 
-  eraseAt(point) {
+  eraseAt(point, options = {}) {
     const layer = this.activeLayer;
     if (
       !layer ||
@@ -1690,8 +1700,10 @@ export class DrawingEngine {
       layer.elements.splice(index, 1);
       this.erasedIds.add(result.id);
       this.changed = true;
-      this.document.touch?.();
-      this.renderer.renderActiveLayer(layer);
+      if (!options.deferRender) {
+        this.document.touch?.();
+        this.renderer.renderActiveLayer(layer);
+      }
       return true;
     }
 
@@ -1743,8 +1755,10 @@ export class DrawingEngine {
 
     if (!modified) return false;
     this.changed = true;
-    this.document.touch?.();
-    this.renderer.renderActiveLayer(layer);
+    if (!options.deferRender) {
+      this.document.touch?.();
+      this.renderer.renderActiveLayer(layer);
+    }
     return true;
   }
 
