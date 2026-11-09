@@ -504,33 +504,47 @@
     const menu = $("complementaryColorsMenu");
     if (!menu) return;
     const hsv = hexToHsv(currentColor);
-    const family = getHarmonies(hsv.h, hsv.s, hsv.v).find(item => item.name === "مكمل");
+    const harmonies = getHarmonies(hsv.h, hsv.s, hsv.v);
     const swatches = menu.querySelector(".complementary-menu-swatches");
     const base = menu.querySelector(".complementary-menu-base");
-    if (!family || !swatches || !base) return;
+    if (!swatches || !base) return;
     base.replaceChildren();
-    // Reuse the exact circular swatch group and button class used by the wheel.
-    const familyGroup = document.createElement("div");
-    familyGroup.className = "concepts-harmony-family";
-    familyGroup.setAttribute("role", "group");
-    familyGroup.setAttribute("aria-label", family.name);
     swatches.replaceChildren();
-    family.colors.forEach((hex, index) => {
-      const swatch = document.createElement("button");
-      swatch.type = "button";
-      swatch.className = "concepts-swatch";
-      swatch.style.backgroundColor = hex;
-      swatch.title = family.name + " · درجة " + (index + 1) + ": " + hex;
-      swatch.setAttribute("aria-label", swatch.title);
-      swatch.addEventListener("click", () => {
-        const next = hexToHsv(hex);
-        activeHue = next.h; activeSat = next.s; activeVal = next.v;
-        applyColor(hex, true);
-        closeComplementaryColorsMenu();
+
+    // Four color-rule groups: selected hue, complementary, analogous, and triadic.
+    const groups = [
+      { name: "اللون المحدد وتدرجاته", colors: [currentColor, ...getHarmonies(hsv.h, hsv.s, hsv.v).slice(0, 1).flatMap(() => [
+        hsvToHex(hsv.h, Math.max(.16, hsv.s * .62), Math.min(1, hsv.v * 1.04)),
+        hsvToHex(hsv.h, hsv.s, hsv.v * .82),
+        hsvToHex(hsv.h, hsv.s, hsv.v * .58)
+      ])] },
+      { name: "اللون المكمل", colors: harmonies.filter(item => item.name === "مكمل").flatMap(item => item.colors) },
+      { name: "الألوان المتجاورة", colors: harmonies.filter(item => item.name === "متجاور").flatMap(item => item.colors) },
+      { name: "الألوان الثلاثية", colors: harmonies.filter(item => item.name === "ثلاثي" || item.name === "مكمل منقسم").flatMap(item => item.colors) }
+    ];
+
+    groups.forEach(group => {
+      const familyGroup = document.createElement("div");
+      familyGroup.className = "concepts-harmony-family complementary-palette-group";
+      familyGroup.setAttribute("role", "group");
+      familyGroup.setAttribute("aria-label", group.name);
+      group.colors.forEach((hex, index) => {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "concepts-swatch";
+        swatch.style.backgroundColor = hex;
+        swatch.title = group.name + " · " + (index + 1) + ": " + hex;
+        swatch.setAttribute("aria-label", swatch.title);
+        swatch.addEventListener("click", () => {
+          const next = hexToHsv(hex);
+          activeHue = next.h; activeSat = next.s; activeVal = next.v;
+          applyColor(hex, true);
+          closeComplementaryColorsMenu();
+        });
+        familyGroup.appendChild(swatch);
       });
-      familyGroup.appendChild(swatch);
+      swatches.appendChild(familyGroup);
     });
-    swatches.appendChild(familyGroup);
   }
 
   function closeComplementaryColorsMenu() {
@@ -544,7 +558,7 @@
     const menu = document.createElement("div");
     menu.id = "complementaryColorsMenu";
     menu.setAttribute("dir", "rtl");
-    menu.innerHTML = '<div class="complementary-menu-title">الألوان المتكاملة</div><div class="complementary-menu-base"></div><div class="complementary-menu-swatches"></div>';
+    menu.innerHTML = '<div class="complementary-menu-base"></div><div class="complementary-menu-swatches"></div>';
     document.body.appendChild(menu);
     btn.addEventListener("click", event => {
       event.stopPropagation();
@@ -593,6 +607,8 @@
     }
     updateHarmonies();
     updateComplementaryColorsMenu();
+    const topColor = $("complementaryColorsColor");
+    if (topColor) topColor.style.backgroundColor = currentColor;
 
     if (saveHistory) {
       saveToHistory(currentColor);
