@@ -1202,7 +1202,7 @@
         }
       } catch (err) {
         console.error("Share error:", err);
-        alert("تعذرت تحميل الملف: " + (err?.message || err));
+        alert("تعذرت المشاركة: " + (err?.message || err));
       } finally {
         executeShareBtn.disabled = false;
         executeShareBtn.textContent = "مشاركة الملف";
