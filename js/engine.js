@@ -1026,6 +1026,7 @@ export class DrawingEngine {
     this.changed = false;
 
     this.erasedIds = new Set();
+    this.previousEraserPoint = null;
     this.destroyed = false;
     this.shapeRecognitionTimer = null;
     this.renderFrameId = null;
@@ -1218,6 +1219,7 @@ export class DrawingEngine {
     this.erasedIds.clear();
 
     if (this.settings.tool === "eraser") {
+      this.previousEraserPoint = { x: point.x, y: point.y };
       this.eraseAt(point);
       return true;
     }
@@ -1314,7 +1316,7 @@ export class DrawingEngine {
     if (!point) return false;
 
     if (this.settings.tool === "eraser") {
-      return this.eraseAt(point);
+      return this.eraseAlongPath(point);
     }
 
     const input = pointerData || event;
@@ -1716,6 +1718,26 @@ export class DrawingEngine {
   }
 
 
+  eraseAlongPath(point) {
+    if (!EngineUtils.validPoint(point)) return false;
+    const previous = this.previousEraserPoint;
+    this.previousEraserPoint = { x: point.x, y: point.y };
+    if (!previous || !EngineUtils.validPoint(previous)) return this.eraseAt(point);
+
+    const distance = EngineUtils.distance(previous, point);
+    const radius = Math.max(1, this.getEraserTolerance());
+    const steps = Math.max(1, Math.ceil(distance / Math.max(1, radius * 0.4)));
+    let changed = false;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      changed = this.eraseAt({
+        x: previous.x + (point.x - previous.x) * t,
+        y: previous.y + (point.y - previous.y) * t
+      }) || changed;
+    }
+    return changed;
+  }
+
   eraseAt(point) {
     const layer = this.activeLayer;
     if (
@@ -1772,8 +1794,11 @@ export class DrawingEngine {
       const element = layer.elements[elIdx];
       if (!element || element.visible === false) continue;
 
+      // Include the visible stroke width so touching its painted edge erases it.
+      const strokeHalfWidth = Math.max(0, EngineUtils.number(element.style?.size, 0) / 2);
+      const effectiveRadius = radius + strokeHalfWidth;
       const dist = HitTesting.getElementDistance(element, point);
-      if (dist > radius) continue;
+      if (dist > effectiveRadius) continue;
 
       if (Array.isArray(element.points) && element.points.length > 0) {
         const points = element.points;
@@ -1786,7 +1811,7 @@ export class DrawingEngine {
         };
 
         if (points.length === 1) {
-          if (distanceToEraser(points[0]) > radius) {
+          if (distanceToEraser(points[0]) > effectiveRadius) {
             current.push({ ...points[0] });
           }
           flushFragment();
@@ -1806,7 +1831,7 @@ export class DrawingEngine {
             const C =
               (p0.x - point.x) ** 2 +
               (p0.y - point.y) ** 2 -
-              radius * radius;
+              effectiveRadius * effectiveRadius;
 
             const cuts = [0, 1];
 
@@ -1835,7 +1860,7 @@ export class DrawingEngine {
                 (t0 + t1) / 2
               );
 
-              if (distanceToEraser(middle) > radius) {
+              if (distanceToEraser(middle) > effectiveRadius) {
                 const from = interpolatePoint(p0, p1, t0);
                 const to = interpolatePoint(p0, p1, t1);
 
