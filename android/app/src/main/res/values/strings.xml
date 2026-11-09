@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">رسام فكتور بسيط</string>
-    <string name="title_activity_main">رسام فكتور بسيط</string>
-    <string name="package_name">com.rasem.vectorartist</string>
-    <string name="custom_url_scheme">com.rasem.vectorartist</string>
+    <string name="app_name">رسام الخط العربي</string>
+    <string name="title_activity_main">رسام الخط العربي</string>
+    <string name="package_name">com.rasem.vectorartist.calligraphy</string>
+    <string name="custom_url_scheme">com.rasem.vectorartist.calligraphy</string>
 </resources>
