@@ -734,11 +734,6 @@
     });
   }
 
-      if (!settings[activeTool]) settings[activeTool] = {};
-      save();
-    });
-  }
-
   close.addEventListener("click", hide);
 
   popup.addEventListener("click", event => {
