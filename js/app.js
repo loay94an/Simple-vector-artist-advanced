@@ -24,11 +24,11 @@ import {
   Scene,
   Coordinates,
   EventManager
-} from "./core.js?v=20261109-04";
+} from "./core.js?v=20261109-05";
 
 import {
   DrawingEngine
-} from "./engine.js?v=20261109-27";
+} from "./engine.js?v=20261109-28";
 
 import {
   ToolManager
