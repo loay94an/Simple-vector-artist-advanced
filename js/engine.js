@@ -1,6 +1,7 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
 import { recognizeShape } from "./shape-recognition.js";
+import { correctStrokePoints, transferStrokeAttributes } from "./auto-correction.js?v=20261109-01";
 
 /* =========================================================
    RASEM 2.0
@@ -223,11 +224,26 @@ function smoothSmartStrokePoints(source, amount = 0) {
   return result;
 }
 
+function supportsAutomaticCorrection(builder) {
+  if (!builder || builder.tool === "calligraphy" || builder.tool === "feather") return false;
+  const preset = String(builder.brushStyle?.preset || "round");
+  // Geometric edits are limited to plain round strokes. Special nibs,
+  // textured brushes, stamps and custom artwork must retain their geometry.
+  return ["pencil", "pen", "marker"].includes(builder.tool) &&
+    ["", "round"].includes(preset) &&
+    !builder.brushStyle?.image;
+}
+
 function recognizeSmartStroke(source, level = 0) {
   if (!Array.isArray(source) || source.length < 8 || level < 1) return null;
   const result = recognizeShape(source, { strength: level / 100 });
   if (!result || !Array.isArray(result.points) || result.points.length < 2) return null;
-  return result;
+  const minimumConfidence = Math.max(0.74, 0.90 - (level / 100) * 0.12);
+  if ((Number(result.confidence) || 0) < minimumConfidence) return null;
+  return {
+    ...result,
+    points: transferStrokeAttributes(source, result.points)
+  };
 }
 
 /* =========================================================
@@ -346,7 +362,8 @@ export class StrokeBuilder {
     const preset = String(this.brushStyle?.preset || "");
     const isCalligraphy = this.tool === "calligraphy" || preset === "calligraphy" || preset.startsWith("cal-");
     let points = isCalligraphy ? smoothCalligraphyPoints(this.points) : this.points;
-    if (this.smartDrawing?.enabled && this.smartDrawing.smoothness > 0) {
+    if (this.smartDrawing?.enabled && this.smartDrawing.smoothness > 0 &&
+        supportsAutomaticCorrection(this)) {
       points = smoothSmartStrokePoints(points, this.smartDrawing.smoothness);
     }
     return points;
@@ -1612,13 +1629,20 @@ export class DrawingEngine {
         this.addPoint(finalPoint, finalEvent, true);
       }
 
-      // Global smart-drawing filters run once when the stroke is committed.
-      if (this.smartDrawing.enabled) {
+      // Smart correction runs once after pen-up. It is deliberately
+      // excluded from calligraphy, feather and textured/custom nibs.
+      if (this.smartDrawing.enabled && supportsAutomaticCorrection(this.builder)) {
         if (this.smartDrawing.correction > 0) {
-          this.builder.points = smoothSmartStrokePoints(this.builder.points, this.smartDrawing.correction);
+          this.builder.points = correctStrokePoints(
+            this.builder.points,
+            this.smartDrawing.correction
+          );
         }
         if (this.smartDrawing.recognition > 0) {
-          const recognized = recognizeSmartStroke(this.builder.points, this.smartDrawing.recognition);
+          const recognized = recognizeSmartStroke(
+            this.builder.points,
+            this.smartDrawing.recognition
+          );
           if (recognized) {
             this.builder.points = recognized.points;
             this.shapeRecognitionResult = {
