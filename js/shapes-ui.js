@@ -33,6 +33,20 @@
 
   const previewSvg = document.getElementById("shapePreviewSvg");
   const badge = document.getElementById("shapeIndicatorBadge");
+  const shapeToolIcon = document.getElementById("shapeToolIcon");
+
+  // أيقونة مستقلة لكل شكل، تظهر مباشرة على زر الأداة في الشريط.
+  const shapeIconMarkup = {
+    rect: '<rect x="4" y="6" width="16" height="12" rx="1"/>',
+    square: '<rect x="5" y="5" width="14" height="14" rx="0.5"/>',
+    circle: '<circle cx="12" cy="12" r="8"/>',
+    ellipse: '<ellipse cx="12" cy="12" rx="9" ry="6"/>',
+    triangle: '<path d="M12 4 21 20H3Z"/>',
+    diamond: '<path d="M12 3 21 12 12 21 3 12Z"/>',
+    line: '<path d="M4 20 20 4"/>',
+    curve: '<path d="M3 18C7 3 17 3 21 18"/>',
+    arrow: '<path d="M3 12H20M13 5l7 7-7 7"/>'
+  };
 
   const shapeSymbols = {
     rect: "▭",
@@ -64,6 +78,30 @@
 
   function getActiveColor() {
     return window.rasem?.engine?.settings?.color || "#2563EB";
+  }
+
+  function updateShapeToolIcon() {
+    const shape = shapeIconMarkup[currentShape] ? currentShape : "rect";
+    if (shapeToolIcon) {
+      shapeToolIcon.innerHTML = shapeIconMarkup[shape];
+      shapeToolIcon.setAttribute("aria-label", "أداة " + ({
+        rect: "المستطيل", square: "المربع", circle: "الدائرة",
+        ellipse: "الشكل البيضاوي", triangle: "المثلث", diamond: "المعين",
+        line: "الخط المستقيم", curve: "المنحنى", arrow: "السهم"
+      }[shape]));
+    }
+    if (toggleBtn) {
+      const label = ({
+        rect: "مستطيل", square: "مربع", circle: "دائرة",
+        ellipse: "بيضاوي", triangle: "مثلث", diamond: "معين",
+        line: "خط مستقيم", curve: "منحنى", arrow: "سهم"
+      }[shape]);
+      toggleBtn.title = "أداة " + label + " — نقرة لاختيار شكل آخر";
+    }
+    if (badge) {
+      badge.textContent = shapeSymbols[shape] || "▭";
+      badge.hidden = true;
+    }
   }
 
   function syncFromTool() {
@@ -102,10 +140,7 @@
       });
     }
 
-    if (badge) {
-      badge.textContent = shapeSymbols[currentShape] || "▭";
-    }
-
+    updateShapeToolIcon();
     updatePreview();
   }
 
@@ -124,10 +159,7 @@
       cornerRadius
     });
 
-    if (badge) {
-      badge.textContent = shapeSymbols[currentShape] || "▭";
-    }
-
+    updateShapeToolIcon();
     updatePreview();
   }
 
