@@ -33,7 +33,6 @@
     featherTaper: "featherTaper",
     featherFade: "featherFade",
     featherSpacing: "featherSpacing", featherGap:"featherGap", featherPressure:"featherPressure", featherSpeed:"featherSpeed", featherAngle:"featherAngle", featherTexture:"featherTexture",
-    calligraphyEndStyle: "calligraphyEndStyle"
   };
 
   const presets = {
@@ -158,7 +157,6 @@
     result.headSettings = settings[activeTool]?.headSettings || {};
     result.eraserMode = settings[activeTool]?.eraserMode || "partial";
     result.calligraphyAngle = Number(document.getElementById("calligraphyAngle")?.value ?? 45);
-    result.calligraphyEndStyle = document.getElementById("calligraphyEndStyle")?.value || "none";
     result.featherDensity = Number(document.getElementById("featherDensity")?.value ?? 10);
     result.featherGlow = Number(document.getElementById("featherGlow")?.value ?? 0);
     result.featherSpacing = Number(document.getElementById("featherSpacing")?.value ?? 1);
@@ -207,10 +205,8 @@
           opacity: activeSettings.opacity,
           pressureEnabled: activeSettings.pressureEnabled,
           calligraphyAngle: Number.isFinite(activeSettings.calligraphyAngle) ? activeSettings.calligraphyAngle : 45,
-          calligraphyEndStyle: activeSettings.calligraphyEndStyle || "none",
           brushStyle: {
             preset: brush,
-            calligraphyEndStyle: activeSettings.calligraphyEndStyle || "none",
             lineCap: style.lineCap || "round",
             dashArray: style.dashArray || "",
             image: activeSettings.customBrush || null,
@@ -277,7 +273,7 @@
 
 
   // لكل رأس فرشاة ملف إعدادات مستقل؛ الضغطة الطويلة على الرأس تفتح ملفه.
-  const headProfiles = { feather:{"feather-pointed":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-flat":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-round":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-fan":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-soft":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-dry":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-quill":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-script":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"]},calligraphy:{"*":["brushSize","brushOpacity","calligraphyAngle","calligraphyEndStyle","pressureEnabled"]},pencil:{"*":["brushSize","brushOpacity","pressureEnabled"]} };
+  const headProfiles = { feather:{"feather-pointed":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-flat":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-round":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-fan":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-soft":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-dry":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-quill":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-script":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"]},calligraphy:{"*":["brushSize","brushOpacity","calligraphyAngle","pressureEnabled"]},pencil:{"*":["brushSize","brushOpacity","pressureEnabled"]} };
   const featherDefaults = {
     "feather-pointed":{featherDensity:8,featherSpread:.20,featherSoftness:.15,featherTaper:.85,featherSpacing:1,featherGap:.18,featherPressure:.9,featherSpeed:.2,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:0},
     "feather-flat":{featherDensity:18,featherSpread:.10,featherSoftness:.10,featherTaper:.30,featherSpacing:1,featherGap:.12,featherPressure:.35,featherSpeed:.1,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:false},
@@ -288,7 +284,7 @@
     "feather-quill":{featherDensity:5,featherSpread:.12,featherSoftness:.08,featherTaper:.9,featherSpacing:1,featherGap:.08,featherPressure:1,featherSpeed:.25,featherAngle:0,featherTexture:.18,featherGlow:0,featherFade:false},
     "feather-script":{featherDensity:12,featherSpread:.18,featherSoftness:.15,featherTaper:.7,featherSpacing:1,featherGap:.12,featherPressure:.85,featherSpeed:.15,featherAngle:35,featherTexture:.08,featherGlow:0,featherFade:false}
   };
-  const headLabels = {featherDensity:"عدد الشعيرات",featherSpread:"انتشار الشعيرات",featherSoftness:"نعومة الأثر",featherTaper:"تلاشي البداية والنهاية",featherSpacing:"مقياس تباعد الأثر",featherGap:"الفجوة بين الشعيرات",featherPressure:"حساسية الضغط",featherSpeed:"استجابة السرعة",featherAngle:"زاوية الريشة",featherTexture:"خشونة وملمس الشعيرات",featherGlow:"التوهج",featherFade:"التلاشي المتوازن من الوسط",brushSize:"حجم الرأس",brushOpacity:"شفافية الرأس",pressureEnabled:"استجابة الضغط",calligraphyAngle:"زاوية السن",calligraphyEndStyle:"نهاية الضربة"};
+  const headLabels = {featherDensity:"عدد الشعيرات",featherSpread:"انتشار الشعيرات",featherSoftness:"نعومة الأثر",featherTaper:"تلاشي البداية والنهاية",featherSpacing:"مقياس تباعد الأثر",featherGap:"الفجوة بين الشعيرات",featherPressure:"حساسية الضغط",featherSpeed:"استجابة السرعة",featherAngle:"زاوية الريشة",featherTexture:"خشونة وملمس الشعيرات",featherGlow:"التوهج",featherFade:"التلاشي المتوازن من الوسط",brushSize:"حجم الرأس",brushOpacity:"شفافية الرأس",pressureEnabled:"استجابة الضغط",calligraphyAngle:"زاوية السن"};
   const headRanges = {brushSize:{min:.5,max:120,step:.5},brushOpacity:{min:.05,max:1,step:.01},calligraphyAngle:{min:0,max:180,step:1},featherDensity:{min:3,max:48,step:1},featherSpread:{min:0,max:1,step:.01},featherSoftness:{min:0,max:1,step:.01},featherTaper:{min:0,max:1,step:.01},featherFade:{min:0,max:1,step:.01},featherSpacing:{min:.25,max:2.5,step:.05},featherGap:{min:0,max:1.5,step:.01},featherPressure:{min:0,max:1,step:.01},featherSpeed:{min:0,max:1,step:.01},featherAngle:{min:0,max:180,step:1},featherTexture:{min:0,max:1,step:.01},featherGlow:{min:0,max:1,step:.01}};
   let headOptionsPanel = null;
   let headPressTimer = null;
@@ -353,12 +349,6 @@
         select.dataset.headKey = key;
         select.innerHTML = '<option value="true">مفعّل</option><option value="false">متوقف</option>';
         select.value = String(profile[key] ?? document.getElementById(key)?.checked ?? (key === "featherFade" ? false : true));
-        wrap.appendChild(select);
-      } else if (key === "calligraphyEndStyle") {
-        const select = document.createElement("select");
-        select.dataset.headKey = key;
-        select.innerHTML = '<option value="none">طبيعية</option><option value="thin">رفيعة</option><option value="wide">عريضة</option><option value="pointed">مدببة</option><option value="crescent">هلال</option>';
-        select.value = profile[key] ?? document.getElementById(key)?.value ?? "none";
         wrap.appendChild(select);
       } else {
         const range = headRanges[key] || {min:0,max:1,step:0.01};
@@ -440,14 +430,8 @@
       art.innerHTML = defs + '<defs><mask id="headPreviewMask"><rect width="320" height="76" fill="url(#headPreviewFade)"/></mask></defs>' + drawing;
     } else {
       const strokeWidth = clamp((2 + size / 7) * pressureFactor, 2, 18);
-      const endStyle = values.calligraphyEndStyle || "none";
       const path = '<path d="M 16 51 C 70 8 116 64 166 34 S 258 10 304 39" fill="none" stroke="currentColor" stroke-width="' + strokeWidth.toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" filter="' + (softness > .05 ? 'url(#headPreviewBlur)' : 'none') + '"/>';
-      let end = "";
-      if (endStyle === "pointed") end = '<path d="M294 34 L310 39 L294 44Z" fill="currentColor"/>';
-      else if (endStyle === "wide") end = '<path d="M298 29 L310 39 L298 49Z" fill="currentColor"/>';
-      else if (endStyle === "thin") end = '<path d="M292 38 Q302 39 312 39" fill="none" stroke="currentColor" stroke-width="1.2"/>';
-      else if (endStyle === "crescent") end = '<path d="M300 29 Q316 38 300 49 Q307 38 300 29Z" fill="currentColor"/>';
-      art.innerHTML = defs + '<g transform="rotate(' + (angle - 45).toFixed(1) + ' 160 38)">' + path + end + '</g>';
+       art.innerHTML = defs + '<g transform="rotate(' + (angle - 45).toFixed(1) + ' 160 38)">' + path + '</g>';
     }
     if (caption) caption.textContent = changedKey
       ? "يتغير المثال الآن مع: " + (headLabels[changedKey] || changedKey)
@@ -461,7 +445,7 @@
     toolSettings.headSettings[brush] ||= {};
     const key = control.dataset.headKey;
     const value = key === "pressureEnabled" ? control.value === "true" :
-      key === "calligraphyEndStyle" ? control.value : key === "featherFade" ? normalizeFade(control.value) : Number(control.value);
+      key === "featherFade" ? normalizeFade(control.value) : Number(control.value);
     toolSettings.headSettings[brush][key] = value;
     const targetId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
     const target = document.getElementById(targetId);
@@ -510,7 +494,6 @@
         base.size = 14;
         base.brush = "calligraphy";
         base.calligraphyAngle = 45;
-        base.calligraphyEndStyle = "none";
       } else if (tool === "eraser") {
         base.size = 20;
         base.eraserMode = "partial";
@@ -565,12 +548,8 @@
     );
     const calRow = document.getElementById("calligraphyAngleRow");
     const calScale = document.getElementById("calligraphyAngleScale");
-    const calEndRow = document.getElementById("calligraphyEndStyleRow");
-    const calEndSelect = document.getElementById("calligraphyEndStyle");
     if (calRow) calRow.style.display = isCal ? "flex" : "none";
     if (calScale) calScale.style.display = isCal ? "block" : "none";
-    if (calEndRow) calEndRow.style.display = isCal ? "flex" : "none";
-    if (calEndSelect) { calEndSelect.style.display = isCal ? "block" : "none"; calEndSelect.value = current.calligraphyEndStyle || "none"; }
 
     // Eraser mode row visibility
     const eraserRow = document.getElementById("eraserModeRow");
@@ -755,11 +734,7 @@
     });
   }
 
-  const calligraphyEndStyleInput = document.getElementById("calligraphyEndStyle");
-  if (calligraphyEndStyleInput) {
-    calligraphyEndStyleInput.addEventListener("change", () => {
       if (!settings[activeTool]) settings[activeTool] = {};
-      settings[activeTool].calligraphyEndStyle = calligraphyEndStyleInput.value;
       save();
     });
   }
