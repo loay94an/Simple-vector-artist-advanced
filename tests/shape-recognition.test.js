@@ -217,3 +217,11 @@ test("classifies regular and convex polygon properties", () => {
   assert.ok(result?.classifications.includes("polygon-convex"));
   assert.ok(result?.classifications.includes("polygon-regular"));
 });
+
+test("returns multiple semantic labels for triangle geometry", () => {
+  const result=recognizeShape(polygon([
+    {x:40,y:140},{x:40,y:40},{x:140,y:140}
+  ]));
+  assert.ok(result?.classifications.includes("triangle-right"));
+  assert.ok(result?.classifications.includes("triangle-isosceles"));
+});
