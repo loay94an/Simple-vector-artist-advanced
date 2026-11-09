@@ -15,7 +15,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.nio.charset.StandardCharsets;
 
 @CapacitorPlugin(name = "NativeShare")
 public class NativeSharePlugin extends Plugin {
