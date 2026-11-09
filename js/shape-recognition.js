@@ -345,7 +345,7 @@ function fitSmoothCurve(points) {
   }
   // A simple arch keeps one curvature direction; an S-shaped freehand stroke
   // reverses it and must not be mistaken for a single curve.
-  if (meaningfulTurns < 3 || reversals > 1) return null;
+  if (meaningfulTurns < 3 || reversals > 0) return null;
 
   const baseline = points.map(p => Math.abs(
     (last.x - first.x) * (first.y - p.y) -
