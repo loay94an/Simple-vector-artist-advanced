@@ -876,11 +876,20 @@
       app?.setTwoFingerPan?.(e.target.checked, true);
     });
 
-    // Save document action
+    // Save document action: only show success after persistent storage confirms it.
     saveBtn?.addEventListener("click", () => {
       closeSettings();
-      if (window.rasem?.save) {
-        window.rasem.save();
+      const saved = window.rasem?.save?.();
+      if (saved !== true) {
+        const toast = document.getElementById("toast");
+        if (toast) {
+          toast.textContent = "تعذر حفظ المستند. تحقق من مساحة التخزين ثم حاول مجدداً.";
+          toast.classList.add("show");
+          setTimeout(() => toast.classList.remove("show"), 3500);
+        } else {
+          alert("تعذر حفظ المستند. تحقق من مساحة التخزين ثم حاول مجدداً.");
+        }
+        return;
       }
       if (saveModal) {
         saveModal.hidden = false;
