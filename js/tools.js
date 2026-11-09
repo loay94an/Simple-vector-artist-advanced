@@ -14,7 +14,7 @@
    ToolManager
 ========================================================= */
 
-import { HitTesting } from "./engine.js?v=20261109-50";
+import { HitTesting } from "./engine.js?v=20261109-51";
 
 /* =========================================================
    1. TOOL UTILITIES
