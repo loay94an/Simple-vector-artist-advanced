@@ -66,31 +66,32 @@ function pointsToPath(points) {
 }
 
 function smoothCalligraphyPoints(source) {
-  if (!Array.isArray(source) || source.length < 3) return source || [];
+  if (!Array.isArray(source) || !source.length) return [];
+  if (source.length < 3) return source.map(point => ({ ...point }));
 
-  // Three gentle passes remove hand tremor without flattening the stroke ends.
-  let filtered = source.map(point => ({ ...point }));
-  for (let pass = 0; pass < 3; pass++) {
-    const next = filtered.map(point => ({ ...point }));
-    for (let i = 1; i < filtered.length - 1; i++) {
-      const before = filtered[i - 1], current = filtered[i], after = filtered[i + 1];
-      next[i] = {
-        ...current,
-        x: before.x * 0.22 + current.x * 0.56 + after.x * 0.22,
-        y: before.y * 0.22 + current.y * 0.56 + after.y * 0.22,
-        pressure: before.pressure * 0.22 + current.pressure * 0.56 + after.pressure * 0.22
-      };
-    }
-    filtered = next;
+  // A single symmetric low-pass pass calms pointer tremor while keeping
+  // the first and last contact points anchored. Repeated full-path filtering
+  // made the beginning of a live stroke drift whenever a new sample arrived.
+  const filtered = source.map(point => ({ ...point }));
+  for (let i = 1; i < source.length - 1; i++) {
+    const before = source[i - 1];
+    const current = source[i];
+    const after = source[i + 1];
+    filtered[i] = {
+      ...current,
+      x: before.x * 0.2 + current.x * 0.6 + after.x * 0.2,
+      y: before.y * 0.2 + current.y * 0.6 + after.y * 0.2,
+      pressure: before.pressure * 0.2 + current.pressure * 0.6 + after.pressure * 0.2
+    };
   }
 
-  // Linear resampling after low-pass filtering avoids Catmull-Rom overshoot.
-  // Overshooting between sharp direction changes can create hooks and spikes
-  // that are especially visible with a fixed-angle calligraphy nib.
+  // Evenly subdivide long gaps only. Dense hardware samples are not expanded
+  // again, which avoids needless micro-segments and polygon edge wobble.
   const result = [filtered[0]];
-  const subdivisions = 3;
   for (let i = 0; i < filtered.length - 1; i++) {
     const a = filtered[i], b = filtered[i + 1];
+    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    const subdivisions = Math.max(1, Math.min(8, Math.ceil(distance / 3)));
     for (let step = 1; step <= subdivisions; step++) {
       const t = step / subdivisions;
       result.push({
@@ -476,71 +477,75 @@ export class StrokeBuilder {
     if (!points.length) return "";
 
     const angle = Number.isFinite(this.calligraphyAngle) ? this.calligraphyAngle : 45;
-    const angleRad = angle * (Math.PI / 180);
+    const angleRad = angle * Math.PI / 180;
     const cosA = Math.cos(angleRad);
     const sinA = Math.sin(angleRad);
+    const preset = String(this.brushStyle?.preset || "");
 
     const nibWidths = {
-      "cal-thuluth": 1.30,
-      "cal-naskh": 1.00,
-      "cal-ruqah": 0.82,
-      "cal-fine": 0.48,
-      "cal-kufi": 1.38,
-      "cal-italic": 1.12,
-      "cal-stub": 0.96,
-      "cal-oblique": 1.06,
-      "cal-diwani": 1.18,
-      "cal-jali": 1.42,
-      "cal-maghribi": 1.16,
-      "cal-taliq": 0.92,
-      "cal-sini": 1.04,
-      "cal-brush": 1.22,
-      "cal-needle": 0.38,
+      "cal-thuluth": 1.30, "cal-naskh": 1.00, "cal-ruqah": 0.82,
+      "cal-fine": 0.48, "cal-kufi": 1.38, "cal-italic": 1.12,
+      "cal-stub": 0.96, "cal-oblique": 1.06, "cal-diwani": 1.18,
+      "cal-jali": 1.42, "cal-maghribi": 1.16, "cal-taliq": 0.92,
+      "cal-sini": 1.04, "cal-brush": 1.22, "cal-needle": 0.38,
       "cal-square": 1.28
     };
+    const baseRadius = Math.max(0.6, this.baseSize * 0.5 * (nibWidths[preset] || 1));
 
-    const nibScale = nibWidths[this.brushStyle?.preset] || 1;
-    const radius = Math.max(0.6, (this.baseSize / 2) * nibScale);
+    // A tap is a real nib contact, not an empty path. Render it as a small
+    // angle-aware nib impression so the stroke never appears to start late.
+    if (points.length === 1) {
+      const p = points[0];
+      const pressure = this.pressureEnabled ? 0.35 + (p.pressure || 1) * 0.65 : 1;
+      const rx = Math.max(0.45, baseRadius * pressure);
+      const ry = Math.max(0.35, rx * (["cal-kufi", "cal-square", "cal-jali", "cal-sini"].includes(preset) ? 0.34 : 0.48));
+      const ux = cosA * rx, uy = sinA * rx;
+      const vx = -sinA * ry, vy = cosA * ry;
+      const a = { x: p.x + ux, y: p.y + uy };
+      const b = { x: p.x - ux, y: p.y - uy };
+      const c = { x: p.x + vx, y: p.y + vy };
+      const d = { x: p.x - vx, y: p.y - vy };
+      return `M ${(a.x+c.x).toFixed(3)} ${(a.y+c.y).toFixed(3)} Q ${(a.x+ux*0.15).toFixed(3)} ${(a.y+uy*0.15).toFixed(3)} ${(a.x-c.x+d.x).toFixed(3)} ${(a.y-c.y+d.y).toFixed(3)} Q ${(b.x-vx*0.15).toFixed(3)} ${(b.y-vy*0.15).toFixed(3)} ${(b.x-c.x+d.x).toFixed(3)} ${(b.y-c.y+d.y).toFixed(3)} Q ${(b.x-ux*0.15).toFixed(3)} ${(b.y-uy*0.15).toFixed(3)} ${(b.x+c.x-d.x).toFixed(3)} ${(b.y+c.y-d.y).toFixed(3)} Q ${(a.x+vx*0.15).toFixed(3)} ${(a.y+vy*0.15).toFixed(3)} ${(a.x+c.x-d.x).toFixed(3)} ${(a.y+c.y-d.y).toFixed(3)} Z`;
+    }
 
-    const getRadius = (point, index) => {
-      const pressureMultiplier = this.pressureEnabled
-        ? (0.35 + (point.pressure || 1) * 0.65)
-        : 1;
-      const previous=points[Math.max(0,index-1)], next=points[Math.min(points.length-1,index+1)];
-      const direction=Math.atan2(next.y-previous.y,next.x-previous.x);
-      const preset=String(this.brushStyle?.preset||"");
-      const nibAngle=direction-angleRad;
-      const broadNib=["cal-kufi","cal-square","cal-jali","cal-sini","cal-italic","cal-oblique","cal-stub"].includes(preset);
-      const contrast=broadNib ? (0.10+Math.abs(Math.sin(nibAngle))*0.90) : 1;
-      let profile=1;
-      if (preset==="cal-ruqah") profile=0.78+0.22*Math.abs(Math.sin(nibAngle));
-      else if (preset==="cal-diwani") profile=0.88+0.12*Math.abs(Math.cos(nibAngle));
-      else if (preset==="cal-taliq") profile=0.82+0.18*Math.abs(Math.cos(nibAngle));
-      else if (preset==="cal-maghribi") profile=0.92+0.08*Math.abs(Math.sin(nibAngle));
-      else if (preset==="cal-brush") profile=0.72+0.28*pressureMultiplier;
-      else if (preset==="cal-fine" || preset==="cal-needle") profile=0.72+0.28*pressureMultiplier;
-      // Keep nib width independent of event batching and pointer sampling rate.
-      // Pressure is already filtered; deriving width from instantaneous speed
-      // made identical hand motion render with visibly different thickness.
-      return radius * pressureMultiplier * contrast * profile;
-    };
+    const broadNib = ["cal-kufi", "cal-square", "cal-jali", "cal-sini", "cal-italic", "cal-oblique", "cal-stub"].includes(preset);
+    const rawRadii = points.map((point, index) => {
+      const previous = points[Math.max(0, index - 1)];
+      const next = points[Math.min(points.length - 1, index + 1)];
+      let dx = next.x - previous.x;
+      let dy = next.y - previous.y;
+      if (Math.hypot(dx, dy) < 0.0001) {
+        const fallback = points[Math.min(points.length - 1, index + 1)] || point;
+        dx = fallback.x - point.x || cosA;
+        dy = fallback.y - point.y || sinA;
+      }
+      const direction = Math.atan2(dy, dx);
+      const nibAngle = direction - angleRad;
+      const pressureMultiplier = this.pressureEnabled ? 0.35 + (point.pressure || 1) * 0.65 : 1;
+      const contrast = broadNib ? 0.10 + Math.abs(Math.sin(nibAngle)) * 0.90 : 1;
+      let profile = 1;
+      if (preset === "cal-ruqah") profile = 0.78 + 0.22 * Math.abs(Math.sin(nibAngle));
+      else if (preset === "cal-diwani") profile = 0.88 + 0.12 * Math.abs(Math.cos(nibAngle));
+      else if (preset === "cal-taliq") profile = 0.82 + 0.18 * Math.abs(Math.cos(nibAngle));
+      else if (preset === "cal-maghribi") profile = 0.92 + 0.08 * Math.abs(Math.sin(nibAngle));
+      else if (["cal-brush", "cal-fine", "cal-needle"].includes(preset)) profile = 0.72 + 0.28 * pressureMultiplier;
+      return baseRadius * pressureMultiplier * contrast * profile;
+    });
 
-    // Build one continuous ribbon from both nib edges instead of filling
-    // a separate quadrilateral for every pointer segment. Independent quads
-    // leave wedges at corners and can create visible seams/overdraw.
+    // Smooth only the nib-width envelope; keep the centerline and nib angle
+    // untouched so the calligraphic character is not rounded away.
+    const radii = rawRadii.map((radius, index) => {
+      if (index === 0 || index === rawRadii.length - 1) return radius;
+      return rawRadii[index - 1] * 0.2 + radius * 0.6 + rawRadii[index + 1] * 0.2;
+    });
+
     const left = [];
     const right = [];
     for (let i = 0; i < points.length; i++) {
       const point = points[i];
-      const r = getRadius(point, i);
-      left.push({
-        x: point.x + cosA * r,
-        y: point.y + sinA * r
-      });
-      right.push({
-        x: point.x - cosA * r,
-        y: point.y - sinA * r
-      });
+      const radius = Math.max(0.35, radii[i]);
+      left.push({ x: point.x + cosA * radius, y: point.y + sinA * radius });
+      right.push({ x: point.x - cosA * radius, y: point.y - sinA * radius });
     }
 
     const outline = [...left, ...right.reverse()];
@@ -549,7 +554,6 @@ export class StrokeBuilder {
       `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`
     ).join(" ") + " Z";
   }
-
   build(options = {}) {
     if (!this.id || !this.points.length) {
       return null;
