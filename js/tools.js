@@ -694,7 +694,11 @@ export class Selector extends BaseTool {
         if (el.type === "stroke" && Array.isArray(snap.points)) {
           // Keep the finished brush outline intact; points are source samples,
           // not a centerline from which a calligraphy stroke can be rebuilt.
-          el.points = snap.points.map(p => ({ ...p }));
+          el.points = snap.points.map(p => ({
+            ...p,
+            x: p.x + dx,
+            y: p.y + dy
+          }));
           el.path = snap.path;
           el.transform = [
             `translate(${dx} ${dy})`,
@@ -740,6 +744,15 @@ export class Selector extends BaseTool {
         if (!snap) continue;
 
         const rotation = `rotate(${degrees} ${center.cx} ${center.cy})`;
+        if (el.type === "stroke" && Array.isArray(snap.points)) {
+          const radians = degrees * Math.PI / 180;
+          const cos = Math.cos(radians), sin = Math.sin(radians);
+          el.points = snap.points.map(p => {
+            const x = p.x - center.cx, y = p.y - center.cy;
+            return { ...p, x: center.cx + x * cos - y * sin, y: center.cy + x * sin + y * cos };
+          });
+          el.path = snap.path;
+        }
         el.transform = [rotation, snap.transform].filter(Boolean).join(" ");
       }
 
@@ -781,7 +794,11 @@ export class Selector extends BaseTool {
         if (el.type === "stroke" && Array.isArray(snap.points)) {
           // Transform the existing SVG outline instead of rebuilding it from
           // raw samples, which would lose the nib profile and pressure shape.
-          el.points = snap.points.map(p => ({ ...p }));
+          el.points = snap.points.map(p => ({
+            ...p,
+            x: originX + (p.x - originX) * scaleX,
+            y: originY + (p.y - originY) * scaleY
+          }));
           el.path = snap.path;
           const scaleTransform = [
             `translate(${originX} ${originY})`,
@@ -982,6 +999,20 @@ export class Selector extends BaseTool {
         original.transform
       ].filter(Boolean).join(" ");
 
+      if (el.type === "stroke" && Array.isArray(el.points)) {
+        el.points = el.points.map(p => {
+          const x = p.x - snapshot.startCenter.x;
+          const y = p.y - snapshot.startCenter.y;
+          const scaledX = x * factor, scaledY = y * factor;
+          const rotatedX = scaledX * Math.cos(angle) - scaledY * Math.sin(angle);
+          const rotatedY = scaledX * Math.sin(angle) + scaledY * Math.cos(angle);
+          return {
+            ...p,
+            x: snapshot.startCenter.x + rotatedX + moveX,
+            y: snapshot.startCenter.y + rotatedY + moveY
+          };
+        });
+      }
       el.transform = transform;
     }
 
@@ -1033,7 +1064,8 @@ export class Selector extends BaseTool {
       const copy = EngineUtils.clone(el);
       copy.id = EngineUtils.createId(copy.type || "element");
       if (copy.type === "stroke" && Array.isArray(copy.points)) {
-        // Duplicate the exact rendered stroke without reconstructing its path.
+        // Keep hit-testing/bounds samples in sync while retaining the exact outline.
+        copy.points = copy.points.map(p => ({ ...p, x: p.x + 20, y: p.y + 20 }));
         copy.transform = [`translate(20 20)`, copy.transform].filter(Boolean).join(" ");
       } else if (Array.isArray(copy.points)) {
         copy.points = copy.points.map(p => ({ ...p, x: p.x + 20, y: p.y + 20 }));
