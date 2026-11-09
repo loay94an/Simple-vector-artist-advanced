@@ -895,6 +895,54 @@ export class Scene {
     }
   }
 
+  applyEraserMask(node, element) {
+    const maskData = element.eraseMask;
+    const svg = node.ownerSVGElement;
+    if (!svg || !maskData || typeof maskData.d !== "string" || !maskData.d.trim()) {
+      node.removeAttribute("mask");
+      return;
+    }
+
+    const safeId = String(node.dataset.id || "stroke").replace(/[^a-zA-Z0-9_-]/g, "");
+    const maskId = "rasem-eraser-mask-" + safeId;
+    let defs = svg.querySelector("defs[data-rasem-eraser-masks]");
+    if (!defs) {
+      defs = document.createElementNS(SVG_NS, "defs");
+      defs.setAttribute("data-rasem-eraser-masks", "true");
+      svg.insertBefore(defs, svg.firstChild);
+    }
+
+    let mask = defs.querySelector("#" + maskId);
+    if (!mask) {
+      mask = document.createElementNS(SVG_NS, "mask");
+      mask.id = maskId;
+      mask.setAttribute("maskUnits", "userSpaceOnUse");
+      mask.setAttribute("maskContentUnits", "userSpaceOnUse");
+      mask.setAttribute("x", "-100000");
+      mask.setAttribute("y", "-100000");
+      mask.setAttribute("width", "200000");
+      mask.setAttribute("height", "200000");
+      mask.setAttribute("mask-type", "luminance");
+      defs.appendChild(mask);
+    }
+
+    while (mask.firstChild) mask.removeChild(mask.firstChild);
+    const background = document.createElementNS(SVG_NS, "rect");
+    background.setAttribute("x", "-100000");
+    background.setAttribute("y", "-100000");
+    background.setAttribute("width", "200000");
+    background.setAttribute("height", "200000");
+    background.setAttribute("fill", "#fff");
+    mask.appendChild(background);
+
+    const erasedArea = document.createElementNS(SVG_NS, "path");
+    erasedArea.setAttribute("d", maskData.d);
+    erasedArea.setAttribute("fill", "#000");
+    erasedArea.setAttribute("fill-rule", "nonzero");
+    mask.appendChild(erasedArea);
+    node.setAttribute("mask", "url(#" + maskId + ")");
+  }
+
   updateNode(node, element) {
     node.dataset.id = element.id;
 
@@ -918,6 +966,7 @@ export class Scene {
     } else {
       this.applyGeometry(node, element);
       this.applyStyle(node, element);
+      this.applyEraserMask(node, element);
     }
 
     node.setAttribute(
