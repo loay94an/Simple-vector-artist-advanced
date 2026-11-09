@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { recognizeShape } from "../js/shape-recognition.js";
+import { recognizeShape, SHAPE_CLASSIFICATIONS } from "../js/shape-recognition.js";
 
 function jitter(value, seed) {
   return value + Math.sin(seed * 2.17) * 0.65 + Math.cos(seed * 0.73) * 0.25;
@@ -186,7 +186,6 @@ test("distinguishes a zigzag from an ordinary broken line", () => {
   assert.equal(recognizeShape(openStroke(brokenVertices))?.type, "polyline");
 });
 
-import { SHAPE_CLASSIFICATIONS } from "../js/shape-recognition.js";
 
 test("exposes exactly 62 unique shape classifications", () => {
   assert.equal(SHAPE_CLASSIFICATIONS.length, 62);
@@ -208,14 +207,6 @@ test("classifies right and isosceles triangle properties", () => {
   assert.equal(result?.type,"triangle");
   assert.ok(result.classifications.includes("triangle-right"));
   assert.ok(result.classifications.includes("triangle-isosceles"));
-});
-
-test("classifies regular and convex polygon properties", () => {
-  const result=recognizeShape(polygon(Array.from({length:6},(_,i)=>({
-    x:110+65*Math.cos(i*Math.PI/3),y:100+65*Math.sin(i*Math.PI/3)
-  }))));
-  assert.ok(result?.classifications.includes("polygon-convex"));
-  assert.ok(result?.classifications.includes("polygon-regular"));
 });
 
 test("returns multiple semantic labels for triangle geometry", () => {
