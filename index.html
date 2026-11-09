@@ -902,15 +902,27 @@
     saveModal?.addEventListener("click", (e) => e.stopPropagation());
 
     downloadRasemBtn?.addEventListener("click", async () => {
+      downloadRasemBtn.disabled = true;
       try {
         const data = window.rasem?.storage?.getDocumentData?.() || window.rasem?.document?.toJSON?.();
-        if (data) {
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-          const storageModule = await import("./js/storage-export.js");
-          await storageModule.downloadBlob(blob, `rasem-drawing-${Date.now()}.rasem`);
+        if (!data) throw new Error("لا توجد بيانات رسم لحفظها.");
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const storageModule = await import("./js/storage-export.js");
+        const saved = await storageModule.downloadBlob(blob, `rasem-drawing-${Date.now()}.rasem`);
+        if (saved === false) throw new Error("لم يتم حفظ الملف. اختر موقعاً للحفظ وحاول مجدداً.");
+        const toast = document.getElementById("toast");
+        if (toast) {
+          toast.textContent = "تم حفظ ملف المشروع";
+          toast.classList.add("show");
+          setTimeout(() => toast.classList.remove("show"), 2500);
         }
+        if (saveModal) saveModal.hidden = true;
+        if (saveModalBackdrop) saveModalBackdrop.hidden = true;
       } catch (err) {
-        console.warn("Download rasem error:", err);
+        console.error("Save project failed:", err);
+        alert(err?.message || "تعذر حفظ المشروع.");
+      } finally {
+        downloadRasemBtn.disabled = false;
       }
     });
 
@@ -1175,8 +1187,11 @@
           throw new Error("تعذر إنشاء ملف المشاركة.");
         }
 
-        // Android keeps its native export path; the website downloads directly.
-        const isNative = window.Capacitor?.isNativePlatform?.() === true;
+        // Detect Capacitor from its module, not window.Capacitor.
+        // Capacitor is not automatically exposed on window in production APK builds.
+        const { Capacitor } = await import("@capacitor/core");
+        const isNative = Capacitor.isNativePlatform()
+          && Capacitor.getPlatform() === "android";
         let completed = false;
 
         if (isNative) {
