@@ -134,7 +134,11 @@
       const outer = canvas.width / 2 - 7;
       const inner = outer - 38;
       const fieldRadius = inner - 9;
-      return { cx, cy, outer, inner, fieldRadius };
+      // Keep a generous, non-interactive moat between the hue ring and the SV disk.
+      const svTouchRadius = fieldRadius - 9;
+      const hueTouchInner = inner + 5;
+      const hueTouchOuter = outer + 5;
+      return { cx, cy, outer, inner, fieldRadius, svTouchRadius, hueTouchInner, hueTouchOuter };
     };
 
     const clamp01 = value => Math.max(0, Math.min(1, value));
@@ -246,22 +250,44 @@
       ctx.restore();
     }
 
-    function pickFromCoords(x, y) {
+    function getCanvasPoint(x, y) {
       const rect = canvas.getBoundingClientRect();
-      const px = (x - rect.left) * canvas.width / rect.width;
-      const py = (y - rect.top) * canvas.height / rect.height;
-      const { cx, cy, outer, inner, fieldRadius } = geometry();
-      const dx = px - cx;
-      const dy = py - cy;
+      return {
+        x: (x - rect.left) * canvas.width / rect.width,
+        y: (y - rect.top) * canvas.height / rect.height
+      };
+    }
+
+    function getPickerMode(x, y) {
+      const p = getCanvasPoint(x, y);
+      const { cx, cy, svTouchRadius, hueTouchInner, hueTouchOuter } = geometry();
+      const dist = Math.hypot(p.x - cx, p.y - cy);
+      if (dist <= svTouchRadius) return "sv";
+      if (dist >= hueTouchInner && dist <= hueTouchOuter) return "hue";
+      return null; // The gap is intentional: it prevents accidental cross-selection.
+    }
+
+    function pickFromCoords(x, y, mode) {
+      const p = getCanvasPoint(x, y);
+      const { cx, cy, fieldRadius, svTouchRadius, hueTouchInner, hueTouchOuter } = geometry();
+      const dx = p.x - cx;
+      const dy = p.y - cy;
       const dist = Math.hypot(dx, dy);
 
-      if (dist >= inner - 5 && dist <= outer + 5) {
+      if (mode === "hue") {
+        // Hue can only be changed while the gesture began on the outer ring.
+        if (dist < hueTouchInner || dist > hueTouchOuter) return;
         let angle = Math.atan2(dy, dx) + Math.PI / 2;
         if (angle < 0) angle += Math.PI * 2;
         activeHue = (angle * 180 / Math.PI + 360) % 360;
-      } else if (dist <= fieldRadius + 3) {
-        activeSat = clamp01((dx / (fieldRadius * 2)) + 0.5);
-        activeVal = clamp01(0.5 - (dy / (fieldRadius * 2)));
+      } else if (mode === "sv") {
+        // Lock the gesture to the inner disk; clamp at its safe circular edge.
+        const safeDist = Math.min(dist, svTouchRadius);
+        const scale = dist > 0 ? safeDist / dist : 0;
+        const safeX = dx * scale;
+        const safeY = dy * scale;
+        activeSat = clamp01(0.5 + safeX / (2 * svTouchRadius));
+        activeVal = clamp01(0.5 - safeY / (2 * svTouchRadius));
       } else {
         return;
       }
@@ -274,27 +300,32 @@
 
     if (canvas.dataset.wheelBound !== "true") {
       canvas.dataset.wheelBound = "true";
-      let isDragging = false;
+      let activeGesture = null;
 
       canvas.addEventListener("pointerdown", e => {
-        isDragging = true;
+        const mode = getPickerMode(e.clientX, e.clientY);
+        if (!mode) return;
+        e.preventDefault();
+        activeGesture = mode;
         canvas.setPointerCapture(e.pointerId);
-        pickFromCoords(e.clientX, e.clientY);
+        pickFromCoords(e.clientX, e.clientY, activeGesture);
       });
 
       canvas.addEventListener("pointermove", e => {
-        if (!isDragging) return;
-        pickFromCoords(e.clientX, e.clientY);
+        if (!activeGesture) return;
+        e.preventDefault();
+        pickFromCoords(e.clientX, e.clientY, activeGesture);
       });
 
       const finishWheelDrag = e => {
-        if (!isDragging) return;
-        isDragging = false;
+        if (!activeGesture) return;
+        activeGesture = null;
         try { canvas.releasePointerCapture(e.pointerId); } catch {}
         saveToHistory(currentColor);
       };
       canvas.addEventListener("pointerup", finishWheelDrag);
       canvas.addEventListener("pointercancel", finishWheelDrag);
+      canvas.addEventListener("lostpointercapture", () => { activeGesture = null; });
     }
 
     // Eyedropper
