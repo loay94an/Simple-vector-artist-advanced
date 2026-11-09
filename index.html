@@ -1189,9 +1189,9 @@
 
         // Detect Capacitor from its module, not window.Capacitor.
         // Capacitor is not automatically exposed on window in production APK builds.
-        const { Capacitor } = await import("@capacitor/core");
-        const isNative = Capacitor.isNativePlatform()
-          && Capacitor.getPlatform() === "android";
+        const Capacitor = window.Capacitor;
+        const isNative = Capacitor?.isNativePlatform?.() === true
+          && Capacitor?.getPlatform?.() === "android";
         let completed = false;
 
         if (isNative) {
