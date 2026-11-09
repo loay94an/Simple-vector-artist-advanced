@@ -481,7 +481,6 @@ export class StrokeBuilder {
     const cosA = Math.cos(angleRad);
     const sinA = Math.sin(angleRad);
     const preset = String(this.brushStyle?.preset || "");
-
     const nibWidths = {
       "cal-thuluth": 1.30, "cal-naskh": 1.00, "cal-ruqah": 0.82,
       "cal-fine": 0.48, "cal-kufi": 1.38, "cal-italic": 1.12,
@@ -491,66 +490,70 @@ export class StrokeBuilder {
       "cal-square": 1.28
     };
     const baseRadius = Math.max(0.6, this.baseSize * 0.5 * (nibWidths[preset] || 1));
-
-    // A tap is a real nib contact, not an empty path. Render it as a small
-    // angle-aware nib impression so the stroke never appears to start late.
-    if (points.length === 1) {
-      const p = points[0];
-      const pressure = this.pressureEnabled ? 0.35 + (p.pressure || 1) * 0.65 : 1;
-      const rx = Math.max(0.45, baseRadius * pressure);
-      const ry = Math.max(0.35, rx * (["cal-kufi", "cal-square", "cal-jali", "cal-sini"].includes(preset) ? 0.34 : 0.48));
-      const ux = cosA * rx, uy = sinA * rx;
-      const vx = -sinA * ry, vy = cosA * ry;
-      const startX = p.x + ux, startY = p.y + uy;
-      const endX = p.x - ux, endY = p.y - uy;
-      return `M ${startX.toFixed(3)} ${startY.toFixed(3)} A ${rx.toFixed(3)} ${ry.toFixed(3)} ${angle.toFixed(2)} 0 1 ${endX.toFixed(3)} ${endY.toFixed(3)} A ${rx.toFixed(3)} ${ry.toFixed(3)} ${angle.toFixed(2)} 0 1 ${startX.toFixed(3)} ${startY.toFixed(3)} Z`;
-    }
-
     const broadNib = ["cal-kufi", "cal-square", "cal-jali", "cal-sini", "cal-italic", "cal-oblique", "cal-stub"].includes(preset);
-    const rawRadii = points.map((point, index) => {
+    const pressureRadius = point => {
+      const pressure = this.pressureEnabled ? 0.35 + (point.pressure || 1) * 0.65 : 1;
+      return Math.max(0.35, baseRadius * pressure);
+    };
+    const ellipse = (point, radius) => {
+      const ry = Math.max(0.35, radius * (["cal-kufi", "cal-square", "cal-jali", "cal-sini"].includes(preset) ? 0.34 : 0.48));
+      const ux = cosA * radius, uy = sinA * radius;
+      const vx = -sinA * ry, vy = cosA * ry;
+      const p1 = { x: point.x + ux, y: point.y + uy };
+      const p2 = { x: point.x - ux, y: point.y - uy };
+      return `M ${p1.x.toFixed(3)} ${p1.y.toFixed(3)} A ${radius.toFixed(3)} ${ry.toFixed(3)} ${angle.toFixed(2)} 0 1 ${p2.x.toFixed(3)} ${p2.y.toFixed(3)} A ${radius.toFixed(3)} ${ry.toFixed(3)} ${angle.toFixed(2)} 0 1 ${p1.x.toFixed(3)} ${p1.y.toFixed(3)} Z`;
+    };
+    if (points.length === 1) return ellipse(points[0], pressureRadius(points[0]));
+
+    // Build the mark as consistently-wound nib-sized quads, not one long
+    // self-crossing ribbon. When the stroke doubles back over itself, every
+    // overlapping piece paints in the same winding direction instead of
+    // cancelling under SVG's non-zero fill rule.
+    const radii = points.map((point, index) => {
       const previous = points[Math.max(0, index - 1)];
       const next = points[Math.min(points.length - 1, index + 1)];
-      let dx = next.x - previous.x;
-      let dy = next.y - previous.y;
-      if (Math.hypot(dx, dy) < 0.0001) {
-        const fallback = points[Math.min(points.length - 1, index + 1)] || point;
-        dx = fallback.x - point.x || cosA;
-        dy = fallback.y - point.y || sinA;
-      }
-      const direction = Math.atan2(dy, dx);
+      const direction = Math.atan2(next.y - previous.y, next.x - previous.x);
       const nibAngle = direction - angleRad;
-      const pressureMultiplier = this.pressureEnabled ? 0.35 + (point.pressure || 1) * 0.65 : 1;
+      const pressure = this.pressureEnabled ? 0.35 + (point.pressure || 1) * 0.65 : 1;
       const contrast = broadNib ? 0.10 + Math.abs(Math.sin(nibAngle)) * 0.90 : 1;
       let profile = 1;
       if (preset === "cal-ruqah") profile = 0.78 + 0.22 * Math.abs(Math.sin(nibAngle));
       else if (preset === "cal-diwani") profile = 0.88 + 0.12 * Math.abs(Math.cos(nibAngle));
       else if (preset === "cal-taliq") profile = 0.82 + 0.18 * Math.abs(Math.cos(nibAngle));
       else if (preset === "cal-maghribi") profile = 0.92 + 0.08 * Math.abs(Math.sin(nibAngle));
-      else if (["cal-brush", "cal-fine", "cal-needle"].includes(preset)) profile = 0.72 + 0.28 * pressureMultiplier;
-      return baseRadius * pressureMultiplier * contrast * profile;
+      else if (["cal-brush", "cal-fine", "cal-needle"].includes(preset)) profile = 0.72 + 0.28 * pressure;
+      return Math.max(0.35, baseRadius * pressure * contrast * profile);
+    }).map((radius, index, values) => {
+      if (index === 0 || index === values.length - 1) return radius;
+      return values[index - 1] * 0.2 + radius * 0.6 + values[index + 1] * 0.2;
     });
 
-    // Smooth only the nib-width envelope; keep the centerline and nib angle
-    // untouched so the calligraphic character is not rounded away.
-    const radii = rawRadii.map((radius, index) => {
-      if (index === 0 || index === rawRadii.length - 1) return radius;
-      return rawRadii[index - 1] * 0.2 + radius * 0.6 + rawRadii[index + 1] * 0.2;
-    });
+    const paths = [];
+    const quadPath = (p1, p2, r1, r2) => {
+      const corners = [
+        { x: p1.x + cosA * r1, y: p1.y + sinA * r1 },
+        { x: p2.x + cosA * r2, y: p2.y + sinA * r2 },
+        { x: p2.x - cosA * r2, y: p2.y - sinA * r2 },
+        { x: p1.x - cosA * r1, y: p1.y - sinA * r1 }
+      ];
+      let area = 0;
+      for (let i = 0; i < corners.length; i++) {
+        const p = corners[i], q = corners[(i + 1) % corners.length];
+        area += p.x * q.y - q.x * p.y;
+      }
+      if (area < 0) corners.reverse();
+      return corners.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join(" ") + " Z";
+    };
 
-    const left = [];
-    const right = [];
-    for (let i = 0; i < points.length; i++) {
-      const point = points[i];
-      const radius = Math.max(0.35, radii[i]);
-      left.push({ x: point.x + cosA * radius, y: point.y + sinA * radius });
-      right.push({ x: point.x - cosA * radius, y: point.y - sinA * radius });
+    for (let i = 1; i < points.length; i++) {
+      const p1 = points[i - 1], p2 = points[i];
+      if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 0.0001) continue;
+      paths.push(quadPath(p1, p2, radii[i - 1], radii[i]));
     }
-
-    const outline = [...left, ...right.reverse()];
-    if (outline.length < 4) return "";
-    return outline.map((point, index) =>
-      `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`
-    ).join(" ") + " Z";
+    // Round nib contacts cover joins and keep tight reversals connected.
+    paths.push(ellipse(points[0], radii[0]));
+    paths.push(ellipse(points[points.length - 1], radii[radii.length - 1]));
+    return paths.join(" ");
   }
   build(options = {}) {
     if (!this.id || !this.points.length) {
