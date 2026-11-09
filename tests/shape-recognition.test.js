@@ -131,3 +131,40 @@ test("recognizes a rotated ellipse and preserves its orientation", () => {
   assert.ok(Math.abs(result.rotation - angle) < 0.08);
   assert.ok(result.points.length >= 90);
 });
+
+
+test("distinguishes a square from a rectangle", () => {
+  const square = recognizeShape(polygon([
+    { x: 40, y: 40 }, { x: 140, y: 40 },
+    { x: 140, y: 140 }, { x: 40, y: 140 }
+  ]));
+  const rectangle = recognizeShape(polygon([
+    { x: 30, y: 55 }, { x: 190, y: 55 },
+    { x: 190, y: 125 }, { x: 30, y: 125 }
+  ]));
+  assert.equal(square?.type, "square");
+  assert.equal(rectangle?.type, "rectangle");
+});
+
+test("recognizes a smooth open curve", () => {
+  const points = Array.from({ length: 90 }, (_, i) => {
+    const t = i / 89;
+    return { x: 20 + t * 180, y: 140 - Math.sin(t * Math.PI) * 65,
+      pressure: 0.5, time: i * 8 };
+  });
+  const result = recognizeShape(points);
+  assert.ok(["curve", "arc"].includes(result?.type), `unexpected curve type: ${result?.type}`);
+});
+
+test("distinguishes a zigzag from an ordinary broken line", () => {
+  const zigzagVertices = [
+    { x: 20, y: 100 }, { x: 55, y: 35 }, { x: 90, y: 100 },
+    { x: 125, y: 35 }, { x: 160, y: 100 }, { x: 195, y: 35 }
+  ];
+  const brokenVertices = [
+    { x: 20, y: 120 }, { x: 75, y: 45 }, { x: 125, y: 80 },
+    { x: 180, y: 25 }
+  ];
+  assert.equal(recognizeShape(polygon(zigzagVertices))?.type, "zigzag");
+  assert.equal(recognizeShape(brokenVertices.map((p, i) => ({ ...p, pressure: 0.5, time: i * 20 })))?.type, "polyline");
+});
