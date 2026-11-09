@@ -4105,3 +4105,66 @@ body.dark .canvas-area {
 .concepts-harmony-family { display:flex; flex:0 0 auto; align-items:center; gap:4px; padding-inline:2px; border-inline-start:1px solid var(--border,rgba(127,127,127,.25)); }
 .concepts-harmonies-list { align-items:center; gap:7px; padding:3px 2px 6px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
 .concepts-harmonies-list .concepts-swatch { width:24px; height:24px; min-width:24px; border-radius:50%; }
+
+
+/* Integrated color palette dropdown: anchored to the upper-right toolbar button */
+.header-actions #colorMenuBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; min-width: 38px; height: 38px; padding: 4px;
+  border-radius: 11px; flex: 0 0 38px;
+}
+.header-actions #colorMenuBtn .color-dot { width: 25px; height: 25px; }
+.concepts-wheel-container.open {
+  display: block !important; inset: 0 !important; padding: 0 !important;
+  background: transparent !important; pointer-events: auto !important;
+}
+.concepts-wheel-container .concepts-backdrop {
+  background: transparent !important; backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.concepts-wheel-card {
+  position: fixed !important; top: var(--palette-top, 58px) !important;
+  right: var(--palette-right, 8px) !important; left: auto !important; bottom: auto !important;
+  margin: 0 !important; width: min(350px, calc(100vw - 16px)) !important;
+  max-height: min(78dvh, 620px) !important; overflow-x: hidden !important;
+  overflow-y: auto !important; border-radius: 16px !important; padding: 12px !important;
+  gap: 9px !important; box-shadow: 0 12px 34px rgba(0,0,0,.24) !important;
+  transform-origin: top right !important; animation: conceptsDropdownIn .16s ease-out !important;
+}
+@keyframes conceptsDropdownIn {
+  from { opacity: 0; transform: translateY(-7px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.concepts-wheel-header {
+  position: sticky; top: -12px; z-index: 8; padding: 3px 0 8px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.concepts-canvas-wrap { width: min(190px, 58vw) !important; margin: 0 auto !important; }
+#conceptsCanvas { max-width: 190px; max-height: 190px; }
+.concepts-special-list, .concepts-recent-list {
+  flex-wrap: wrap; overflow-x: hidden; overflow-y: auto;
+}
+.concepts-harmonies-list {
+  display: flex !important; flex-direction: column !important;
+  align-items: stretch !important; gap: 5px !important;
+  overflow: visible !important; padding: 2px 0 4px !important;
+}
+.concepts-harmony-family {
+  display: grid !important; grid-template-columns: minmax(72px, auto) repeat(4, 30px) !important;
+  align-items: center !important; justify-content: space-between !important;
+  gap: 7px !important; width: 100% !important; padding: 5px 2px !important;
+  border-inline-start: 0 !important; border-bottom: 1px solid var(--border) !important;
+}
+.concepts-harmony-family-label {
+  color: var(--text-secondary); font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.concepts-harmonies-list .concepts-swatch {
+  width: 29px !important; height: 29px !important; min-width: 29px !important;
+  border-radius: 9px !important;
+}
+@media (max-width: 600px) {
+  .concepts-wheel-card {
+    top: var(--palette-top, 58px) !important; right: var(--palette-right, 8px) !important;
+    width: min(340px, calc(100vw - 16px)) !important; max-height: min(76dvh, 600px) !important;
+  }
+}
