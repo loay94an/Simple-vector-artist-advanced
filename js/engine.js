@@ -1747,16 +1747,14 @@ export class DrawingEngine {
       !EngineUtils.validPoint(point)
     ) return false;
 
-    const radius = this.getEraserTolerance();
+    const radius = Math.max(0.5, this.getEraserTolerance());
 
-    // ممحاة الخط الكامل: تبقى كما هي.
+    // Whole-stroke mode intentionally keeps its original behavior.
     if (this.settings.eraserMode === "stroke") {
       const result = HitTesting.hitTest(layer.elements, point, radius);
       if (!result || this.erasedIds.has(result.id)) return false;
 
-      const index = layer.elements.findIndex(
-        element => element.id === result.id
-      );
+      const index = layer.elements.findIndex(element => element.id === result.id);
       if (index === -1) return false;
 
       layer.elements.splice(index, 1);
@@ -1768,197 +1766,46 @@ export class DrawingEngine {
     }
 
     let modified = false;
-    const elementsToRemove = [];
-    const elementsToAdd = [];
+    const circle = (x, y, r) =>
+      `M ${(x-r).toFixed(3)} ${y.toFixed(3)} a ${r.toFixed(3)} ${r.toFixed(3)} 0 1 0 ${(2*r).toFixed(3)} 0 a ${r.toFixed(3)} ${r.toFixed(3)} 0 1 0 ${(-2*r).toFixed(3)} 0 Z`;
 
-    const distanceToEraser = p =>
-      Math.hypot(p.x - point.x, p.y - point.y);
-
-    const interpolatePoint = (a, b, t) => ({
-      x: a.x + (b.x - a.x) * t,
-      y: a.y + (b.y - a.y) * t,
-      pressure:
-        EngineUtils.number(a.pressure, 1) +
-        (EngineUtils.number(b.pressure, 1) -
-          EngineUtils.number(a.pressure, 1)) * t,
-      time:
-        EngineUtils.number(a.time, 0) +
-        (EngineUtils.number(b.time, 0) -
-          EngineUtils.number(a.time, 0)) * t
-    });
-
-    const samePoint = (a, b) =>
-      Math.hypot(a.x - b.x, a.y - b.y) < 0.000001;
-
-    for (let elIdx = 0; elIdx < layer.elements.length; elIdx++) {
-      const element = layer.elements[elIdx];
+    for (let index = 0; index < layer.elements.length; index++) {
+      const element = layer.elements[index];
       if (!element || element.visible === false) continue;
 
-      // Include the visible stroke width so touching its painted edge erases it.
-      const strokeHalfWidth = Math.max(0, EngineUtils.number(element.style?.size, 0) / 2);
-      const effectiveRadius = radius + strokeHalfWidth;
-      const dist = HitTesting.getElementDistance(element, point);
-      if (dist > effectiveRadius) continue;
+      const style = element.style || {};
+      const size = Math.max(0, EngineUtils.number(style.size, 0));
+      const preset = String(style.brushPreset || element.brushStyle?.preset || "");
+      const calligraphyWidths = {
+        "cal-thuluth":1.30,"cal-naskh":1,"cal-ruqah":0.82,"cal-fine":0.48,
+        "cal-kufi":1.38,"cal-italic":1.12,"cal-stub":0.96,"cal-oblique":1.06,
+        "cal-diwani":1.18,"cal-jali":1.42,"cal-maghribi":1.16,"cal-taliq":0.92,
+        "cal-sini":1.04,"cal-brush":1.22,"cal-needle":0.38,"cal-square":1.28
+      };
+      const paintedHalfWidth = size * Math.max(0.5, (calligraphyWidths[preset] || 1) * 0.5);
+      const distance = HitTesting.getElementDistance(element, point);
 
-      if (Array.isArray(element.points) && element.points.length > 0) {
-        const points = element.points;
-        const fragments = [];
-        let current = [];
+      // Hit-test the visible footprint, but erase only the actual circular
+      // cursor footprint. Never split or rebuild the source stroke geometry.
+      if (distance > radius + paintedHalfWidth) continue;
 
-        const flushFragment = () => {
-          if (current.length > 1) fragments.push(current);
-          current = [];
+      if (Array.isArray(element.points) && element.points.length) {
+        const oldMask = element.eraseMask && typeof element.eraseMask.d === "string"
+          ? element.eraseMask.d
+          : "";
+        element.eraseMask = {
+          d: (oldMask ? oldMask + " " : "") + circle(point.x, point.y, radius)
         };
-
-        if (points.length === 1) {
-          if (distanceToEraser(points[0]) > effectiveRadius) {
-            current.push({ ...points[0] });
-          }
-          flushFragment();
-        } else {
-          for (let i = 1; i < points.length; i++) {
-            const p0 = points[i - 1];
-            const p1 = points[i];
-            const dx = p1.x - p0.x;
-            const dy = p1.y - p0.y;
-
-            // نقاط تقاطع القطعة مع دائرة الممحاة.
-            const A = dx * dx + dy * dy;
-            const B = 2 * (
-              (p0.x - point.x) * dx +
-              (p0.y - point.y) * dy
-            );
-            const C =
-              (p0.x - point.x) ** 2 +
-              (p0.y - point.y) ** 2 -
-              effectiveRadius * effectiveRadius;
-
-            const cuts = [0, 1];
-
-            if (A > 0.0000001) {
-              const discriminant = B * B - 4 * A * C;
-              if (discriminant >= 0) {
-                const root = Math.sqrt(discriminant);
-                const t1 = (-B - root) / (2 * A);
-                const t2 = (-B + root) / (2 * A);
-
-                if (t1 > 0 && t1 < 1) cuts.push(t1);
-                if (t2 > 0 && t2 < 1) cuts.push(t2);
-              }
-            }
-
-            cuts.sort((x, y) => x - y);
-
-            for (let j = 1; j < cuts.length; j++) {
-              const t0 = cuts[j - 1];
-              const t1 = cuts[j];
-              if (t1 - t0 < 0.0000001) continue;
-
-              const middle = interpolatePoint(
-                p0,
-                p1,
-                (t0 + t1) / 2
-              );
-
-              if (distanceToEraser(middle) > effectiveRadius) {
-                const from = interpolatePoint(p0, p1, t0);
-                const to = interpolatePoint(p0, p1, t1);
-
-                if (
-                  current.length &&
-                  samePoint(current[current.length - 1], from)
-                ) {
-                  if (!samePoint(current[current.length - 1], to)) {
-                    current.push(to);
-                  }
-                } else {
-                  flushFragment();
-                  current = [from, to];
-                }
-              } else {
-                flushFragment();
-              }
-            }
-          }
-
-          flushFragment();
-        }
-
-        const style = element.style || {};
-        const tool = element.tool || "pen";
-
-        for (const fragment of fragments) {
-          if (fragment.length < 2) continue;
-
-          // إعادة بناء الجزء بنفس نمط القلم بدلاً من تحويله إلى خط عادي.
-          const builder = new StrokeBuilder();
-          const started = builder.begin(fragment[0], {
-            size: style.size ?? 5,
-            color: style.color || "#111111",
-            opacity: style.opacity ?? 1,
-            tool,
-            calligraphyAngle:
-              element.calligraphyAngle ??
-              element.settings?.calligraphyAngle ??
-              this.settings.calligraphyAngle ??
-              45,
-            sensitivity:
-              element.sensitivity ??
-              this.settings.sensitivity ??
-              0.8,
-            pressureEnabled: element.pressureEnabled !== false,
-            brushStyle: {
-              lineCap: style.lineCap || "round",
-              lineJoin: style.lineJoin || "round",
-              dashArray: style.dashArray || "",
-              image: style.customBrush || null,
-              preset: element.brushStyle?.preset
-            }
-          });
-
-          if (!started) continue;
-
-          for (let i = 1; i < fragment.length; i++) {
-            builder.addPoint(fragment[i]);
-          }
-
-          const built = builder.build({
-            pressureEnabled: element.pressureEnabled !== false
-          });
-          if (!built) continue;
-
-          const newElement = EngineUtils.clone(element);
-          newElement.id = EngineUtils.createId("stroke");
-          newElement.points = built.points;
-          newElement.path = built.path;
-          newElement.renderMode = built.renderMode;
-          newElement.style = {
-            ...style,
-            ...built.style
-          };
-
-          elementsToAdd.push(newElement);
-        }
-
-        elementsToRemove.push(elIdx);
         modified = true;
       } else {
-        // العناصر التي لا تحتوي نقاطاً تُحذف عند ملامسة الممحاة.
-        elementsToRemove.push(elIdx);
+        // Non-stroke vector objects without sampled paths remain whole-object erasures.
+        layer.elements.splice(index, 1);
+        index--;
         modified = true;
       }
     }
 
     if (!modified) return false;
-
-    for (let i = elementsToRemove.length - 1; i >= 0; i--) {
-      layer.elements.splice(elementsToRemove[i], 1);
-    }
-
-    for (const newElement of elementsToAdd) {
-      layer.elements.push(newElement);
-    }
-
     this.changed = true;
     this.document.touch?.();
     this.renderer.renderActiveLayer(layer);
