@@ -16,7 +16,7 @@
    - Cleanup application resources
 ========================================================= */
 
-import { registerPlugin } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 
 import {
   DrawingDocument,
