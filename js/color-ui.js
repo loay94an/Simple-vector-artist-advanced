@@ -156,36 +156,57 @@
       const { cx, cy, outer, inner, centerRadius } = geometry();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Soft shadow beneath the spectrum gives the ring visual depth.
+      // A true continuous conic gradient replaces the visibly segmented ring.
+      // Keep a high-resolution sector fallback for older canvas implementations.
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,.22)";
-      ctx.shadowBlur = 9;
+      ctx.shadowColor = "rgba(15,23,42,.22)";
+      ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 2;
 
-      const segments = 720;
-      for (let i = 0; i < segments; i++) {
-        const hue = i * 360 / segments;
-        const a0 = (i / segments) * Math.PI * 2 - Math.PI / 2;
-        const a1 = ((i + 1.35) / segments) * Math.PI * 2 - Math.PI / 2;
+      let spectrum;
+      if (typeof ctx.createConicGradient === "function") {
+        spectrum = ctx.createConicGradient(-Math.PI / 2, cx, cy);
+        [
+          [0, "#FF3030"],
+          [1 / 6, "#FFE13B"],
+          [2 / 6, "#42D66B"],
+          [3 / 6, "#25D9D2"],
+          [4 / 6, "#3978FF"],
+          [5 / 6, "#B94BEB"],
+          [1, "#FF3030"]
+        ].forEach(([stop, color]) => spectrum.addColorStop(stop, color));
+
         ctx.beginPath();
-        ctx.arc(cx, cy, outer, a0, a1);
-        ctx.arc(cx, cy, inner, a1, a0, true);
-        ctx.closePath();
-        ctx.fillStyle = hsvToHex(hue, 1, 1);
-        ctx.fill();
+        ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+        ctx.arc(cx, cy, inner, 0, Math.PI * 2, true);
+        ctx.fillStyle = spectrum;
+        ctx.fill("evenodd");
+      } else {
+        const segments = 1440;
+        for (let i = 0; i < segments; i++) {
+          const hue = i * 360 / segments;
+          const a0 = (i / segments) * Math.PI * 2 - Math.PI / 2;
+          const a1 = ((i + 1.05) / segments) * Math.PI * 2 - Math.PI / 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, outer, a0, a1);
+          ctx.arc(cx, cy, inner, a1, a0, true);
+          ctx.closePath();
+          ctx.fillStyle = hsvToHex(hue, 1, 1);
+          ctx.fill();
+        }
       }
       ctx.restore();
 
-      // Fine outer and inner outlines keep the spectrum crisp on every theme.
+      // Fine outlines and a restrained inner highlight give the smooth ring definition.
       ctx.beginPath();
       ctx.arc(cx, cy, outer, 0, Math.PI * 2);
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "rgba(255,255,255,.82)";
+      ctx.strokeStyle = "rgba(255,255,255,.9)";
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(cx, cy, inner, 0, Math.PI * 2);
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "rgba(15,23,42,.24)";
+      ctx.strokeStyle = "rgba(15,23,42,.18)";
       ctx.stroke();
 
       // Twelve subtle radial reference marks.
