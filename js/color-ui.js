@@ -430,6 +430,10 @@
       group.className = "concepts-harmony-family";
       group.setAttribute("role", "group");
       group.setAttribute("aria-label", family.name);
+      const familyLabel = document.createElement("span");
+      familyLabel.className = "concepts-harmony-family-label";
+      familyLabel.textContent = family.name;
+      group.appendChild(familyLabel);
       family.colors.forEach((hex, shadeIndex) => {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -628,7 +632,13 @@
     const container = $("conceptsWheelContainer");
     if (!container) return;
 
+    const anchorRect = openBtn?.getBoundingClientRect();
+    if (anchorRect) {
+      container.style.setProperty("--palette-top", String(Math.round(anchorRect.bottom + 7)) + "px");
+      container.style.setProperty("--palette-right", String(Math.max(8, Math.round(window.innerWidth - anchorRect.right))) + "px");
+    }
     container.classList.add("open");
+    openBtn?.setAttribute("aria-expanded", "true");
     isWheelExpanded = true;
     updateHarmonies();
     renderRecentColors();
@@ -638,6 +648,7 @@
     const container = $("conceptsWheelContainer");
     if (!container) return;
     container.classList.remove("open");
+    openBtn?.setAttribute("aria-expanded", "false");
     isWheelExpanded = false;
   }
 
