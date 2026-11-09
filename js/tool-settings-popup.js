@@ -31,6 +31,7 @@
     featherSpread: "featherSpread",
     featherSoftness: "featherSoftness",
     featherTaper: "featherTaper",
+    featherFade: "featherFade",
     featherSpacing: "featherSpacing",
     calligraphyEndStyle: "calligraphyEndStyle"
   };
@@ -157,6 +158,7 @@
     result.featherSpread = Number(document.getElementById("featherSpread")?.value ?? 0.45);
     result.featherSoftness = Number(document.getElementById("featherSoftness")?.value ?? 0.35);
     result.featherTaper = Number(document.getElementById("featherTaper")?.value ?? 0.7);
+    result.featherFade = document.getElementById("featherFade")?.checked === true;
 
     return result;
   }
@@ -201,7 +203,8 @@
             featherSpacing: current.featherSpacing ?? 1,
             featherSpread: current.featherSpread ?? 0.45,
             featherSoftness: current.featherSoftness ?? 0.35,
-            featherTaper: current.featherTaper ?? 0.7
+            featherTaper: current.featherTaper ?? 0.7,
+            featherFade: current.featherFade === true
           }
         });
       }
@@ -257,7 +260,7 @@
   // لكل رأس فرشاة ملف إعدادات مستقل؛ الضغطة الطويلة على الرأس تفتح ملفه.
   const headProfiles = {
     feather: {
-      "feather-pointed": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
+      "feather-pointed": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
       "feather-flat": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
       "feather-round": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
       "feather-fan": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
@@ -332,11 +335,11 @@
       const caption = document.createElement("span");
       caption.textContent = headLabels[key] || key;
       wrap.appendChild(caption);
-      if (key === "pressureEnabled") {
+      if (key === "pressureEnabled" || key === "featherFade") {
         const select = document.createElement("select");
         select.dataset.headKey = key;
         select.innerHTML = '<option value="true">مفعّل</option><option value="false">متوقف</option>';
-        select.value = String(profile[key] ?? document.getElementById(key)?.checked ?? true);
+        select.value = String(profile[key] ?? document.getElementById(key)?.checked ?? (key === "featherFade" ? false : true));
         wrap.appendChild(select);
       } else if (key === "calligraphyEndStyle") {
         const select = document.createElement("select");
@@ -376,13 +379,13 @@
     toolSettings.headSettings ||= {};
     toolSettings.headSettings[brush] ||= {};
     const key = control.dataset.headKey;
-    const value = key === "pressureEnabled" ? control.value === "true" :
+    const value = key === "pressureEnabled" || key === "featherFade" ? control.value === "true" :
       key === "calligraphyEndStyle" ? control.value : Number(control.value);
     toolSettings.headSettings[brush][key] = value;
     const targetId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
     const target = document.getElementById(targetId);
     if (target) {
-      if (key === "pressureEnabled") target.checked = value;
+      if (key === "pressureEnabled" || key === "featherFade") target.checked = value;
       else target.value = String(value);
     }
     save();
@@ -396,7 +399,7 @@
       const id = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
       const input = document.getElementById(id);
       if (!input) return;
-      if (key === "pressureEnabled") input.checked = Boolean(value);
+      if (key === "pressureEnabled" || key === "featherFade") input.checked = Boolean(value);
       else input.value = String(value);
     });
   }
