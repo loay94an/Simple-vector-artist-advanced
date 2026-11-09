@@ -1,0 +1,22 @@
+name: Web shape recognition checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feat/1000-shape-classifications]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run shape recognition tests
+        run: npm test
+      - name: Build website
+        run: npm run build
