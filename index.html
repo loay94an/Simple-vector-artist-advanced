@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
-  <link rel="stylesheet" href="./css/app.css?v=20261109-17">
+  <link rel="stylesheet" href="./css/app.css?v=20261109-18">
   <style>
     /* Bulletproof Flexbox Centering Overlay for All Dialogs & Modals */
     .modal-overlay-wrapper {
@@ -75,7 +75,7 @@
       display: none !important;
     }
   </style>
-  <script type="module" src="./js/app.js?v=20261109-30"></script>
+  <script type="module" src="./js/app.js?v=20261109-31"></script>
 </head>
 
 <body class="light">
@@ -86,6 +86,7 @@
     <header class="app-header">
 
       <div class="header-actions">
+        <button id="smartDrawingToggleBtn" class="header-tool-btn smart-drawing-toggle" type="button" aria-label="تشغيل أو إيقاف الرسم الذكي" aria-pressed="false" title="الرسم الذكي: متوقف"><span class="smart-drawing-icon" aria-hidden="true">✦</span><span class="btn-text">الرسم الذكي</span></button>
         <button id="complementaryColorsBtn" class="header-tool-btn complementary-colors-toggle" type="button" aria-label="الألوان المتكاملة" aria-expanded="false" title="الألوان المتكاملة">
           <span id="complementaryColorsColor" class="complementary-current-color" aria-hidden="true"></span>
         </button>
@@ -225,8 +226,51 @@
               <span class="toggle-switch-slider"></span>
             </label>
           </div>
+          <div class="settings-menu-item smart-drawing-settings-entry">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+              <span class="smart-drawing-icon" aria-hidden="true">✦</span>
+              <div style="text-align:right;">
+                <strong style="display:block;font-size:13px;">الرسم الذكي</strong>
+                <span id="smartDrawingStatus" style="font-size:11px;color:var(--text-muted);">الرسم الذكي متوقف</span>
+              </div>
+            </div>
+            <button id="openSmartDrawingSettingsBtn" type="button" class="header-action-btn">الإعدادات</button>
+          </div>
         </div>
       </div>
+    </div>
+
+    <div id="smartDrawingModalBackdrop" class="modal-overlay-wrapper" hidden>
+      <section id="smartDrawingModal" class="smart-drawing-modal modal-box" role="dialog" aria-label="إعدادات الرسم الذكي" hidden>
+        <div class="geometry-menu-head">
+          <div style="display:flex;align-items:center;gap:8px;"><span class="smart-drawing-icon">✦</span><strong>الرسم الذكي</strong></div>
+          <button id="closeSmartDrawingModal" type="button" class="concepts-close-btn" aria-label="إغلاق">✕</button>
+        </div>
+        <div class="smart-drawing-master">
+          <div><strong>تشغيل الرسم الذكي</strong><span>تطبيق الإعدادات العامة على أدوات الرسم</span></div>
+          <label class="toggle-switch-wrapper" title="تشغيل أو إيقاف جميع ميزات الرسم الذكي">
+            <input type="checkbox" id="smartDrawingEnabled">
+            <span class="toggle-switch-slider"></span>
+          </label>
+        </div>
+        <div class="smart-drawing-controls">
+          <label class="smart-drawing-range" for="smartDrawingSmoothness">
+            <span><strong>النعومة</strong><output id="smartDrawingSmoothnessValue">35%</output></span>
+            <input id="smartDrawingSmoothness" type="range" min="0" max="100" step="1" value="35">
+            <small>تقليل اهتزاز الخط وتنعيم انحناءاته مع الحفاظ على شكل القلم.</small>
+          </label>
+          <label class="smart-drawing-range" for="smartDrawingCorrection">
+            <span><strong>التصحيح التلقائي</strong><output id="smartDrawingCorrectionValue">20%</output></span>
+            <input id="smartDrawingCorrection" type="range" min="0" max="100" step="1" value="20">
+            <small>تحسين مسار الضربة بعد رفع القلم دون تعديل سماكة الفرشاة أو ضغطها.</small>
+          </label>
+          <label class="smart-drawing-range" for="smartDrawingRecognition">
+            <span><strong>التعرّف على الأشكال</strong><output id="smartDrawingRecognitionValue">0%</output></span>
+            <input id="smartDrawingRecognition" type="range" min="0" max="100" step="1" value="0">
+            <small>تحويل الخطوط والدوائر والمستطيلات المرسومة يدوياً إلى أشكال منتظمة عند وضوح الرسم.</small>
+          </label>
+        </div>
+      </section>
     </div>
 
     <!-- NEW CANVAS CONFIRMATION MODAL -->
