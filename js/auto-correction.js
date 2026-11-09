@@ -46,7 +46,7 @@ function angleAt(points, index, radius = 2) {
 function findProtectedSamples(points) {
   const protectedSamples = new Set([0, points.length - 1]);
   for (let i = 2; i < points.length - 2; i++) {
-    if (angleAt(points, i, 2) > 0.58) {
+    if (angleAt(points, i, 2) > 0.82) {
       protectedSamples.add(i - 1);
       protectedSamples.add(i);
       protectedSamples.add(i + 1);
