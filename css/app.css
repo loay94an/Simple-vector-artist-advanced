@@ -3948,3 +3948,8 @@ body.dark .canvas-area {
   display: block !important;
   margin-top: 8px;
 }
+#brushPresetsSection .brush-presets-general[hidden],
+#brushPresetsSection .brush-presets-calligraphy[hidden],
+#brushPresetsSection .brush-presets-feather[hidden] {
+  display: none !important;
+}
