@@ -430,10 +430,6 @@
       group.className = "concepts-harmony-family";
       group.setAttribute("role", "group");
       group.setAttribute("aria-label", family.name);
-      const familyLabel = document.createElement("span");
-      familyLabel.className = "concepts-harmony-family-label";
-      familyLabel.textContent = family.name;
-      group.appendChild(familyLabel);
       family.colors.forEach((hex, shadeIndex) => {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -503,6 +499,68 @@
     renderRecentColors();
   }
 
+  // Independent compact menu: only the complementary hue and its shades.
+  function updateComplementaryColorsMenu() {
+    const menu = $("complementaryColorsMenu");
+    if (!menu) return;
+    const hsv = hexToHsv(currentColor);
+    const family = getHarmonies(hsv.h, hsv.s, hsv.v).find(item => item.name === "مكمل");
+    const swatches = menu.querySelector(".complementary-menu-swatches");
+    const base = menu.querySelector(".complementary-menu-base");
+    if (!family || !swatches || !base) return;
+    base.replaceChildren();
+    const dot = document.createElement("span");
+    dot.style.cssText = "width:15px;height:15px;border-radius:50%;background:" + currentColor + ";border:1px solid rgba(127,127,127,.35)";
+    base.append(dot, document.createTextNode("اللون الحالي " + currentColor));
+    swatches.replaceChildren();
+    family.colors.forEach((hex, index) => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "complementary-menu-swatch";
+      swatch.style.backgroundColor = hex;
+      swatch.title = "درجة اللون المتكامل " + (index + 1) + " · " + hex;
+      swatch.setAttribute("aria-label", swatch.title);
+      swatch.addEventListener("click", () => {
+        const next = hexToHsv(hex);
+        activeHue = next.h; activeSat = next.s; activeVal = next.v;
+        applyColor(hex, true);
+        closeComplementaryColorsMenu();
+      });
+      swatches.appendChild(swatch);
+    });
+  }
+
+  function closeComplementaryColorsMenu() {
+    $("complementaryColorsMenu")?.classList.remove("open");
+    $("complementaryColorsBtn")?.setAttribute("aria-expanded", "false");
+  }
+
+  function initComplementaryColorsMenu() {
+    const btn = $("complementaryColorsBtn");
+    if (!btn || $("complementaryColorsMenu")) return;
+    const menu = document.createElement("div");
+    menu.id = "complementaryColorsMenu";
+    menu.setAttribute("dir", "rtl");
+    menu.innerHTML = '<div class="complementary-menu-title">الألوان المتكاملة</div><div class="complementary-menu-base"></div><div class="complementary-menu-swatches"></div>';
+    document.body.appendChild(menu);
+    btn.addEventListener("click", event => {
+      event.stopPropagation();
+      if (menu.classList.contains("open")) { closeComplementaryColorsMenu(); return; }
+      updateComplementaryColorsMenu();
+      const rect = btn.getBoundingClientRect();
+      menu.style.top = Math.round(rect.bottom + 7) + "px";
+      menu.style.right = Math.max(8, Math.round(window.innerWidth - rect.right)) + "px";
+      menu.classList.add("open");
+      btn.setAttribute("aria-expanded", "true");
+    });
+    menu.addEventListener("click", event => event.stopPropagation());
+    document.addEventListener("pointerdown", event => {
+      if (!menu.contains(event.target) && !btn.contains(event.target)) closeComplementaryColorsMenu();
+    });
+    window.addEventListener("resize", closeComplementaryColorsMenu);
+    window.addEventListener("scroll", closeComplementaryColorsMenu, true);
+    updateComplementaryColorsMenu();
+  }
   function applyColor(color, saveHistory = false) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) return;
     currentColor = color.toUpperCase();
@@ -531,6 +589,7 @@
       selectedDot.setAttribute("aria-label", "اللون المختار " + currentColor);
     }
     updateHarmonies();
+    updateComplementaryColorsMenu();
 
     if (saveHistory) {
       saveToHistory(currentColor);
@@ -632,13 +691,7 @@
     const container = $("conceptsWheelContainer");
     if (!container) return;
 
-    const anchorRect = openBtn?.getBoundingClientRect();
-    if (anchorRect) {
-      container.style.setProperty("--palette-top", String(Math.round(anchorRect.bottom + 7)) + "px");
-      container.style.setProperty("--palette-right", String(Math.max(8, Math.round(window.innerWidth - anchorRect.right))) + "px");
-    }
     container.classList.add("open");
-    openBtn?.setAttribute("aria-expanded", "true");
     isWheelExpanded = true;
     updateHarmonies();
     renderRecentColors();
@@ -648,7 +701,6 @@
     const container = $("conceptsWheelContainer");
     if (!container) return;
     container.classList.remove("open");
-    openBtn?.setAttribute("aria-expanded", "false");
     isWheelExpanded = false;
   }
 
@@ -704,6 +756,7 @@
   // Support long-press directly on canvas workspace to summon Concepts radial wheel
   window.addEventListener("DOMContentLoaded", () => {
     initConceptsWheelUI();
+    initComplementaryColorsMenu();
     if (currentColor) applyColor(currentColor, false);
   });
 
