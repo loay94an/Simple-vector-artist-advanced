@@ -18,6 +18,11 @@
 
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
+// Expose the official Capacitor runtime for the legacy inline UI controllers.
+if (typeof window !== "undefined") {
+  window.Capacitor = Capacitor;
+}
+
 import {
   DrawingDocument,
   Camera,
