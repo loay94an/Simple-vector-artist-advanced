@@ -1449,7 +1449,12 @@ export class DrawingEngine {
         featherSpacing: brushStyle.featherSpacing ?? 1,
         featherSpread: brushStyle.featherSpread ?? 0.45,
         featherSoftness: brushStyle.featherSoftness ?? 0.35,
-        featherTaper: brushStyle.featherTaper ?? 0.7
+        featherTaper: brushStyle.featherTaper ?? 0.7,
+        featherGap: brushStyle.featherGap ?? .35,
+        featherPressure: brushStyle.featherPressure ?? .75,
+        featherSpeed: brushStyle.featherSpeed ?? .25,
+        featherAngle: brushStyle.featherAngle ?? 0,
+        featherTexture: brushStyle.featherTexture ?? .35
       };
 
       if (screenPoints.length && this.renderer.appendCanvasPreview?.(
@@ -1469,6 +1474,11 @@ export class DrawingEngine {
           featherSpread: brushStyle.featherSpread,
           featherSoftness: brushStyle.featherSoftness,
           featherTaper: brushStyle.featherTaper,
+          featherGap: brushStyle.featherGap,
+          featherPressure: brushStyle.featherPressure,
+          featherSpeed: brushStyle.featherSpeed,
+          featherAngle: brushStyle.featherAngle,
+          featherTexture: brushStyle.featherTexture,
           pressureEnabled: this.builder.pressureEnabled
         }
       )) {
