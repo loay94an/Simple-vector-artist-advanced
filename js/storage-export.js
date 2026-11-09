@@ -25,6 +25,16 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 // SHARED HELPERS
 // =========================================================
 
+async function blobToBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 function cloneData(value) {
   if (typeof structuredClone === "function") {
     return structuredClone(value);
@@ -79,15 +89,18 @@ export async function downloadBlob(blob, filename) {
   else if (ext === "pdf") description = "مستند PDF";
   else if (ext === "rasem" || ext === "json") description = "مشروع رسم";
 
-  // Native Android APK: use the registered Save As plugin instead of an HTML download.
-  // WebView downloads are not reliably handled by an anchor element.
+  // Native Android APK: call the registered Capacitor Downloads plugin.
+  // Android WebView anchor downloads are not reliable for generated Blob files.
   try {
-    const { Capacitor } = await import("@capacitor/core");
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
-      if (typeof window.rasemNativeSaveAs !== "function") {
-        throw new Error("خدمة الحفظ الأصلية غير متاحة في نسخة التطبيق.");
-      }
-      const result = await window.rasemNativeSaveAs(blob, filename);
+      const Downloads = registerPlugin("Downloads");
+      const data = await blobToBase64(blob);
+      const result = await Downloads.save({
+        filename,
+        mimeType: blob.type || "application/octet-stream",
+        data
+      });
       return result?.cancelled === true ? false : result?.saved === true;
     }
   } catch (nativeError) {
@@ -257,10 +270,18 @@ export async function shareBlob(blob, filename) {
     console.error("Android native sharing failed:", error);
 
     // Keep a working native export path if the Android share sheet is unavailable.
-    if (typeof window.rasemNativeSaveAs === "function") {
-      const saved = await window.rasemNativeSaveAs(blob, safeName);
+    try {
+      const { registerPlugin } = await import("@capacitor/core");
+      const Downloads = registerPlugin("Downloads");
+      const saved = await Downloads.save({
+        filename: safeName,
+        mimeType: blob.type || "application/octet-stream",
+        data: await blobToBase64(blob)
+      });
       if (saved?.cancelled === true) return false;
       if (saved?.saved === true) return true;
+    } catch (saveError) {
+      console.error("Native save fallback failed:", saveError);
     }
 
     throw new Error(
