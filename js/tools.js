@@ -321,9 +321,9 @@ export class Eraser extends BaseTool {
       overlay.id = "eraserCursorOverlay";
       overlay.setAttribute("pointer-events", "none");
       overlay.innerHTML = `
-        <circle class="eraser-cursor-fill" r="16"/>
-        <circle class="eraser-cursor-ring" r="16"/>
-        <path class="eraser-cursor-center" d="M-4 0H4 M0 -4V4"/>
+        <circle class="eraser-cursor-fill" r="16" fill="rgba(225,29,72,0.12)" stroke="none"/>
+        <circle class="eraser-cursor-ring" r="16" fill="none" stroke="#e11d48" stroke-width="1.8" stroke-dasharray="4 2" vector-effect="non-scaling-stroke"/>
+        <path class="eraser-cursor-center" d="M-4 0H4 M0 -4V4" fill="none" stroke="#e11d48" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
       `;
       viewport.appendChild(overlay);
     }
