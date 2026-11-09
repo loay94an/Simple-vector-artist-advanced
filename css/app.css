@@ -4005,3 +4005,30 @@ body.dark .canvas-area {
   .concepts-center-hub { width: 96px; height: 96px; }
   .concepts-center-color { width: 38px; height: 38px; }
 }
+
+
+/* Minimal hue ring with an interactive saturation/value center disk */
+.concepts-wheel-card { width: min(350px, calc(100vw - 24px)) !important; gap: 10px !important; }
+.concepts-title-row { gap: 9px; }
+.concepts-title-row .concepts-hex-label {
+  margin-inline-start: 8px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.concepts-canvas-wrap { width: min(292px, calc(100vw - 64px)); margin: 0 auto; }
+#conceptsCanvas { cursor: crosshair; }
+.concepts-tools-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+}
+.concepts-tools-row .concepts-subhead { line-height: 1.5; }
+.concepts-tools-row .concepts-eyedropper-btn { flex: 0 0 34px; margin: 0; }
+@media (max-width: 380px) {
+  .concepts-wheel-card { padding: 12px; gap: 9px; }
+  .concepts-canvas-wrap { width: min(278px, calc(100vw - 52px)); }
+}
