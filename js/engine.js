@@ -514,32 +514,34 @@ export class StrokeBuilder {
       return Math.max(0.35, baseRadius * pressure);
     };
 
-    // A real nib-shaped contact replaces the old oval cap. Its long axis
-    // follows the selected nib angle, while its silhouette follows the head preset.
-    const nibStamp = (point, radius) => {
-      const depth = Math.max(0.3, radius * (["cal-kufi", "cal-square", "cal-jali", "cal-sini"].includes(preset) ? 0.34 : 0.48));
-      let shape;
-      if (preset === "cal-needle" || preset === "cal-fine") {
-        shape = [[-radius, 0], [-radius * 0.38, -depth], [radius * 0.38, -depth], [radius, 0], [radius * 0.38, depth], [-radius * 0.38, depth]];
-      } else if (broadNib || preset === "cal-square") {
-        shape = [[-radius, -depth], [radius, -depth], [radius, depth], [-radius, depth]];
-      } else {
-        const bevel = Math.min(radius * 0.22, depth * 0.45);
-        shape = [[-radius + bevel, -depth], [radius - bevel, -depth], [radius, -depth + bevel], [radius, depth - bevel], [radius - bevel, depth], [-radius + bevel, depth], [-radius, depth - bevel], [-radius, -depth + bevel]];
-      }
-      const vertices = shape.map(([u, v]) => ({
-        x: point.x + cosA * u - sinA * v,
-        y: point.y + sinA * u + cosA * v
-      }));
+    // Stroke terminals are tapered along the actual movement direction.
+    // This avoids decorative nib stamps (ovals, polygons or blunt blocks) at
+    // the beginning and end: each terminal narrows naturally to one sharp tip.
+    const pathFromVertices = vertices => {
       let area = 0;
       for (let i = 0; i < vertices.length; i++) {
         const p = vertices[i], q = vertices[(i + 1) % vertices.length];
         area += p.x * q.y - q.x * p.y;
       }
       if (area < 0) vertices.reverse();
-      return vertices.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join(" ") + " Z";
+      return vertices.map((p, i) =>
+        `${i ? "L" : "M"} ${p.x.toFixed(3)} ${p.y.toFixed(3)}`
+      ).join(" ") + " Z";
     };
-    if (points.length === 1) return nibStamp(points[0], pressureRadius(points[0]));
+    const singlePointTip = (point, radius) => {
+      const sideX = cosA * radius;
+      const sideY = sinA * radius;
+      const depth = Math.max(radius * 1.25, this.baseSize * 0.45);
+      const alongX = -sinA * depth;
+      const alongY = cosA * depth;
+      return pathFromVertices([
+        { x: point.x + alongX, y: point.y + alongY },
+        { x: point.x + sideX, y: point.y + sideY },
+        { x: point.x - alongX, y: point.y - alongY },
+        { x: point.x - sideX, y: point.y - sideY }
+      ]);
+    };
+    if (points.length === 1) return singlePointTip(points[0], pressureRadius(points[0]));
 
     // Use consistently-wound nib-sized quads so a stroke crossing itself
     // cannot cancel under SVG's non-zero fill rule.
@@ -584,9 +586,29 @@ export class StrokeBuilder {
       if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 0.0001) continue;
       paths.push(quadPath(p1, p2, radii[i - 1], radii[i]));
     }
-    // Shape both stroke endpoints with the selected nib instead of an ellipse.
-    paths.push(nibStamp(points[0], radii[0]));
-    paths.push(nibStamp(points[points.length - 1], radii[radii.length - 1]));
+    // Taper both ends in the tangent direction of the stroke. The terminal
+    // point is sharp; the wider base blends into the ribbon without a cap stamp.
+    const addTaperedEnd = (point, neighbour, radius, atStart) => {
+      let dx = neighbour.x - point.x;
+      let dy = neighbour.y - point.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 0.0001) return;
+      dx /= length;
+      dy /= length;
+      const taperLength = Math.max(radius * 1.35, this.baseSize * 0.4);
+      const baseX = point.x + dx * taperLength;
+      const baseY = point.y + dy * taperLength;
+      const sideX = cosA * radius;
+      const sideY = sinA * radius;
+      paths.push(pathFromVertices([
+        { x: point.x, y: point.y },
+        { x: baseX + sideX, y: baseY + sideY },
+        { x: baseX - sideX, y: baseY - sideY }
+      ]));
+    };
+    addTaperedEnd(points[0], points[1], radii[0], true);
+    addTaperedEnd(points[points.length - 1], points[points.length - 2],
+      radii[radii.length - 1], false);
     return paths.join(" ");
   }
   build(options = {}) {
