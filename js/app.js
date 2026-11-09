@@ -983,7 +983,7 @@ export class RasemApplication {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem("rasem_smart_drawing_v1") || "{}"); } catch {}
     const initial = engine.setSmartDrawing({
-      enabled: saved.enabled === true,
+      enabled: saved.enabled !== false,
       smoothness: Number.isFinite(saved.smoothness) ? saved.smoothness : 35,
       correction: Number.isFinite(saved.correction) ? saved.correction : 20,
       recognition: Number.isFinite(saved.recognition) ? saved.recognition : 65
@@ -1005,7 +1005,14 @@ export class RasemApplication {
       const output = getElement(input.id + "Value");
       const updateOutput = () => { if (output) output.textContent = input.value + "%"; };
       updateOutput();
-      input.addEventListener("input", () => { updateOutput(); persist(); });
+      input.addEventListener("input", () => {
+        updateOutput();
+        // Moving the correction slider activates smart drawing automatically.
+        if (key === "correction" && Number(input.value) > 0 && enabledInput) {
+          enabledInput.checked = true;
+        }
+        persist();
+      });
       input.addEventListener("change", persist);
     });
     enabledInput?.addEventListener("change", persist);
@@ -1099,7 +1106,12 @@ export class RasemApplication {
     button.setAttribute("aria-pressed", String(enabled));
     button.title = enabled ? "الرسم الذكي: يعمل" : "الرسم الذكي: متوقف";
     const status = getElement("smartDrawingStatus");
-    if (status) status.textContent = enabled ? "الرسم الذكي يعمل على أدوات الرسم" : "الرسم الذكي متوقف";
+    if (status) {
+      const correction = Math.round(Number(state.correction) || 0);
+      status.textContent = enabled
+        ? `الرسم الذكي يعمل · قوة التصحيح ${correction}%`
+        : "الرسم الذكي متوقف";
+    }
   }
 
   setTwoFingerPan(enabled, announce = true) {
