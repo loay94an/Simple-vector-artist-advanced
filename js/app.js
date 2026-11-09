@@ -24,15 +24,15 @@ import {
   Scene,
   Coordinates,
   EventManager
-} from "./core.js?v=20261109-05";
+} from "./core.js?v=20261109-06";
 
 import {
   DrawingEngine
-} from "./engine.js?v=20261109-30";
+} from "./engine.js?v=20261109-31";
 
 import {
   ToolManager
-} from "./tools.js?v=20261109-02";
+} from "./tools.js?v=20261109-03";
 
 import {
   HistoryManager
