@@ -1,7 +1,7 @@
 
 import { ArabicWritingAssistant } from "./arabic-writing.js";
 import { recognizeShape } from "./shape-recognition.js";
-import { correctStrokePoints, transferStrokeAttributes } from "./auto-correction.js?v=20261109-02";
+import { correctStrokePoints, transferStrokeAttributes } from "./auto-correction.js?v=20261109-03";
 
 /* =========================================================
    RASEM 2.0
