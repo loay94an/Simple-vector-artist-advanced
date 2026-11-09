@@ -203,91 +203,62 @@ export async function shareBlob(blob, filename) {
   }
 
   const safeName = String(filename || "rasem-" + Date.now())
-    .replaceAll("/", "-")
-    .replaceAll("\\", "-")
-    .replaceAll(":", "-")
-    .replaceAll("*", "-")
-    .replaceAll("?", "-")
-    .replaceAll('"', "-")
-    .replaceAll("<", "-")
-    .replaceAll(">", "-")
-    .replaceAll("|", "-")
-    .trim();
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .trim() || "rasem-export";
 
-  const { Capacitor } = await import("@capacitor/core");
-  const platform = Capacitor.getPlatform();
-
-  if (platform !== "android" || !Capacitor.isNativePlatform()) {
-    throw new Error(
-      "لم يتعرف التطبيق على بيئة Android الأصلية. المنصة المكتشفة: " + platform
-    );
-  }
-
-  try {
-    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
-      import("@capacitor/filesystem"),
-      import("@capacitor/share")
-    ]);
-
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let binary = "";
-    const chunkSize = 0x8000;
-
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-    }
-
-    const saved = await Filesystem.writeFile({
-      path: safeName,
-      data: btoa(binary),
-      directory: Directory.Cache,
-      recursive: true
+  // Native Android: use our own ACTION_SEND + FileProvider bridge.
+  // This avoids relying on WebView's download handling or a plugin fallback
+  // that silently opens the Save As dialog instead of the share sheet.
+  const { Capacitor, registerPlugin } = await import("@capacitor/core");
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
+    const NativeShare = registerPlugin("NativeShare");
+    const data = await blobToBase64(blob);
+    const result = await NativeShare.share({
+      filename: safeName,
+      mimeType: blob.type || "application/octet-stream",
+      title: "مشاركة الرسم",
+      data
     });
 
-    const uri = saved.uri || (
-      await Filesystem.getUri({
-        path: safeName,
-        directory: Directory.Cache
-      })
-    ).uri;
-
-    if (!uri) {
-      throw new Error("تعذر الحصول على رابط ملف المشاركة.");
+    if (result?.shared !== true) {
+      throw new Error("لم يؤكد Android فتح قائمة المشاركة.");
     }
-
-    await Share.share({
-      title: safeName,
-      dialogTitle: "مشاركة الرسم",
-      files: [uri]
-    });
-
     return true;
-  } catch (error) {
-    if (error?.name === "AbortError" || error?.message?.toLowerCase?.().includes("cancel")) {
-      return false;
-    }
-
-    console.error("Android native sharing failed:", error);
-
-    // Keep a working native export path if the Android share sheet is unavailable.
-    try {
-      const { registerPlugin } = await import("@capacitor/core");
-      const Downloads = registerPlugin("Downloads");
-      const saved = await Downloads.save({
-        filename: safeName,
-        mimeType: blob.type || "application/octet-stream",
-        data: await blobToBase64(blob)
-      });
-      if (saved?.cancelled === true) return false;
-      if (saved?.saved === true) return true;
-    } catch (saveError) {
-      console.error("Native save fallback failed:", saveError);
-    }
-
-    throw new Error(
-      "تعذرت مشاركة الملف عبر Android: " + (error?.message || error)
-    );
   }
+
+  // Browser/PWA fallback: use the native Web Share sheet when file sharing
+  // is supported, otherwise download the generated file.
+  if (typeof navigator !== "undefined" &&
+      typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function") {
+    try {
+      const file = new File([blob], safeName, {
+        type: blob.type || "application/octet-stream",
+        lastModified: Date.now()
+      });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: safeName
+        });
+        return true;
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") return false;
+      console.warn("Web Share API failed; using file download.", error);
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = safeName;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  return true;
 }
 
 function normalizeFilename(name, extension) {
