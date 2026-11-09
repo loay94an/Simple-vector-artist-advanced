@@ -688,7 +688,7 @@ function classifyExtended(points,result) {
     const radii=points.map(p=>distance(p,center));
     let radialChanges=0;
     for(let i=1;i<radii.length;i++) if(Math.abs(radii[i]-radii[i-1])>diag*.002) radialChanges++;
-    if(radialChanges>points.length*.55&&open/Math.max(1,diag)>.18) labels.add("spiral");
+    if(result.type==="spiral") labels.add("spiral");
     // A double-lobed closed-looking open stroke is a lemniscate candidate.
     if(extrema>=2&&open/Math.max(1,diag)<.08) labels.add("lemniscate");
   }
@@ -721,54 +721,99 @@ function classifyExtended(points,result) {
   return [...labels];
 }
 
-function classifyShapeVariant(points, result, labels) {
-  const box = boundsOf(points);
-  const diagonal = Math.hypot(box.width, box.height);
-  if (!diagonal) return null;
-  const isClosed = distance(points[0], points.at(-1)) <= Math.max(10, diagonal * 0.14) &&
-    pathLength(points) > diagonal * 2.1;
-  let family = null;
-  if (!isClosed) {
-    if (labels.includes("spiral")) family = "open-spiral";
-    else if (labels.includes("sine-wave") || labels.includes("wavy-line")) family = "open-wave";
-    else if (labels.includes("s-curve")) family = "open-s-curve";
-    else if (labels.includes("orthogonal-polyline")) family = "open-orthogonal-polyline";
-    else if (labels.includes("compound-curve")) family = "open-compound-curve";
-    else if (result.type === "line") family = "open-line";
-    else if (result.type === "arc") family = "open-arc";
-    else if (result.type === "zigzag") family = "open-zigzag";
-    else if (result.type === "polyline") family = "open-polyline";
-    else if (result.type === "curve") family = "open-curve";
-  } else {
-    if (labels.includes("annulus")) family = "closed-annulus";
-    else if (labels.includes("crescent")) family = "closed-crescent";
-    else if (labels.includes("polygon-star")) family = "closed-star";
-    else if (labels.includes("polygon-concave")) family = "closed-concave-polygon";
-    else if (labels.includes("polygon-regular")) family = "closed-regular-polygon";
-    else if (result.type === "triangle") family = "closed-triangle";
-    else if (result.type === "circle") family = "closed-circle";
-    else if (result.type === "ellipse") family = "closed-ellipse";
-    else if (["square", "rectangle", "rhombus", "parallelogram", "trapezoid", "quadrilateral", "kite", "dart"].includes(result.type)) family = "closed-quadrilateral";
-    else if (result.corners?.length >= 3) family = "closed-polygon";
+function classifyOpenSpecialFamily(points,result,labels) {
+  const box=boundsOf(points),diag=Math.hypot(box.width,box.height);
+  const chordRatio=distance(points[0],points.at(-1))/Math.max(1,diag);
+  const sampled=resample(points,Math.max(2,diag/80),false);
+  let signs=[],turnSum=0,sharpest=180;
+  for(let i=2;i<sampled.length;i++){
+    const a={x:sampled[i-1].x-sampled[i-2].x,y:sampled[i-1].y-sampled[i-2].y};
+    const b={x:sampled[i].x-sampled[i-1].x,y:sampled[i].y-sampled[i-1].y};
+    if(length(a)<.001||length(b)<.001)continue;
+    const turn=Math.atan2(cross(a,b),dot(a,b));
+    if(Math.abs(turn)>.035){signs.push(Math.sign(turn));turnSum+=turn;}
+    sharpest=Math.min(sharpest,Math.acos(clamp(dot(a,b)/(length(a)*length(b)),-1,1))*180/Math.PI);
   }
-  if (!family) return null;
-  const mean = points.reduce((sum, p) => ({
-    x: sum.x + p.x / points.length,
-    y: sum.y + p.y / points.length
-  }), { x: 0, y: 0 });
-  let xx = 0, xy = 0, yy = 0;
-  for (const p of points) {
-    const dx = p.x - mean.x, dy = p.y - mean.y;
-    xx += dx * dx; xy += dx * dy; yy += dy * dy;
+  const reversals=signs.slice(1).filter((v,i)=>v!==signs[i]).length;
+  const corners=result.corners?.length||0,absTurn=Math.abs(turnSum);
+  if(chordRatio<.2&&absTurn>Math.PI*1.35)return "open-loop";
+  if(reversals>=2||result.type==="zigzag")return "open-serpentine";
+  if(sharpest<48&&corners===0)return "open-cusp";
+  if(corners>=2)return "open-compound-path";
+  if(corners===1){
+    const a={x:result.corners[0].x-points[0].x,y:result.corners[0].y-points[0].y};
+    const b={x:points.at(-1).x-result.corners[0].x,y:points.at(-1).y-result.corners[0].y};
+    const angle=Math.acos(clamp(dot(a,b)/Math.max(EPSILON,length(a)*length(b)),-1,1));
+    if(Math.abs(angle-Math.PI/2)<.38)return "open-l-path";
+    return "open-hook";
   }
-  const angle = ((0.5 * Math.atan2(2 * xy, xx - yy) % Math.PI) + Math.PI) % Math.PI;
-  const axisBin = Math.min(9, Math.floor(angle / Math.PI * 10));
-  const ratio = Math.max(box.width, box.height) / Math.max(1, Math.min(box.width, box.height));
-  const ratioBin = ratio < 1.15 ? 0 : ratio < 1.35 ? 1 : ratio < 1.7 ? 2 : ratio < 2.4 ? 3 : 4;
-  return family + "-axis-" + String(axisBin + 1).padStart(2, "0") +
-    "-ratio-" + String(ratioBin + 1).padStart(2, "0");
+  if(reversals===1||labels.includes("s-curve"))return "open-s-curve";
+  if(absTurn>Math.PI*.78&&absTurn<Math.PI*1.4)return box.height>box.width*1.15?"open-j-curve":"open-u-shape";
+  if(absTurn>Math.PI*.3&&absTurn<=Math.PI*.78)return box.height>box.width*1.3?"open-j-curve":"open-c-curve";
+  if(chordRatio<.5)return "open-hook";
+  return "open-compound-path";
 }
 
+function classifyShapeVariant(points,result,labels) {
+  const box=boundsOf(points),diagonal=Math.hypot(box.width,box.height);
+  if(!diagonal)return null;
+  const isClosed=distance(points[0],points.at(-1))<=Math.max(10,diagonal*.14)&&pathLength(points)>diagonal*2.1;
+  if(isClosed)return null;
+
+  let family=null,levelMetric=0;
+  if(result.type==="spiral"){
+    const turns=result.spiralTurns||1.5,growth=result.spiralGrowth||.1;
+    const center={x:box.minX+box.width/2,y:box.minY+box.height/2};
+    const polar=points.map(p=>({a:Math.atan2(p.y-center.y,p.x-center.x),r:distance(p,center)}));
+    const angles=[polar[0].a];
+    for(let i=1;i<polar.length;i++){let d=polar[i].a-polar[i-1].a;while(d>Math.PI)d-=2*Math.PI;while(d< -Math.PI)d+=2*Math.PI;angles.push(angles[i-1]+d);}
+    const modelError=values=>{
+      const n=values.length,mx=angles.reduce((a,b)=>a+b,0)/n,my=values.reduce((a,b)=>a+b,0)/n;
+      let num=0,den=0;
+      for(let i=0;i<n;i++){num+=(angles[i]-mx)*(values[i]-my);den+=(angles[i]-mx)**2;}
+      const slope=num/Math.max(EPSILON,den),intercept=my-slope*mx;
+      let e=0;for(let i=0;i<n;i++)e+=(values[i]-(intercept+slope*angles[i]))**2;
+      return Math.sqrt(e/n)/Math.max(1,Math.max(...values)-Math.min(...values));
+    };
+    const r=polar.map(p=>p.r),linear=modelError(r);
+    const logarithmic=modelError(r.map(v=>Math.log(Math.max(1,v))));
+    const fermat=modelError(r.map(v=>v*v));
+    const hyperbolic=modelError(r.map(v=>1/Math.max(1,v)));
+    const quadratic=modelError(r.map((v,i)=>v+0.0));
+    if(logarithmic+.035<linear&&logarithmic<fermat)family="spiral-logarithmic";
+    else if(fermat+.035<linear)family="spiral-fermat";
+    else if(hyperbolic+.035<linear)family="spiral-hyperbolic";
+    else if(turns>3.5&&growth<.32)family="spiral-tight";
+    else if(turns<1.85)family="spiral-partial";
+    else if(growth>.48)family="spiral-loose";
+    else if(turns>2.7)family="spiral-multi-turn";
+    else if(quadratic<linear*.82)family="spiral-clothoid";
+    else family="spiral-archimedean";
+    levelMetric=turns;
+    labels.push("spiral");
+  }else{
+    family=classifyOpenSpecialFamily(points,result,labels);
+    const sampled=resample(points,Math.max(2,diagonal/80),false);
+    let reversals=0,last=0;
+    for(let i=2;i<sampled.length;i++){
+      const a={x:sampled[i-1].x-sampled[i-2].x,y:sampled[i-1].y-sampled[i-2].y};
+      const b={x:sampled[i].x-sampled[i-1].x,y:sampled[i].y-sampled[i-1].y};
+      const sign=Math.sign(cross(a,b));
+      if(sign&&last&&sign!==last)reversals++;
+      if(sign)last=sign;
+    }
+    levelMetric=(result.corners?.length||0)+reversals;
+  }
+  if(!family)return null;
+  const mean=points.reduce((s,p)=>({x:s.x+p.x/points.length,y:s.y+p.y/points.length}),{x:0,y:0});
+  let xx=0,xy=0,yy=0;
+  for(const p of points){const dx=p.x-mean.x,dy=p.y-mean.y;xx+=dx*dx;xy+=dx*dy;yy+=dy*dy;}
+  const angle=((.5*Math.atan2(2*xy,xx-yy)%Math.PI)+Math.PI)%Math.PI;
+  const direction=Math.min(9,Math.floor(angle/Math.PI*10));
+  const level=Math.min(4,Math.max(0,Math.floor(levelMetric/1.6)));
+  return family+"-level-"+String(level+1).padStart(2,"0")+
+    "-direction-"+String(direction+1).padStart(2,"0");
+}
 export function recognizeShape(sourcePoints, options = {}) {
   const result=recognizeShapeBase(sourcePoints,options);
   if(!result) return null;
