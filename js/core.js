@@ -918,20 +918,42 @@ export class Scene {
       mask.id = maskId;
       mask.setAttribute("maskUnits", "userSpaceOnUse");
       mask.setAttribute("maskContentUnits", "userSpaceOnUse");
-      mask.setAttribute("x", "-100000");
-      mask.setAttribute("y", "-100000");
-      mask.setAttribute("width", "200000");
-      mask.setAttribute("height", "200000");
       mask.setAttribute("mask-type", "luminance");
+      mask.style.maskType = "luminance";
       defs.appendChild(mask);
+    }
+
+    // Keep the mask surface tight to the actual stroke bounds. Extremely
+    // large mask rectangles can trigger clipping/rasterization artefacts on
+    // mobile browsers, which look like stray horizontal or vertical erasure.
+    let bounds = null;
+    try {
+      const box = node.getBBox();
+      if ([box.x, box.y, box.width, box.height].every(Number.isFinite)) {
+        bounds = box;
+      }
+    } catch {}
+
+    const style = element.style || {};
+    const pad = Math.max(24, numberOr(Number(style.size), 3) * 2);
+    if (bounds) {
+      mask.setAttribute("x", String(bounds.x - pad));
+      mask.setAttribute("y", String(bounds.y - pad));
+      mask.setAttribute("width", String(Math.max(1, bounds.width + pad * 2)));
+      mask.setAttribute("height", String(Math.max(1, bounds.height + pad * 2)));
+    } else {
+      mask.setAttribute("x", "-10000");
+      mask.setAttribute("y", "-10000");
+      mask.setAttribute("width", "20000");
+      mask.setAttribute("height", "20000");
     }
 
     while (mask.firstChild) mask.removeChild(mask.firstChild);
     const background = document.createElementNS(SVG_NS, "rect");
-    background.setAttribute("x", "-100000");
-    background.setAttribute("y", "-100000");
-    background.setAttribute("width", "200000");
-    background.setAttribute("height", "200000");
+    background.setAttribute("x", mask.getAttribute("x"));
+    background.setAttribute("y", mask.getAttribute("y"));
+    background.setAttribute("width", mask.getAttribute("width"));
+    background.setAttribute("height", mask.getAttribute("height"));
     background.setAttribute("fill", "#fff");
     mask.appendChild(background);
 
@@ -939,6 +961,7 @@ export class Scene {
     erasedArea.setAttribute("d", maskData.d);
     erasedArea.setAttribute("fill", "#000");
     erasedArea.setAttribute("fill-rule", "nonzero");
+    erasedArea.setAttribute("clip-rule", "nonzero");
     mask.appendChild(erasedArea);
     node.setAttribute("mask", "url(#" + maskId + ")");
   }
