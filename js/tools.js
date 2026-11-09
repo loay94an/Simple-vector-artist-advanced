@@ -914,7 +914,9 @@ export class Selector extends BaseTool {
 
     for (const el of this.getSelectedElements()) {
       elements.set(el.id, {
-        transform: el.transform || ""
+        transform: el.transform || "",
+        points: Array.isArray(el.points) ? el.points.map(p => ({ ...p })) : null,
+        path: el.path
       });
     }
 
@@ -999,8 +1001,8 @@ export class Selector extends BaseTool {
         original.transform
       ].filter(Boolean).join(" ");
 
-      if (el.type === "stroke" && Array.isArray(el.points)) {
-        el.points = el.points.map(p => {
+      if (el.type === "stroke" && Array.isArray(original.points)) {
+        el.points = original.points.map(p => {
           const x = p.x - snapshot.startCenter.x;
           const y = p.y - snapshot.startCenter.y;
           const scaledX = x * factor, scaledY = y * factor;
@@ -1012,6 +1014,7 @@ export class Selector extends BaseTool {
             y: snapshot.startCenter.y + rotatedY + moveY
           };
         });
+        el.path = original.path;
       }
       el.transform = transform;
     }
