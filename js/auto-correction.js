@@ -1,166 +1,139 @@
 /*
- * Adaptive freehand correction for Rasem.
- *
- * The implementation combines established sketch-processing ideas:
- * uniform local neighbourhoods, corner preservation, speed-aware filtering,
- * and attribute-preserving resampling. It is an original integration for
- * Rasem; it does not copy third-party source files.
+ * Strength-controlled freehand beautification for Rasem.
+ * The correction is deliberately post-stroke so raw pointer samples remain
+ * available for undo/history. Pressure and timing are retained.
  */
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const validPoint = point => Number.isFinite(point?.x) && Number.isFinite(point?.y);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const validPoint = p => Number.isFinite(p?.x) && Number.isFinite(p?.y);
 const distance = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
 
 function median(values) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[middle]
-    : (sorted[middle - 1] + sorted[middle]) / 2;
+  const m = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
 }
 
-function boundsDiagonal(points) {
-  const xs = points.map(point => point.x);
-  const ys = points.map(point => point.y);
-  return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-}
-
-function angleAt(points, index, radius = 2) {
-  const before = points[Math.max(0, index - radius)];
-  const current = points[index];
-  const after = points[Math.min(points.length - 1, index + radius)];
-  const ax = current.x - before.x;
-  const ay = current.y - before.y;
-  const bx = after.x - current.x;
-  const by = after.y - current.y;
-  const denominator = Math.hypot(ax, ay) * Math.hypot(bx, by);
-  if (denominator < 1e-6) return 0;
-  return Math.acos(clamp((ax * bx + ay * by) / denominator, -1, 1));
-}
-
-/*
- * Anchor real corners before filtering. A corner is protected together with
- * its adjacent samples so smoothing cannot round a deliberate vertex.
- */
-function findProtectedSamples(points) {
-  const protectedSamples = new Set([0, points.length - 1]);
-  for (let i = 2; i < points.length - 2; i++) {
-    if (angleAt(points, i, 2) > 0.82) {
-      protectedSamples.add(i - 1);
-      protectedSamples.add(i);
-      protectedSamples.add(i + 1);
-    }
+function diagonal(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
   }
-  return protectedSamples;
+  return Math.max(1, Math.hypot(maxX - minX, maxY - minY));
+}
+
+function turningAngle(points, index, radius = 2) {
+  const a = points[Math.max(0, index - radius)];
+  const p = points[index];
+  const b = points[Math.min(points.length - 1, index + radius)];
+  const ax = p.x - a.x, ay = p.y - a.y;
+  const bx = b.x - p.x, by = b.y - p.y;
+  const den = Math.hypot(ax, ay) * Math.hypot(bx, by);
+  if (den < 1e-7) return 0;
+  return Math.acos(clamp((ax * bx + ay * by) / den, -1, 1));
 }
 
 /**
- * Reduce hand tremor while retaining endpoints, intentional corners,
- * pressure, timestamps and point order.
- *
- * strength: 0..100. The function never changes the number of samples.
+ * 0% = untouched. 100% = deliberately strong beautification.
+ * Higher strengths use a wider neighbourhood, more passes, and soften
+ * intentional corners instead of protecting them absolutely.
  */
 export function correctStrokePoints(source, strength = 35) {
   if (!Array.isArray(source)) return [];
-  const points = source.filter(validPoint).map(point => ({ ...point }));
+  const points = source.filter(validPoint).map(p => ({ ...p }));
   const amount = clamp(Number(strength) || 0, 0, 100);
-  if (points.length < 5 || amount <= 0) return points;
+  if (points.length < 3 || amount <= 0) return points;
 
-  const protectedSamples = findProtectedSamples(points);
-  const diagonal = Math.max(1, boundsDiagonal(points));
-  const segmentSpeeds = [];
-  for (let i = 1; i < points.length; i++) {
-    const elapsed = Math.max(1, (Number(points[i].time) || i) - (Number(points[i - 1].time) || i - 1));
-    segmentSpeeds.push(distance(points[i - 1], points[i]) / elapsed);
+  // Non-linear response makes the upper half of the slider substantially stronger.
+  const power = Math.pow(amount / 100, 0.78);
+  const radius = 1 + Math.round(power * 3);
+  const passes = 1 + Math.round(power * 5);
+  const weights = [];
+  for (let offset = -radius; offset <= radius; offset++) {
+    weights.push(Math.exp(-(offset * offset) / (2 * Math.max(1, radius * 0.72) ** 2)));
   }
-  const typicalSpeed = Math.max(1e-6, median(segmentSpeeds));
-  const passes = amount >= 72 ? 2 : 1;
-  const baseStrength = amount / 100;
 
+  const bounds = diagonal(points);
+  const speeds = [];
+  for (let i = 1; i < points.length; i++) {
+    const dt = Math.max(1, (Number(points[i].time) || i) - (Number(points[i - 1].time) || i - 1));
+    speeds.push(distance(points[i - 1], points[i]) / dt);
+  }
+  const typicalSpeed = Math.max(1e-6, median(speeds));
   let current = points;
-  for (let pass = 0; pass < passes; pass++) {
-    const previous = current.map(point => ({ ...point }));
-    const next = previous.map(point => ({ ...point }));
-    for (let i = 2; i < previous.length - 2; i++) {
-      if (protectedSamples.has(i)) continue;
-      const p = previous[i];
-      const localSpeed = (segmentSpeeds[Math.max(0, i - 1)] + segmentSpeeds[Math.min(segmentSpeeds.length - 1, i)]) / 2;
-      const speedRatio = clamp(localSpeed / typicalSpeed, 0.55, 1.8);
-      // Faster motion receives slightly more tremor filtering; deliberate
-      // slow movement remains closer to the captured hand path.
-      const adaptive = baseStrength * (0.82 + clamp(speedRatio - 1, -0.35, 0.55) * 0.22);
-      const weights = [1, 2, 4, 2, 1];
-      let totalWeight = 0, targetX = 0, targetY = 0;
-      for (let offset = -2; offset <= 2; offset++) {
-        const weight = weights[offset + 2];
-        const sample = previous[i + offset];
-        totalWeight += weight;
-        targetX += sample.x * weight;
-        targetY += sample.y * weight;
-      }
-      targetX /= totalWeight;
-      targetY /= totalWeight;
 
-      const proposedX = p.x + (targetX - p.x) * adaptive * 0.72;
-      const proposedY = p.y + (targetY - p.y) * adaptive * 0.72;
-      const maxShift = diagonal * (0.0015 + baseStrength * 0.006);
-      const dx = proposedX - p.x;
-      const dy = proposedY - p.y;
+  for (let pass = 0; pass < passes; pass++) {
+    const previous = current;
+    const next = previous.map(p => ({ ...p }));
+    for (let i = 1; i < previous.length - 1; i++) {
+      let sx = 0, sy = 0, sw = 0;
+      for (let offset = -radius; offset <= radius; offset++) {
+        const j = clamp(i + offset, 0, previous.length - 1);
+        const w = weights[offset + radius];
+        sx += previous[j].x * w;
+        sy += previous[j].y * w;
+        sw += w;
+      }
+      const p = previous[i];
+      const localSpeed = (speeds[Math.max(0, i - 1)] + speeds[Math.min(speeds.length - 1, i)]) / 2;
+      const speedRatio = clamp(localSpeed / typicalSpeed, 0.55, 1.8);
+      const speedGain = 0.9 + clamp(speedRatio - 1, -0.35, 0.55) * 0.22;
+      const blend = clamp((0.12 + power * 0.88) * speedGain, 0, 1);
+      let dx = (sx / sw - p.x) * blend;
+      let dy = (sy / sw - p.y) * blend;
+
+      // Corners are protected at low strength, but intentionally softened
+      // at high strength as requested by the user.
+      const angle = turningAngle(previous, i, Math.min(2, radius));
+      if (angle > 0.52) {
+        const cornerRetention = Math.pow(1 - power, 1.35);
+        dx *= cornerRetention;
+        dy *= cornerRetention;
+      }
+
+      const maxShift = bounds * (0.001 + power * 0.045);
       const shift = Math.hypot(dx, dy);
-      const scale = shift > maxShift ? maxShift / shift : 1;
-      next[i] = {
-        ...p,
-        x: p.x + dx * scale,
-        y: p.y + dy * scale
-      };
+      if (shift > maxShift) {
+        const scale = maxShift / shift;
+        dx *= scale; dy *= scale;
+      }
+      next[i] = { ...p, x: p.x + dx, y: p.y + dy };
     }
     current = next;
   }
   return current;
 }
 
-/*
- * Geometry fitting creates new sample positions. Transfer pressure and time
- * by normalized arc length so variable-width brushes retain their dynamics.
- */
+/** Transfer variable-width brush dynamics to a fitted/replaced path. */
 export function transferStrokeAttributes(source, target) {
   if (!Array.isArray(target)) return [];
   if (!Array.isArray(source) || source.length < 2 || target.length === 0) {
-    return target.map(point => ({ ...point }));
+    return target.map(p => ({ ...p }));
   }
-
   const lengths = [0];
   for (let i = 1; i < source.length; i++) {
     lengths.push(lengths[i - 1] + distance(source[i - 1], source[i]));
   }
-  const total = lengths[lengths.length - 1];
-  if (total < 1e-6) {
-    return target.map((point, index) => ({
-      ...point,
-      pressure: source[Math.min(source.length - 1, index)]?.pressure ?? 0.5,
-      time: source[Math.min(source.length - 1, index)]?.time ?? 0
-    }));
-  }
+  const total = lengths.at(-1);
+  if (total < 1e-6) return target.map((p, i) => ({
+    ...p,
+    pressure: source[Math.min(i, source.length - 1)]?.pressure ?? 0.5,
+    time: source[Math.min(i, source.length - 1)]?.time ?? 0
+  }));
 
-  return target.map((point, index) => {
-    const progress = target.length <= 1 ? 0 : index / (target.length - 1);
-    const wanted = total * progress;
-    let right = lengths.findIndex(value => value >= wanted);
+  return target.map((p, index) => {
+    const wanted = total * (target.length <= 1 ? 0 : index / (target.length - 1));
+    let right = lengths.findIndex(v => v >= wanted);
     if (right < 1) right = 1;
     if (right < 0) right = source.length - 1;
     const left = right - 1;
-    const span = Math.max(1e-6, lengths[right] - lengths[left]);
-    const t = clamp((wanted - lengths[left]) / span, 0, 1);
+    const t = clamp((wanted - lengths[left]) / Math.max(1e-6, lengths[right] - lengths[left]), 0, 1);
     const a = source[left], b = source[right];
-    const pressureA = Number.isFinite(a.pressure) ? a.pressure : 0.5;
-    const pressureB = Number.isFinite(b.pressure) ? b.pressure : 0.5;
-    const timeA = Number.isFinite(a.time) ? a.time : 0;
-    const timeB = Number.isFinite(b.time) ? b.time : timeA;
-    return {
-      ...point,
-      pressure: pressureA + (pressureB - pressureA) * t,
-      time: timeA + (timeB - timeA) * t
-    };
+    const pa = Number.isFinite(a.pressure) ? a.pressure : 0.5;
+    const pb = Number.isFinite(b.pressure) ? b.pressure : 0.5;
+    const ta = Number.isFinite(a.time) ? a.time : 0;
+    const tb = Number.isFinite(b.time) ? b.time : ta;
+    return { ...p, pressure: pa + (pb - pa) * t, time: ta + (tb - ta) * t };
   });
 }
