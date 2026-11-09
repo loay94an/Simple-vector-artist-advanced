@@ -842,68 +842,105 @@ export class HitTesting {
   }
 
   static getElementDistance(element, point) {
-    if (!element || !EngineUtils.validPoint(point)) {
-      return Infinity;
-    }
+    if (!element || !EngineUtils.validPoint(point)) return Infinity;
 
-    const size = EngineUtils.number(element.style?.size, 3);
-
-    // 1. Array of points (freehand drawing)
-    if (Array.isArray(element.points) && element.points.length > 0) {
-      const distance = this.distanceToPolyline(point, element.points);
-      return Math.max(0, distance - size / 2);
-    }
-
-    // 2. SVG Path string (curves, arrows, lines, complex strokes)
-    if (typeof element.path === "string" && element.path.trim().length > 0) {
-      const pathPoints = this.samplePointsFromPath(element.path);
-      if (pathPoints.length > 0) {
-        const distance = this.distanceToPolyline(point, pathPoints);
-        return Math.max(0, distance - size / 2);
-      }
-    }
-
-    // 3. Geometry attributes (lines, shapes, bounding boxes)
     const geometry = element.geometry || {};
+    const size = Math.max(0.5, EngineUtils.number(
+      element.style?.size ?? element.style?.strokeWidth, 3
+    ));
+    const halfStroke = size / 2;
+    const fill = String(element.style?.fill ?? "none").toLowerCase();
+    const hasFill = fill !== "none" && fill !== "transparent" && fill !== "";
 
-    // Line / Arrow segment geometry (x1, y1, x2, y2)
-    if (
-      geometry.x1 !== undefined && geometry.y1 !== undefined &&
-      geometry.x2 !== undefined && geometry.y2 !== undefined
-    ) {
-      const p1 = { x: Number(geometry.x1), y: Number(geometry.y1) };
-      const p2 = { x: Number(geometry.x2), y: Number(geometry.y2) };
-      if (EngineUtils.validPoint(p1) && EngineUtils.validPoint(p2)) {
-        const dist = this.distanceToSegment(point, p1, p2);
-        return Math.max(0, dist - size / 2);
+    // Freehand strokes: measure against every segment, not their bounding box.
+    if (Array.isArray(element.points) && element.points.length) {
+      return Math.max(0, this.distanceToPolyline(point, element.points) - halfStroke);
+    }
+
+    // Native SVG path geometry (curves and multi-segment arrows included).
+    const pathData = typeof geometry.d === "string" ? geometry.d :
+      (typeof element.path === "string" ? element.path : "");
+    if (pathData) {
+      try {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathData);
+        const length = path.getTotalLength();
+        if (Number.isFinite(length) && length > 0) {
+          let minimum = Infinity;
+          const steps = Math.max(24, Math.min(500, Math.ceil(length / 3)));
+          for (let i = 0; i <= steps; i++) {
+            const p = path.getPointAtLength(length * i / steps);
+            minimum = Math.min(minimum, EngineUtils.distance(point, p));
+          }
+          return Math.max(0, minimum - halfStroke);
+        }
+      } catch {}
+      const samples = this.samplePointsFromPath(pathData);
+      if (samples.length) return Math.max(0, this.distanceToPolyline(point, samples) - halfStroke);
+    }
+
+    // Polygon vertices are stored as an SVG "x,y x,y ..." string.
+    if (typeof geometry.points === "string") {
+      const nums = geometry.points.match(/-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[-+]?\\d+)?/gi)?.map(Number) || [];
+      const polygon = [];
+      for (let i = 0; i + 1 < nums.length; i += 2) polygon.push({ x: nums[i], y: nums[i + 1] });
+      if (polygon.length >= 2) {
+        if (hasFill && this.pointInPolygon(point, polygon)) return 0;
+        const closed = polygon.length > 2 ? [...polygon, polygon[0]] : polygon;
+        return Math.max(0, this.distanceToPolyline(point, closed) - halfStroke);
       }
     }
 
-    // Text elements hit testing
+    // Straight line / arrow legacy geometry.
+    if ([geometry.x1, geometry.y1, geometry.x2, geometry.y2].every(v => Number.isFinite(Number(v)))) {
+      const a = { x: Number(geometry.x1), y: Number(geometry.y1) };
+      const b = { x: Number(geometry.x2), y: Number(geometry.y2) };
+      return Math.max(0, this.distanceToSegment(point, a, b) - halfStroke);
+    }
+
+    // Ellipses and circles: support center/radius geometry explicitly.
+    if (Number.isFinite(geometry.cx) && Number.isFinite(geometry.cy)) {
+      const rx = Math.abs(EngineUtils.number(geometry.rx ?? geometry.r, 0));
+      const ry = Math.abs(EngineUtils.number(geometry.ry ?? geometry.r, rx));
+      if (rx > 0 && ry > 0) {
+        const nx = (point.x - geometry.cx) / rx;
+        const ny = (point.y - geometry.cy) / ry;
+        const normalized = Math.hypot(nx, ny);
+        if (hasFill && normalized <= 1) return 0;
+        // Approximate the nearest ellipse edge in document units.
+        const angle = Math.atan2(ny, nx);
+        const edge = { x: geometry.cx + Math.cos(angle) * rx, y: geometry.cy + Math.sin(angle) * ry };
+        return Math.max(0, EngineUtils.distance(point, edge) - halfStroke);
+      }
+    }
+
+    // Text uses its rendered text box as the selectable region.
     if (element.type === "text" || element.svgTag === "text") {
       const tx = EngineUtils.number(geometry.x, 0);
       const ty = EngineUtils.number(geometry.y, 0);
       const fontSize = EngineUtils.number(element.style?.fontSize || element.style?.size, 24);
-      const textLen = (element.text || "").length || 4;
-      const tw = textLen * fontSize * 0.65;
+      const tw = (element.text || "").length * fontSize * 0.65 || fontSize * 2;
       const th = fontSize * 1.2;
-      const closestX = EngineUtils.clamp(point.x, tx, tx + tw);
-      const closestY = EngineUtils.clamp(point.y, ty - th, ty);
-      const dist = EngineUtils.distance(point, { x: closestX, y: closestY });
-      return Math.max(0, dist);
+      const inside = point.x >= tx && point.x <= tx + tw && point.y >= ty - th && point.y <= ty;
+      if (inside) return 0;
+      const closest = { x: EngineUtils.clamp(point.x, tx, tx + tw), y: EngineUtils.clamp(point.y, ty - th, ty) };
+      return EngineUtils.distance(point, closest);
     }
 
-    // Rect, Square, Image, Circle bounding box
-    const x = EngineUtils.number(geometry.x, 0);
-    const y = EngineUtils.number(geometry.y, 0);
-    const width = EngineUtils.number(geometry.width, 0);
-    const height = EngineUtils.number(geometry.height, 0);
-
-    if (width > 0 && height > 0) {
+    // Rectangles: filled interiors are selectable; unfilled ones hit their outline.
+    const x = EngineUtils.number(geometry.x, NaN);
+    const y = EngineUtils.number(geometry.y, NaN);
+    const width = EngineUtils.number(geometry.width, NaN);
+    const height = EngineUtils.number(geometry.height, NaN);
+    if ([x, y, width, height].every(Number.isFinite) && width > 0 && height > 0) {
+      const inside = point.x >= x && point.x <= x + width && point.y >= y && point.y <= y + height;
+      if (inside && hasFill) return 0;
       const closestX = EngineUtils.clamp(point.x, x, x + width);
       const closestY = EngineUtils.clamp(point.y, y, y + height);
-      const dist = EngineUtils.distance(point, { x: closestX, y: closestY });
-      return Math.max(0, dist - size / 2);
+      if (inside) {
+        return Math.max(0, Math.min(point.x - x, x + width - point.x, point.y - y, y + height - point.y) - halfStroke);
+      }
+      return Math.max(0, EngineUtils.distance(point, { x: closestX, y: closestY }) - halfStroke);
     }
 
     return Infinity;
