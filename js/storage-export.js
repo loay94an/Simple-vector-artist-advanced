@@ -1,3 +1,7 @@
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+const NativeDownloads = registerPlugin("Downloads");
+
 
 /* =========================================================
    RASEM 2.0
@@ -78,69 +82,58 @@ function escapeXML(value) {
 
 export async function downloadBlob(blob, filename) {
   if (!(blob instanceof Blob)) throw new TypeError("Invalid export Blob");
+  const safeName = String(filename || "rasem-drawing-" + Date.now()).replace(/[\\\\/:*?"<>|]/g, "-").trim() || "rasem-export";
+  const extension = safeName.includes(".") ? safeName.split(".").pop().toLowerCase() : "";
+  const mimeType = (blob.type || "application/octet-stream").split(";")[0].trim() || "application/octet-stream";
 
-  const safeName = String(filename || "rasem-drawing-" + Date.now())
-    .replace(/[\\/:*?"<>|]/g, "-").trim() || "rasem-export";
-  const extension = safeName.split(".").pop()?.toLowerCase() || "";
-  const mimeType = (blob.type || "application/octet-stream")
-    .split(";")[0].trim() || "application/octet-stream";
-
-  // Android APK: native Save As picker. No ACTION_SEND or share chooser.
-  try {
-    const { Capacitor, registerPlugin } = await import("@capacitor/core");
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
-      const Downloads = registerPlugin("Downloads");
-      const result = await Downloads.save({
-        filename: safeName,
-        mimeType,
-        data: await blobToBase64(blob)
-      });
+  // Native Android uses the system Storage Access Framework picker.
+  if (Capacitor.isNativePlatform()) {
+    if (Capacitor.getPlatform() !== "android") throw new Error("الحفظ الأصلي مدعوم حالياً على Android فقط.");
+    try {
+      const result = await NativeDownloads.save({ filename: safeName, mimeType, data: await blobToBase64(blob) });
       if (result?.cancelled === true) return false;
-      if (result?.saved !== true) throw new Error("لم يؤكد Android اكتمال حفظ الملف.");
+      if (result?.saved !== true) throw new Error("لم يؤكد Android اكتمال كتابة الملف.");
       return true;
-    }
-  } catch (error) {
-    if (globalThis.Capacitor?.isNativePlatform?.()) {
+    } catch (error) {
       console.error("Native Android save failed:", error);
       throw new Error("تعذر حفظ الملف على Android: " + (error?.message || error));
     }
   }
 
-  const description = extension === "png" ? "صورة PNG عالية الدقة"
-    : extension === "svg" ? "رسم متجهي SVG"
-    : extension === "pdf" ? "مستند PDF"
-    : extension === "rasem" || extension === "json" ? "ملف مشروع رسم"
-    : "ملف";
-
-  // Browser/PWA Save As picker.
+  const description = extension === "png" ? "صورة PNG عالية الدقة" : extension === "svg" ? "رسم متجهي SVG" : extension === "pdf" ? "مستند PDF" : extension === "rasem" || extension === "json" ? "ملف مشروع رسم" : "ملف";
   if (typeof window !== "undefined" && typeof window.showSaveFilePicker === "function") {
+    let handle;
     try {
       const accept = {};
-      accept[mimeType] = extension ? [`.${extension}`] : [];
-      const handle = await window.showSaveFilePicker({
-        suggestedName: safeName,
-        types: [{ description, accept }]
-      });
-      const writable = await handle.createWritable();
+      accept[mimeType] = extension ? ["." + extension] : [];
+      handle = await window.showSaveFilePicker({ suggestedName: safeName, types: [{ description, accept }] });
+    } catch (error) {
+      if (error?.name === "AbortError") return false;
+      throw new Error("تعذر فتح نافذة اختيار مكان الحفظ: " + (error?.message || error));
+    }
+    let writable;
+    try {
+      writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
       return true;
     } catch (error) {
-      if (error?.name === "AbortError") return false;
-      console.info("Save As picker unavailable; using browser download.", error);
+      try { await writable?.abort?.(); } catch {}
+      throw new Error("فشلت كتابة الملف في المكان المحدد: " + (error?.message || error));
     }
   }
 
-  // Browser fallback: direct file download only.
+  // Fallback for browsers without the File System Access API.
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = safeName;
   link.style.display = "none";
   document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
+  try { link.click(); } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
   return true;
 }
 
