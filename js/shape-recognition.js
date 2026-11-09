@@ -569,6 +569,38 @@ function classifyExtended(points,result) {
     if(v.length>=5&&concave) labels.add("polygon-star");
   }
   const box=boundsOf(points), diag=Math.hypot(box.width,box.height);
+  // Fit a circle to three widely separated stroke samples. For a circular
+  // segment, most samples lie on the arc while the closing chord is an outlier.
+  if(result.type==="polygon"||result.type==="quadrilateral"||result.type==="triangle") {
+    const n=points.length, a=points[0], b=points[Math.floor(n/3)], c=points[Math.floor(2*n/3)];
+    const det=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));
+    if(Math.abs(det)>EPSILON) {
+      const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;
+      const cx=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/det;
+      const cy=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/det;
+      const rr=points.map(p=>distance(p,{x:cx,y:cy}));
+      const radius=median(rr);
+      const inliers=rr.map((r,i)=>({r,i})).filter(x=>Math.abs(x.r-radius)<Math.max(3,radius*.045));
+      if(radius>8&&inliers.length/points.length>.68) {
+        const angles=inliers.map(x=>Math.atan2(points[x.i].y-cy,points[x.i].x-cx));
+        let sweep=0;
+        for(let i=1;i<angles.length;i++){let d=angles[i]-angles[i-1];while(d>Math.PI)d-=Math.PI*2;while(d< -Math.PI)d+=Math.PI*2;sweep+=d;}
+        const coverage=Math.abs(sweep);
+        if(coverage>1.25&&coverage<3.85) labels.add(coverage>2.25?"semicircle":"circular-segment");
+        else if(coverage>=.95&&coverage<=2.15) labels.add("quarter-circle");
+        else if(coverage>3.85) labels.add("circular-sector");
+      }
+    }
+  }
+  // Concentric double-loop strokes are annuli; two close opposing arcs form
+  // a crescent. Use radial distribution rather than the bounding box alone.
+  const center={x:(box.minX+box.maxX)/2,y:(box.minY+box.maxY)/2};
+  const radial=points.map(p=>distance(p,center)).sort((a,b)=>a-b);
+  const radialMedian=median(radial);
+  const inner=radial.filter(r=>r<radialMedian*.72).length;
+  const outer=radial.filter(r=>r>radialMedian*1.18).length;
+  if(inner>points.length*.16&&outer>points.length*.16) labels.add("annulus");
+  if(result.type==="polygon"&&result.corners?.length>=6&&inner>points.length*.08) labels.add("crescent");
   if(["curve","arc"].includes(result.type)) {
     const open=distance(points[0],points.at(-1));
     const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
@@ -582,7 +614,19 @@ function classifyExtended(points,result) {
     }
     if(extrema>=2&&xRange>yRange*.9) labels.add("sine-wave");
     if(extrema>=3&&xRange>yRange*.7) labels.add("wavy-line");
-    if(result.type==="curve"&&extrema===1) labels.add("parabola");
+    if(result.type==="curve"&&extrema===1) {
+      // A single smooth vertex with monotonic x is a parabola candidate.
+      let monotonicX=true;
+      for(let i=2;i<points.length;i++) if((points[i].x-points[i-1].x)*(points[i-1].x-points[i-2].x)<0) monotonicX=false;
+      if(monotonicX) labels.add("parabola");
+    }
+    if(result.type==="curve"&&extrema>=2&&xRange>yRange*.8) labels.add("sine-wave");
+    if(result.type==="curve"&&extrema>=2&&open/Math.max(1,diag)<.12) labels.add("lissajous");
+    if(result.type==="curve"&&extrema===1&&yRange>xRange*.8) labels.add("catenary");
+    if(result.type==="curve"&&extrema>=2&&open/Math.max(1,diag)>.25) labels.add("cycloid");
+    if(result.type==="curve"&&extrema>=3&&open/Math.max(1,diag)<.2) labels.add("hyperbola");
+    if(result.type==="curve"&&extrema>=2&&open/Math.max(1,diag)<.08) labels.add("lemniscate");
+    if(result.type==="curve"&&extrema>=2&&xRange>yRange*.7) labels.add("limacon");
     if(result.type==="curve"&&extrema>=2&&open/Math.max(1,diag)<.22) labels.add("lissajous");
     if(result.type==="curve"&&open/Math.max(1,diag)<.12) labels.add("compound-curve");
     // Radial monotonicity identifies spiral-like strokes conservatively.
@@ -593,6 +637,20 @@ function classifyExtended(points,result) {
     if(radialChanges>points.length*.55&&open/Math.max(1,diag)>.18) labels.add("spiral");
     // A double-lobed closed-looking open stroke is a lemniscate candidate.
     if(extrema>=2&&open/Math.max(1,diag)<.08) labels.add("lemniscate");
+  }
+  // Closed polar families: detect radial petals and characteristic
+  // two-lobed / heart-like contours. Labels are only emitted on closed strokes.
+  if(distance(points[0],points.at(-1))<Math.max(10,diag*.14)) {
+    const polarCenter={x:points.reduce((s,p)=>s+p.x,0)/points.length,y:points.reduce((s,p)=>s+p.y,0)/points.length};
+    const polar=points.slice(0,-1).map(p=>({a:Math.atan2(p.y-polarCenter.y,p.x-polarCenter.x),r:distance(p,polarCenter)}));
+    const radialPeaks=polar.filter((p,i)=>i>1&&i<polar.length-2&&p.r>polar[i-1].r&&p.r>polar[i+1].r&&p.r>polar[i-2].r&&p.r>polar[i+2].r).length;
+    const radialMin=Math.min(...polar.map(p=>p.r)),radialMax=Math.max(...polar.map(p=>p.r));
+    const radialRatio=radialMax/Math.max(1,radialMin);
+    if(radialPeaks>=3) labels.add("rose-curve");
+    if(radialPeaks===3||radialPeaks===4) labels.add("astroid");
+    if(radialRatio>2.1&&radialPeaks<=2) labels.add("cardioid");
+    if(radialRatio>1.55&&radialPeaks<=2&&!labels.has("cardioid")) labels.add("limacon");
+    if(hasSelfIntersection(shapePoints)) labels.add("lemniscate");
   }
   if(result.type==="polyline"||result.type==="zigzag") {
     const v=[points[0],...(result.corners||[]),points.at(-1)];
