@@ -205,6 +205,70 @@ export class Pressure {
   }
 }
 
+function smoothSmartStrokePoints(source, amount = 0) {
+  if (!Array.isArray(source) || source.length < 3 || amount <= 0) return source;
+  const strength = Math.max(0, Math.min(1, amount / 100)) * 0.42;
+  const result = source.map(point => ({ ...point }));
+  for (let pass = 0; pass < Math.max(1, Math.ceil(amount / 35)); pass++) {
+    const previous = result.map(point => ({ ...point }));
+    for (let i = 1; i < result.length - 1; i++) {
+      const a = previous[i - 1], p = previous[i], b = previous[i + 1];
+      result[i] = { ...p,
+        x: p.x * (1 - strength) + (a.x + b.x) * 0.5 * strength,
+        y: p.y * (1 - strength) + (a.y + b.y) * 0.5 * strength
+      };
+    }
+  }
+  return result;
+}
+
+function recognizeSmartStroke(source, level = 0) {
+  if (!Array.isArray(source) || source.length < 5 || level < 1) return null;
+  const points = source.filter((p, i) => !i || EngineUtils.distance(p, source[i - 1]) > 0.01);
+  if (points.length < 5) return null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  const width = maxX - minX, height = maxY - minY, diagonal = Math.hypot(width, height);
+  if (diagonal < 8) return null;
+  const closed = EngineUtils.distance(points[0], points[points.length - 1]) <= diagonal * (0.18 + level / 100 * 0.12);
+  const avg = (a, b) => (a + b) / 2;
+  if (closed && points.length >= 8) {
+    const edgeError = points.reduce((sum, p) => {
+      const dx = Math.min(Math.abs(p.x - minX), Math.abs(p.x - maxX));
+      const dy = Math.min(Math.abs(p.y - minY), Math.abs(p.y - maxY));
+      return sum + Math.min(dx, dy);
+    }, 0) / points.length;
+    if (edgeError < diagonal * (0.075 + level / 100 * 0.045) && width > 8 && height > 8) {
+      const corners = [[minX,minY],[maxX,minY],[maxX,maxY],[minX,maxY],[minX,minY]];
+      return corners.map(([x,y], i) => ({ ...(points[Math.round(i / 4 * (points.length - 1))] || points[0]), x, y }));
+    }
+    const cx = avg(minX, maxX), cy = avg(minY, maxY);
+    const rx = width / 2, ry = height / 2;
+    const radii = points.slice(0, -1).map(p => Math.hypot((p.x - cx) / Math.max(rx, 1), (p.y - cy) / Math.max(ry, 1)));
+    const mean = radii.reduce((sum, value) => sum + value, 0) / radii.length;
+    const variance = Math.sqrt(radii.reduce((sum, value) => sum + (value - mean) ** 2, 0) / radii.length) / Math.max(mean, 0.001);
+    if (variance < 0.2 - level / 100 * 0.08) {
+      const count = Math.max(32, Math.min(96, points.length));
+      return Array.from({ length: count + 1 }, (_, i) => {
+        const angle = -Math.PI / 2 + i / count * Math.PI * 2;
+        const nearest = points[Math.round(i / count * (points.length - 1))] || points[0];
+        return { ...nearest, x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry };
+      });
+    }
+  }
+  const first = points[0], last = points[points.length - 1];
+  const vx = last.x - first.x, vy = last.y - first.y, length = Math.hypot(vx, vy);
+  if (length > 8) {
+    const deviation = points.reduce((max, p) => Math.max(max,
+      Math.abs(vy * p.x - vx * p.y + last.x * first.y - last.y * first.x) / length), 0);
+    if (deviation < Math.max(2.5, length * (0.035 + level / 100 * 0.035))) return [{ ...first }, { ...last }];
+  }
+  return null;
+}
+
 /* =========================================================
    3. STROKE BUILDER
 ========================================================= */
@@ -235,6 +299,7 @@ export class StrokeBuilder {
     this.active = false;
     // أثناء الضربة نعرض العينات الخام؛ لا يبدأ التنعيم إلا بعد سكون الإصبع.
     this.deferSmoothing = false;
+    this.smartDrawing = { enabled: false, smoothness: 0, correction: 0, recognition: 0 };
 
     // Incremental live calligraphy outline cache. It is reset with each stroke.
     this.calligraphyPreviewPointCount = 0;
@@ -319,7 +384,11 @@ export class StrokeBuilder {
     // Raw captured samples remain untouched in this.points for editing/history.
     const preset = String(this.brushStyle?.preset || "");
     const isCalligraphy = this.tool === "calligraphy" || preset === "calligraphy" || preset.startsWith("cal-");
-    return isCalligraphy ? smoothCalligraphyPoints(this.points) : this.points;
+    let points = isCalligraphy ? smoothCalligraphyPoints(this.points) : this.points;
+    if (this.smartDrawing?.enabled && this.smartDrawing.smoothness > 0) {
+      points = smoothSmartStrokePoints(points, this.smartDrawing.smoothness);
+    }
+    return points;
   }
 
   getCenterPath() {
@@ -984,6 +1053,7 @@ export class DrawingEngine {
     this.history = history;
     this.coordinates = coordinates;
 
+    this.smartDrawing = { enabled: false, smoothness: 0, correction: 0, recognition: 0 };
     this.settings = {
       tool: "pencil",
       color: "#111111",
@@ -1028,6 +1098,16 @@ export class DrawingEngine {
       this.renderer,
       { onCommit: () => this.commitHistory() }
     );
+  }
+
+  setSmartDrawing(options = {}) {
+    this.smartDrawing = {
+      enabled: typeof options.enabled === "boolean" ? options.enabled : this.smartDrawing.enabled,
+      smoothness: EngineUtils.clamp(EngineUtils.number(options.smoothness, this.smartDrawing.smoothness), 0, 100),
+      correction: EngineUtils.clamp(EngineUtils.number(options.correction, this.smartDrawing.correction), 0, 100),
+      recognition: EngineUtils.clamp(EngineUtils.number(options.recognition, this.smartDrawing.recognition), 0, 100)
+    };
+    return { ...this.smartDrawing };
   }
 
   get activeLayer() {
@@ -1223,7 +1303,8 @@ export class DrawingEngine {
       sensitivity: this.settings.sensitivity,
       pressureEnabled: this.settings.pressureEnabled,
       calligraphyAngle: this.settings.calligraphyAngle,
-      brushStyle: { ...this.brushStyle }
+      brushStyle: { ...this.brushStyle },
+      smartDrawing: this.smartDrawing
     });
 
     // يبدأ كل قلم بضربة خام؛ لا تصحيح بصرياً أثناء الكتابة.
@@ -1568,7 +1649,17 @@ export class DrawingEngine {
         this.addPoint(finalPoint, finalEvent, true);
       }
 
-      // Commit the captured points without post-stroke smoothing or correction.
+      // Global smart-drawing filters run once when the stroke is committed.
+      if (this.smartDrawing.enabled) {
+        if (this.smartDrawing.correction > 0) {
+          this.builder.points = smoothSmartStrokePoints(this.builder.points, this.smartDrawing.correction);
+        }
+        if (this.smartDrawing.recognition > 0) {
+          const recognized = recognizeSmartStroke(this.builder.points, this.smartDrawing.recognition);
+          if (recognized) this.builder.points = recognized;
+        }
+        this.points = this.builder.points;
+      }
       finalizedElement = this.builder.build();
       if (finalizedElement) {
         this.currentElement = {
