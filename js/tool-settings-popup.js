@@ -424,7 +424,7 @@
       const pressure = clamp(values.featherPressure ?? .7, 0, 1);
       const speed = clamp(values.featherSpeed ?? .2, 0, 1);
       const width = clamp((1.1 + size / 16 + pressure * 2) * pressureFactor, 1, 12);
-      const spreadPx = 5 + spread * 27 + gap * 5;
+      const spreadPx = (5 + spread * 27 + gap * 5) * spacing;
       const paths = [];
       const lanes = Math.min(count, 32);
       for (let i = 0; i < lanes; i++) {
