@@ -123,6 +123,13 @@
 
   const STORAGE = "rasem-per-tool-settings-v2";
 
+  function normalizeFade(value) {
+    if (value === true) return 1;
+    if (value === false || value == null || value === "") return 0;
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
+  }
+
   let settings = {};
   let activeTool = "pencil";
   let opened = false;
@@ -158,7 +165,7 @@
     result.featherSpread = Number(document.getElementById("featherSpread")?.value ?? 0.45);
     result.featherSoftness = Number(document.getElementById("featherSoftness")?.value ?? 0.35);
     result.featherTaper = Number(document.getElementById("featherTaper")?.value ?? 0.7);
-    result.featherFade = document.getElementById("featherFade")?.checked === true;
+    result.featherFade = normalizeFade(document.getElementById("featherFade")?.value ?? 0);
     for (const key of ["featherGap","featherPressure","featherSpeed","featherAngle","featherTexture"]) { const input=document.getElementById(key); if(input) result[key]=Number(input.value); }
     return result;
   }
@@ -213,7 +220,7 @@
             featherSpread: activeSettings.featherSpread ?? 0.45,
             featherSoftness: activeSettings.featherSoftness ?? 0.35,
             featherTaper: activeSettings.featherTaper ?? 0.7,
-            featherFade: activeSettings.featherFade === true,
+            featherFade: normalizeFade(activeSettings.featherFade),
             featherGap:activeSettings.featherGap??.35, featherPressure:activeSettings.featherPressure??.75,
             featherSpeed:activeSettings.featherSpeed??.25, featherAngle:activeSettings.featherAngle??0, featherTexture:activeSettings.featherTexture??.35
           }
@@ -272,7 +279,7 @@
   // لكل رأس فرشاة ملف إعدادات مستقل؛ الضغطة الطويلة على الرأس تفتح ملفه.
   const headProfiles = { feather:{"feather-pointed":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-flat":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-round":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-fan":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-soft":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-dry":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-quill":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"],"feather-script":["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGap","featherPressure","featherSpeed","featherAngle","featherTexture","featherGlow","featherFade"]},calligraphy:{"*":["brushSize","brushOpacity","calligraphyAngle","calligraphyEndStyle","pressureEnabled"]},pencil:{"*":["brushSize","brushOpacity","pressureEnabled"]} };
   const featherDefaults = {
-    "feather-pointed":{featherDensity:8,featherSpread:.20,featherSoftness:.15,featherTaper:.85,featherSpacing:1,featherGap:.18,featherPressure:.9,featherSpeed:.2,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:false},
+    "feather-pointed":{featherDensity:8,featherSpread:.20,featherSoftness:.15,featherTaper:.85,featherSpacing:1,featherGap:.18,featherPressure:.9,featherSpeed:.2,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:0},
     "feather-flat":{featherDensity:18,featherSpread:.10,featherSoftness:.10,featherTaper:.30,featherSpacing:1,featherGap:.12,featherPressure:.35,featherSpeed:.1,featherAngle:0,featherTexture:.05,featherGlow:0,featherFade:false},
     "feather-round":{featherDensity:16,featherSpread:.25,featherSoftness:.35,featherTaper:.45,featherSpacing:1,featherGap:.2,featherPressure:.65,featherSpeed:.2,featherAngle:0,featherTexture:.12,featherGlow:0,featherFade:false},
     "feather-fan":{featherDensity:24,featherSpread:.85,featherSoftness:.10,featherTaper:.25,featherSpacing:1,featherGap:.8,featherPressure:.25,featherSpeed:.1,featherAngle:0,featherTexture:.2,featherGlow:0,featherFade:false},
@@ -282,7 +289,7 @@
     "feather-script":{featherDensity:12,featherSpread:.18,featherSoftness:.15,featherTaper:.7,featherSpacing:1,featherGap:.12,featherPressure:.85,featherSpeed:.15,featherAngle:35,featherTexture:.08,featherGlow:0,featherFade:false}
   };
   const headLabels = {featherDensity:"عدد الشعيرات",featherSpread:"انتشار الشعيرات",featherSoftness:"نعومة الأثر",featherTaper:"تلاشي البداية والنهاية",featherSpacing:"مقياس تباعد الأثر",featherGap:"الفجوة بين الشعيرات",featherPressure:"حساسية الضغط",featherSpeed:"استجابة السرعة",featherAngle:"زاوية الريشة",featherTexture:"خشونة وملمس الشعيرات",featherGlow:"التوهج",featherFade:"التلاشي المتوازن من الوسط",brushSize:"حجم الرأس",brushOpacity:"شفافية الرأس",pressureEnabled:"استجابة الضغط",calligraphyAngle:"زاوية السن",calligraphyEndStyle:"نهاية الضربة"};
-  const headRanges = {brushSize:{min:.5,max:120,step:.5},brushOpacity:{min:.05,max:1,step:.01},calligraphyAngle:{min:0,max:180,step:1},featherDensity:{min:3,max:48,step:1},featherSpread:{min:0,max:1,step:.01},featherSoftness:{min:0,max:1,step:.01},featherTaper:{min:0,max:1,step:.01},featherSpacing:{min:.25,max:2.5,step:.05},featherGap:{min:0,max:1.5,step:.01},featherPressure:{min:0,max:1,step:.01},featherSpeed:{min:0,max:1,step:.01},featherAngle:{min:0,max:180,step:1},featherTexture:{min:0,max:1,step:.01},featherGlow:{min:0,max:1,step:.01}};
+  const headRanges = {brushSize:{min:.5,max:120,step:.5},brushOpacity:{min:.05,max:1,step:.01},calligraphyAngle:{min:0,max:180,step:1},featherDensity:{min:3,max:48,step:1},featherSpread:{min:0,max:1,step:.01},featherSoftness:{min:0,max:1,step:.01},featherTaper:{min:0,max:1,step:.01},featherFade:{min:0,max:1,step:.01},featherSpacing:{min:.25,max:2.5,step:.05},featherGap:{min:0,max:1.5,step:.01},featherPressure:{min:0,max:1,step:.01},featherSpeed:{min:0,max:1,step:.01},featherAngle:{min:0,max:180,step:1},featherTexture:{min:0,max:1,step:.01},featherGlow:{min:0,max:1,step:.01}};
   let headOptionsPanel = null;
   let headPressTimer = null;
   let headPressMoved = false;
@@ -329,7 +336,11 @@
     const label = button?.querySelector("span")?.textContent || labels[brush] || brush;
     panel.innerHTML = '<div class="brush-head-options-head"><strong>إعدادات رأس: ' +
       label.replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])) +
-      '</strong><span>تُحفظ لهذا الرأس وحده</span></div><div class="brush-head-options-grid"></div>';
+      '</strong><span>تُحفظ لهذا الرأس وحده</span></div>' +
+      '<div class="brush-head-live-preview"><div class="brush-head-live-preview-title">معاينة مباشرة لتأثير الإعدادات</div>' +
+      '<svg class="brush-head-live-preview-art" viewBox="0 0 320 76" role="img" aria-label="مثال حي لشكل أثر القلم"></svg>' +
+      '<div class="brush-head-live-preview-caption">حرّك أي شريط أو غيّر الخيار لمشاهدة أثره فوراً</div></div>' +
+      '<div class="brush-head-options-grid"></div>';
     const grid = panel.querySelector(".brush-head-options-grid");
     keys.forEach(key => {
       const wrap = document.createElement("label");
@@ -337,7 +348,7 @@
       const caption = document.createElement("span");
       caption.textContent = headLabels[key] || key;
       wrap.appendChild(caption);
-      if (key === "pressureEnabled" || key === "featherFade") {
+      if (key === "pressureEnabled") {
         const select = document.createElement("select");
         select.dataset.headKey = key;
         select.innerHTML = '<option value="true">مفعّل</option><option value="false">متوقف</option>';
@@ -355,7 +366,10 @@
         input.type = "range"; input.min = range.min; input.max = range.max; input.step = range.step;
         input.dataset.headKey = key;
         const sourceId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
-        input.value = String(profile[key] ?? document.getElementById(sourceId)?.value ?? (featherDefaults[brush]?.[key] ?? (key === "featherDensity" ? 10 : 0)));
+        const initialValue = key === "featherFade"
+          ? normalizeFade(profile[key] ?? featherDefaults[brush]?.[key] ?? 0)
+          : (profile[key] ?? document.getElementById(sourceId)?.value ?? (featherDefaults[brush]?.[key] ?? (key === "featherDensity" ? 10 : 0)));
+        input.value = String(initialValue);
         wrap.appendChild(input);
         const value = document.createElement("output");
         value.textContent = key==="featherAngle"||key==="calligraphyAngle"?input.value+"°":key==="brushOpacity"||key.startsWith("feather")&&key!=="featherDensity"?Math.round(Number(input.value)*100)+"%":input.value;
@@ -369,10 +383,73 @@
     note.textContent = "اضغط مطولاً على رأس آخر لفتح إعداداته. التغيير هنا لا يبدّل إعدادات الرؤوس الأخرى.";
     panel.appendChild(note);
     panel.hidden = false;
+    updateHeadPreview(panel, brush);
     panel.querySelectorAll("[data-head-key]").forEach(control => {
-      control.addEventListener("input", () => saveHeadProfile(brush, control));
-      control.addEventListener("change", () => saveHeadProfile(brush, control));
+      const update = () => {
+        updateHeadPreview(panel, brush, control.dataset.headKey);
+        saveHeadProfile(brush, control);
+      };
+      control.addEventListener("input", update);
+      control.addEventListener("change", update);
     });
+  }
+
+  function updateHeadPreview(panel, brush, changedKey = "") {
+    const art = panel.querySelector(".brush-head-live-preview-art");
+    const caption = panel.querySelector(".brush-head-live-preview-caption");
+    if (!art) return;
+    const values = {};
+    panel.querySelectorAll("[data-head-key]").forEach(control => {
+      values[control.dataset.headKey] = control.tagName === "SELECT" ? control.value : Number(control.value);
+    });
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
+    const opacity = clamp(values.brushOpacity ?? 1, 0.05, 1);
+    const fade = normalizeFade(values.featherFade ?? 0);
+    const softness = clamp(values.featherSoftness ?? 0.2, 0, 1);
+    const glow = clamp(values.featherGlow ?? 0, 0, 1);
+    const size = clamp(values.brushSize ?? 14, 0.5, 120);
+    const angle = clamp(values.featherAngle ?? values.calligraphyAngle ?? 0, 0, 180);
+    const fadeStops = '<stop offset="0%" stop-color="white" stop-opacity="' + (1 - fade * .92).toFixed(3) + '"/><stop offset="50%" stop-color="white" stop-opacity="1"/><stop offset="100%" stop-color="white" stop-opacity="' + (1 - fade * .92).toFixed(3) + '"/>';
+    const defs = '<defs><linearGradient id="headPreviewFade" x1="0" y1="0" x2="1" y2="0">' + fadeStops + '</linearGradient><filter id="headPreviewBlur"><feGaussianBlur stdDeviation="' + (softness * 2.2).toFixed(2) + '"/></filter><filter id="headPreviewGlow"><feGaussianBlur stdDeviation="' + (glow * 3).toFixed(2) + '" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+    let drawing = "";
+    if (brush.startsWith("feather-")) {
+      const count = Math.round(clamp(values.featherDensity ?? 12, 3, 48));
+      const spread = clamp(values.featherSpread ?? .3, 0, 1);
+      const gap = clamp(values.featherGap ?? .2, 0, 1.5);
+      const taper = clamp(values.featherTaper ?? .5, 0, 1);
+      const spacing = clamp(values.featherSpacing ?? 1, .25, 2.5);
+      const texture = clamp(values.featherTexture ?? 0, 0, 1);
+      const pressure = clamp(values.featherPressure ?? .7, 0, 1);
+      const speed = clamp(values.featherSpeed ?? .2, 0, 1);
+      const width = clamp(1.1 + size / 16 + pressure * 2, 1, 12);
+      const spreadPx = 5 + spread * 27 + gap * 5;
+      const paths = [];
+      const lanes = Math.min(count, 32);
+      for (let i = 0; i < lanes; i++) {
+        const t = lanes === 1 ? 0 : i / (lanes - 1) * 2 - 1;
+        const y = 38 + t * spreadPx;
+        const laneWidth = Math.max(.45, width * (1 - Math.abs(t) * (.25 + taper * .5)));
+        const dash = texture > .02 ? ' stroke-dasharray="' + (4 + spacing * 7).toFixed(1) + ' ' + (texture * 8 + speed * 3 + 1).toFixed(1) + '"' : "";
+        paths.push('<path d="M 14 ' + y.toFixed(1) + ' C 82 ' + (y - 13 * (1 - Math.abs(t))).toFixed(1) + ' 224 ' + (y + 13 * (1 - Math.abs(t))).toFixed(1) + ' 306 ' + y.toFixed(1) + '" fill="none" stroke="currentColor" stroke-width="' + laneWidth.toFixed(2) + '" stroke-linecap="round" opacity="' + opacity + '"' + dash + '/>');
+      }
+      drawing = '<g transform="rotate(' + angle.toFixed(1) + ' 160 38)" mask="url(#headPreviewMask)" filter="url(#headPreviewBlur)">' + paths.join("") + '</g>';
+      const glowLayer = glow > 0 ? '<g opacity="' + (glow * .45).toFixed(2) + '" filter="url(#headPreviewGlow)">' + paths.join("") + '</g>' : "";
+      drawing += glowLayer;
+      art.innerHTML = defs + '<defs><mask id="headPreviewMask"><rect width="320" height="76" fill="url(#headPreviewFade)"/></mask></defs>' + drawing;
+    } else {
+      const strokeWidth = clamp(2 + size / 7, 2, 18);
+      const endStyle = values.calligraphyEndStyle || "none";
+      const path = '<path d="M 16 51 C 70 8 116 64 166 34 S 258 10 304 39" fill="none" stroke="currentColor" stroke-width="' + strokeWidth.toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" filter="' + (softness > .05 ? 'url(#headPreviewBlur)' : 'none') + '"/>';
+      let end = "";
+      if (endStyle === "pointed") end = '<path d="M294 34 L310 39 L294 44Z" fill="currentColor"/>';
+      else if (endStyle === "wide") end = '<path d="M298 29 L310 39 L298 49Z" fill="currentColor"/>';
+      else if (endStyle === "thin") end = '<path d="M292 38 Q302 39 312 39" fill="none" stroke="currentColor" stroke-width="1.2"/>';
+      else if (endStyle === "crescent") end = '<path d="M300 29 Q316 38 300 49 Q307 38 300 29Z" fill="currentColor"/>';
+      art.innerHTML = defs + '<g transform="rotate(' + (angle - 45).toFixed(1) + ' 160 38)">' + path + end + '</g>';
+    }
+    if (caption) caption.textContent = changedKey
+      ? "يتغير المثال الآن مع: " + (headLabels[changedKey] || changedKey)
+      : "هذا مثال تقريبي مباشر لشكل الأثر قبل الرسم على اللوحة";
   }
 
   function saveHeadProfile(brush, control) {
@@ -381,13 +458,13 @@
     toolSettings.headSettings ||= {};
     toolSettings.headSettings[brush] ||= {};
     const key = control.dataset.headKey;
-    const value = key === "pressureEnabled" || key === "featherFade" ? control.value === "true" :
-      key === "calligraphyEndStyle" ? control.value : Number(control.value);
+    const value = key === "pressureEnabled" ? control.value === "true" :
+      key === "calligraphyEndStyle" ? control.value : key === "featherFade" ? normalizeFade(control.value) : Number(control.value);
     toolSettings.headSettings[brush][key] = value;
     const targetId = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
     const target = document.getElementById(targetId);
     if (target) {
-      if (key === "pressureEnabled" || key === "featherFade") target.checked = value;
+      if (key === "pressureEnabled") target.checked = value;
       else target.value = String(value);
     }
     save();
@@ -401,8 +478,8 @@
       const id = key === "brushSize" ? "brushSize" : key === "brushOpacity" ? "brushOpacity" : key;
       const input = document.getElementById(id);
       if (!input) return;
-      if (key === "pressureEnabled" || key === "featherFade") input.checked = Boolean(value);
-      else input.value = String(value);
+      if (key === "pressureEnabled") input.checked = Boolean(value);
+      else input.value = key === "featherFade" ? String(normalizeFade(value)) : String(value);
     });
   }
 
