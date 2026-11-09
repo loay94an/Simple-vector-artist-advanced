@@ -4110,7 +4110,7 @@ body.dark .canvas-area {
 /* Separate complementary-colors dropdown in the top toolbar */
 .header-actions #complementaryColorsBtn { display:inline-flex; align-items:center; justify-content:center; width:36px; min-width:36px; height:36px; padding:4px; border:0; border-radius:50%; background:transparent; box-shadow:none; flex:0 0 36px; }
 #complementaryColorsBtn .complementary-current-color { display:block; width:23px; height:23px; border-radius:50%; background:#2563EB; border:2px solid rgba(127,127,127,.35); box-shadow:0 1px 3px rgba(0,0,0,.18); }
-#complementaryColorsMenu { position:fixed; z-index:10020; display:none; width:min(330px, calc(100vw - 16px)); max-height:none; overflow-x:auto; overflow-y:hidden; padding:5px 2px; border:0; border-radius:0; background:transparent; color:var(--text); box-shadow:none; direction:rtl; }
+#complementaryColorsMenu { position:fixed; z-index:10020; display:none; width:min(330px, calc(100vw - 16px)); max-height:none; overflow-x:auto; overflow-y:hidden; scroll-behavior:smooth; overscroll-behavior-x:contain; touch-action:pan-x; -webkit-overflow-scrolling:touch; padding:5px 2px; border:0; border-radius:0; background:transparent; color:var(--text); box-shadow:none; direction:rtl; }
 #complementaryColorsMenu.open { display:block; }
 #complementaryColorsMenu .complementary-menu-base { display:none; }
 #complementaryColorsMenu .complementary-menu-swatches { display:flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:7px; width:max-content; min-width:100%; overflow:visible; padding:0; }
