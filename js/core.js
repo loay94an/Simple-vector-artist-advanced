@@ -726,7 +726,52 @@ export class Scene {
       1
     );
 
-    node.setAttribute("fill", fill);
+    let resolvedFill = fill;
+    const isFeatherFade = style.brushPreset?.startsWith("feather-") && style.featherFade === true && Array.isArray(element.points) && element.points.length > 1;
+    if (isFeatherFade) {
+      const points = element.points.filter(p => Number.isFinite(p?.x) && Number.isFinite(p?.y));
+      if (points.length > 1) {
+        const first = points[0], last = points[points.length - 1];
+        const dx = last.x - first.x, dy = last.y - first.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length, ny = dx / length;
+        const projections = points.map(p => p.x * nx + p.y * ny);
+        const min = Math.min(...projections), max = Math.max(...projections);
+        const center = (min + max) / 2;
+        const half = Math.max(0.5, (max - min) / 2);
+        const id = "rasem-feather-fade-" + String(node.dataset.id || "stroke").replace(/[^a-zA-Z0-9_-]/g, "");
+        const svg = node.ownerSVGElement;
+        if (svg) {
+          let defs = svg.querySelector("defs[data-rasem-feather-fades]");
+          if (!defs) {
+            defs = document.createElementNS(SVG_NS, "defs");
+            defs.setAttribute("data-rasem-feather-fades", "true");
+            svg.insertBefore(defs, svg.firstChild);
+          }
+          let gradient = defs.querySelector("#" + id);
+          if (!gradient) {
+            gradient = document.createElementNS(SVG_NS, "linearGradient");
+            gradient.id = id;
+            gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+            for (const [offset, alpha] of [["0", "0"], ["0.18", "0.35"], ["0.5", "1"], ["0.82", "0.35"], ["1", "0"]]) {
+              const stop = document.createElementNS(SVG_NS, "stop");
+              stop.setAttribute("offset", offset);
+              stop.setAttribute("stop-color", color);
+              stop.setAttribute("stop-opacity", alpha);
+              gradient.appendChild(stop);
+            }
+            defs.appendChild(gradient);
+          }
+          gradient.setAttribute("x1", String(nx * (center - half)));
+          gradient.setAttribute("y1", String(ny * (center - half)));
+          gradient.setAttribute("x2", String(nx * (center + half)));
+          gradient.setAttribute("y2", String(ny * (center + half)));
+          gradient.querySelectorAll("stop").forEach(stop => stop.setAttribute("stop-color", color));
+          resolvedFill = "url(#" + id + ")";
+        }
+      }
+    }
+    node.setAttribute("fill", resolvedFill);
     if (style.calligraphyClean === true) {
       node.style.filter = "none";
       node.removeAttribute("filter");
