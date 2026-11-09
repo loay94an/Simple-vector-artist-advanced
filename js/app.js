@@ -1010,7 +1010,7 @@ export class RasemApplication {
     });
     enabledInput?.addEventListener("change", persist);
     const toggleHandler = () => {
-      if (enabledInput) enabledInput.checked = !enabledInput.checked;
+      if (enabledInput) enabledInput.checked = !engine.smartDrawing.enabled;
       persist();
     };
     const show = () => {
@@ -1020,12 +1020,70 @@ export class RasemApplication {
     };
     const hide = () => { modal.hidden = true; backdrop.hidden = true; };
     const backdropHandler = event => { if (event.target === backdrop) hide(); };
-    toggle.addEventListener("click", toggleHandler);
+
+    // A quick tap toggles smart drawing; a press-and-hold opens its settings.
+    const longPressDelay = 520;
+    const moveTolerance = 12;
+    let pressTimer = null;
+    let pressStart = null;
+    let longPressTriggered = false;
+    let suppressNextClick = false;
+    const clearPressTimer = () => {
+      if (pressTimer !== null) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    };
+    const pointerDownHandler = event => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      clearPressTimer();
+      pressStart = { x: event.clientX, y: event.clientY };
+      longPressTriggered = false;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        longPressTriggered = true;
+        suppressNextClick = true;
+        show();
+      }, longPressDelay);
+    };
+    const pointerMoveHandler = event => {
+      if (!pressStart || pressTimer === null) return;
+      if (Math.hypot(event.clientX - pressStart.x, event.clientY - pressStart.y) > moveTolerance) {
+        clearPressTimer();
+        pressStart = null;
+      }
+    };
+    const pointerEndHandler = () => {
+      clearPressTimer();
+      pressStart = null;
+    };
+    const clickHandler = event => {
+      if (suppressNextClick || longPressTriggered) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextClick = false;
+        longPressTriggered = false;
+        return;
+      }
+      toggleHandler();
+    };
+    toggle.addEventListener("pointerdown", pointerDownHandler);
+    toggle.addEventListener("pointermove", pointerMoveHandler);
+    toggle.addEventListener("pointerup", pointerEndHandler);
+    toggle.addEventListener("pointercancel", pointerEndHandler);
+    toggle.addEventListener("pointerleave", pointerEndHandler);
+    toggle.addEventListener("click", clickHandler);
     open?.addEventListener("click", show);
     close?.addEventListener("click", hide);
     backdrop.addEventListener("click", backdropHandler);
     this.cleanupCallbacks.push(() => {
-      toggle.removeEventListener("click", toggleHandler);
+      clearPressTimer();
+      toggle.removeEventListener("pointerdown", pointerDownHandler);
+      toggle.removeEventListener("pointermove", pointerMoveHandler);
+      toggle.removeEventListener("pointerup", pointerEndHandler);
+      toggle.removeEventListener("pointercancel", pointerEndHandler);
+      toggle.removeEventListener("pointerleave", pointerEndHandler);
+      toggle.removeEventListener("click", clickHandler);
       open?.removeEventListener("click", show);
       close?.removeEventListener("click", hide);
       backdrop.removeEventListener("click", backdropHandler);
