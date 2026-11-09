@@ -4159,3 +4159,10 @@ body.dark .canvas-area {
   .smart-drawing-toggle .btn-text { display:none !important; }
   .smart-drawing-modal { width:min(360px,calc(100vw - 24px)); }
 }
+
+.smart-drawing-toggle {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
