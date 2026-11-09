@@ -1782,12 +1782,14 @@ export class DrawingEngine {
         "cal-diwani":1.18,"cal-jali":1.42,"cal-maghribi":1.16,"cal-taliq":0.92,
         "cal-sini":1.04,"cal-brush":1.22,"cal-needle":0.38,"cal-square":1.28
       };
-      const paintedHalfWidth = size * Math.max(0.5, (calligraphyWidths[preset] || 1) * 0.5);
+      // getElementDistance already subtracts the ordinary half stroke width.
+      // Add only the extra nib width for broad Arabic calligraphy presets.
+      const extraNibReach = size * Math.max(0, (calligraphyWidths[preset] || 1) - 1) * 0.5;
       const distance = HitTesting.getElementDistance(element, point);
 
       // Hit-test the visible footprint, but erase only the actual circular
       // cursor footprint. Never split or rebuild the source stroke geometry.
-      if (distance > radius + paintedHalfWidth) continue;
+      if (distance > radius + extraNibReach) continue;
 
       if (Array.isArray(element.points) && element.points.length) {
         const oldMask = element.eraseMask && typeof element.eraseMask.d === "string"
