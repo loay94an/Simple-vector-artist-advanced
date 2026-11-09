@@ -28,7 +28,7 @@ import {
 
 import {
   DrawingEngine
-} from "./engine.js?v=20261109-47";
+} from "./engine.js?v=20261109-48";
 
 import {
   ToolManager
