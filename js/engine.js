@@ -812,7 +812,7 @@ export class HitTesting {
         maxX = Math.max(Number(g.x1), Number(g.x2));
         maxY = Math.max(Number(g.y1), Number(g.y2));
       } else if (typeof g.points === "string") {
-        const values = g.points.match(/-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[-+]?\\d+)?/gi)?.map(Number) || [];
+        const values = g.points.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi)?.map(Number) || [];
         for (let i = 0; i + 1 < values.length; i += 2) {
           minX = Math.min(minX, values[i]); maxX = Math.max(maxX, values[i]);
           minY = Math.min(minY, values[i + 1]); maxY = Math.max(maxY, values[i + 1]);
