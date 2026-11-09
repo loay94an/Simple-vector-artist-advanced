@@ -299,9 +299,9 @@ export class StrokeBuilder {
   getFilteredPoints() {
     // Only the Arabic calligraphy tool receives strong live curve smoothing.
     // Raw captured samples remain untouched in this.points for editing/history.
-    return this.tool === "calligraphy"
-      ? smoothCalligraphyPoints(this.points)
-      : this.points;
+    const preset = String(this.brushStyle?.preset || "");
+    const isCalligraphy = this.tool === "calligraphy" || preset === "calligraphy" || preset.startsWith("cal-");
+    return isCalligraphy ? smoothCalligraphyPoints(this.points) : this.points;
   }
 
   getCenterPath() {
@@ -501,11 +501,9 @@ export class StrokeBuilder {
       const ry = Math.max(0.35, rx * (["cal-kufi", "cal-square", "cal-jali", "cal-sini"].includes(preset) ? 0.34 : 0.48));
       const ux = cosA * rx, uy = sinA * rx;
       const vx = -sinA * ry, vy = cosA * ry;
-      const a = { x: p.x + ux, y: p.y + uy };
-      const b = { x: p.x - ux, y: p.y - uy };
-      const c = { x: p.x + vx, y: p.y + vy };
-      const d = { x: p.x - vx, y: p.y - vy };
-      return `M ${(a.x+c.x).toFixed(3)} ${(a.y+c.y).toFixed(3)} Q ${(a.x+ux*0.15).toFixed(3)} ${(a.y+uy*0.15).toFixed(3)} ${(a.x-c.x+d.x).toFixed(3)} ${(a.y-c.y+d.y).toFixed(3)} Q ${(b.x-vx*0.15).toFixed(3)} ${(b.y-vy*0.15).toFixed(3)} ${(b.x-c.x+d.x).toFixed(3)} ${(b.y-c.y+d.y).toFixed(3)} Q ${(b.x-ux*0.15).toFixed(3)} ${(b.y-uy*0.15).toFixed(3)} ${(b.x+c.x-d.x).toFixed(3)} ${(b.y+c.y-d.y).toFixed(3)} Q ${(a.x+vx*0.15).toFixed(3)} ${(a.y+vy*0.15).toFixed(3)} ${(a.x+c.x-d.x).toFixed(3)} ${(a.y+c.y-d.y).toFixed(3)} Z`;
+      const startX = p.x + ux, startY = p.y + uy;
+      const endX = p.x - ux, endY = p.y - uy;
+      return `M ${startX.toFixed(3)} ${startY.toFixed(3)} A ${rx.toFixed(3)} ${ry.toFixed(3)} ${angle.toFixed(2)} 0 1 ${endX.toFixed(3)} ${endY.toFixed(3)} A ${rx.toFixed(3)} ${ry.toFixed(3)} ${angle.toFixed(2)} 0 1 ${startX.toFixed(3)} ${startY.toFixed(3)} Z`;
     }
 
     const broadNib = ["cal-kufi", "cal-square", "cal-jali", "cal-sini", "cal-italic", "cal-oblique", "cal-stub"].includes(preset);
