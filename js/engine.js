@@ -755,7 +755,7 @@ export class HitTesting {
 
     // Polygon vertices are stored as an SVG "x,y x,y ..." string.
     if (typeof geometry.points === "string") {
-      const nums = geometry.points.match(/-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[-+]?\\d+)?/gi)?.map(Number) || [];
+      const nums = geometry.points.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi)?.map(Number) || [];
       const polygon = [];
       for (let i = 0; i + 1 < nums.length; i += 2) polygon.push({ x: nums[i], y: nums[i + 1] });
       if (polygon.length >= 2) {
@@ -1660,7 +1660,11 @@ export class DrawingEngine {
       // cursor footprint. Never split or rebuild the source stroke geometry.
       if (distance > radius + extraNibReach) continue;
 
-      if (Array.isArray(element.points) && element.points.length) {
+      // Partial erasing is geometry-independent: keep the original vector
+      // element and accumulate the eraser footprint in its SVG mask. This is
+      // essential for shapes, whose geometry is stored as rect/ellipse/polygon
+      // attributes rather than a sampled freehand points array.
+      if (element.type !== "text" && element.svgTag !== "text") {
         const oldMask = element.eraseMask && typeof element.eraseMask.d === "string"
           ? element.eraseMask.d
           : "";
@@ -1669,7 +1673,7 @@ export class DrawingEngine {
         };
         modified = true;
       } else {
-        // Non-stroke vector objects without sampled paths remain whole-object erasures.
+        // Text has no SVG mask hook in the renderer; retain whole-object behavior.
         layer.elements.splice(index, 1);
         index--;
         modified = true;
