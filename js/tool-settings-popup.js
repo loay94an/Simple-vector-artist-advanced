@@ -261,13 +261,13 @@
   const headProfiles = {
     feather: {
       "feather-pointed": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
-      "feather-flat": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
-      "feather-round": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
-      "feather-fan": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
-      "feather-soft": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow"],
-      "feather-dry": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
-      "feather-quill": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"],
-      "feather-script": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing"]
+      "feather-flat": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
+      "feather-round": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
+      "feather-fan": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
+      "feather-soft": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherGlow","featherFade"],
+      "feather-dry": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
+      "feather-quill": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"],
+      "feather-script": ["featherDensity","featherSpread","featherSoftness","featherTaper","featherSpacing","featherFade"]
     },
     calligraphy: {
       "*": ["brushSize","brushOpacity","calligraphyAngle","calligraphyEndStyle","pressureEnabled"]
