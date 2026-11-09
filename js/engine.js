@@ -438,32 +438,6 @@ export class StrokeBuilder {
     }
 
     if (points.length === 1) {
-        const p = points[0], r = radiusAt(p, 0);
-        return `M ${(p.x-r).toFixed(2)} ${p.y.toFixed(2)} a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(r*2).toFixed(2)} 0 a ${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(-r*2).toFixed(2)} 0`;
-      }
-      const paths = [];
-      for (let lane = 0; lane < lanes; lane++) {
-        const ratio = lanes === 1 ? 0 : lane / (lanes - 1) - 0.5;
-        const leftSide = [], rightSide = [];
-        for (let i = 0; i < points.length; i++) {
-          const p = points[i], a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
-          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-          const nx = -dy / len, ny = dx / len;
-          const progress = points.length <= 1 ? 0.5 : i / (points.length - 1);
-          const endTaper = Math.max(0.08, 1 - taper * (1 - Math.min(1, Math.min(progress, 1 - progress) * 5)));
-          const r = radiusAt(p, i) * endTaper;
-          const laneOffset = ratio * spread * spacing * r * 1.65;
-          const laneRadius = Math.max(0.22, r * (preset === "feather-fan" ? 0.12 : preset === "feather-flat" ? 0.30 : preset === "feather-dry" ? 0.10 : 0.42));
-          const cx = p.x + nx * laneOffset, cy = p.y + ny * laneOffset;
-          leftSide.push({x:cx + nx * laneRadius, y:cy + ny * laneRadius});
-          rightSide.push({x:cx - nx * laneRadius, y:cy - ny * laneRadius});
-        }
-        paths.push(poly([...leftSide, ...rightSide.reverse()]));
-      }
-      return paths.join(" ");
-    }
-
-    if (points.length === 1) {
       const p=points[0],r=radiusAt(p,0);
       if(kind==="flat"){const tx=-nibY,ty=nibX,h=Math.max(1,r*0.7);return poly([
         {x:p.x-tx*h+nibX*r,y:p.y-ty*h+nibY*r},{x:p.x+tx*h+nibX*r,y:p.y+ty*h+nibY*r},
