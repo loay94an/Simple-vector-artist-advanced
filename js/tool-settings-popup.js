@@ -430,8 +430,10 @@
       art.innerHTML = defs + '<defs><mask id="headPreviewMask"><rect width="320" height="76" fill="url(#headPreviewFade)"/></mask></defs>' + drawing;
     } else {
       const strokeWidth = clamp((2 + size / 7) * pressureFactor, 2, 18);
-      const path = '<path d="M 16 51 C 70 8 116 64 166 34 S 258 10 304 39" fill="none" stroke="currentColor" stroke-width="' + strokeWidth.toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" filter="' + (softness > .05 ? 'url(#headPreviewBlur)' : 'none') + '"/>';
-       art.innerHTML = defs + '<g transform="rotate(' + (angle - 45).toFixed(1) + ' 160 38)">' + path + '</g>';
+      // Straight preview: keep the sample stroke perfectly horizontal.
+      // The nib-angle setting must not rotate or bend the demonstration line.
+      const path = '<path d="M 16 38 H 304" fill="none" stroke="currentColor" stroke-width="' + strokeWidth.toFixed(2) + '" stroke-linecap="butt" stroke-linejoin="miter" opacity="' + opacity + '" filter="' + (softness > .05 ? 'url(#headPreviewBlur)' : 'none') + '"/>';
+      art.innerHTML = defs + path;
     }
     if (caption) caption.textContent = changedKey
       ? "يتغير المثال الآن مع: " + (headLabels[changedKey] || changedKey)
