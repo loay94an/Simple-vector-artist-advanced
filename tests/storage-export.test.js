@@ -25,13 +25,14 @@ class FakeStorage {
   removeItem(key) { this.removed.push(key); this.values.delete(key); }
 }
 
-test("document export remains available independently of persistent storage", () => {
+test("document export remains available independently of persistent storage", async () => {
   const doc = sampleDocument();
   const manager = new StorageManager(doc, { storage: null });
   const blob = manager.exportFile();
   assert.ok(blob instanceof Blob);
   assert.equal(blob.type, "application/json;charset=utf-8");
-  assert.equal(DocumentFormat.parse(manager.exportFile() ? JSON.stringify(doc) : "{}").name, "اختبار");
+  const exported = DocumentFormat.parse(await blob.text());
+  assert.equal(exported.name, "اختبار");
 });
 
 test("failed storage write never deletes the existing backup", () => {
