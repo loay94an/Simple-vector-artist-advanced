@@ -3939,3 +3939,12 @@ body.dark .canvas-area {
 #brushPresetsSection .brush-preset-group-note { margin:0 0 7px; }
 #brushPresetsSection .brush-preset-group-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
 #brushPresetsSection .brush-preset-family-heading + .brush-preset-groups { margin-top:4px; }
+
+
+/* Family wrappers contain headings and nested grids, not preset tiles themselves. */
+#brushPresetsSection .tool-brush-presets,
+#brushPresetsSection .brush-presets-calligraphy,
+#brushPresetsSection .brush-presets-feather {
+  display: block !important;
+  margin-top: 8px;
+}
