@@ -1,0 +1,75 @@
+name: Build Rasem iOS (unsigned)
+
+on:
+  push:
+    branches:
+      - feature/ios-capacitor-ipa
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run project tests
+        run: npm test
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Generate and sync Capacitor iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Archive iOS app without signing
+        run: |
+          mkdir -p build
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/Rasem-Unsigned.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+
+      - name: Package unsigned IPA (not installable until signed)
+        run: |
+          APP_PATH="$PWD/build/Rasem-Unsigned.xcarchive/Products/Applications/App.app"
+          test -d "$APP_PATH"
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+          cd build/ipa
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload "$GITHUB_WORKSPACE/build/Rasem-Unsigned.ipa"
+
+      - name: Upload unsigned iOS build and archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rasem-iOS-Unsigned
+          path: |
+            build/Rasem-Unsigned.ipa
+            build/Rasem-Unsigned.xcarchive/**
+          if-no-files-found: error
+          retention-days: 14
