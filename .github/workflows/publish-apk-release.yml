@@ -8,6 +8,7 @@ on:
       - completed
     branches:
       - main
+      - fix/capacitor-save-module-resolution
 
 permissions:
   actions: read
