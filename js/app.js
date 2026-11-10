@@ -46,6 +46,7 @@ import {
 import {
   StorageManager,
   Autosave,
+  downloadBlob,
   SVGExport,
   PNGExport,
   PDFExport
@@ -54,6 +55,18 @@ import {
 import {
   UIManager
 } from "./ui.js";
+
+// Publish the already-bundled storage API for legacy inline UI handlers.
+// Never dynamically import this module from classic inline scripts: it contains
+// npm package imports that must be resolved by Vite during the production build.
+if (typeof window !== "undefined") {
+  window.rasemStorageExports = Object.freeze({
+    downloadBlob,
+    SVGExport,
+    PNGExport,
+    PDFExport
+  });
+}
 
 // Native Android file saving is centralized in storage-export.js.
 
