@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - fix/capacitor-save-module-resolution
+      - fix/android-save-style-reference
 
 permissions:
   actions: read
@@ -35,11 +36,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           APK_PATH="$(find release-files -type f -name '*.apk' -print -quit)"
           test -n "$APK_PATH"
-          TAG="rasem-android-build-${RUN_NUMBER}"
+          if [ "$HEAD_BRANCH" = "main" ]; then
+            TAG="v1.0.1"
+            TITLE="رسام الخط العربي 1.0.1"
+          else
+            TAG="rasem-android-build-${RUN_NUMBER}"
+            TITLE="رسام الخط العربي - Android APK #${RUN_NUMBER}"
+          fi
           cp "$APK_PATH" "Rasem-Vector-Artist.apk"
           gh release create "$TAG" "Rasem-Vector-Artist.apk" \
-            --title "رسام الخط العربي - Android APK #${RUN_NUMBER}" \
-            --notes "نسخة Android مستقلة يمكن تثبيتها بجانب التطبيق السابق. مبنية من commit ${COMMIT_SHA}."
+            --title "$TITLE" \
+            --notes "نسخة Android مستقلة. مبنية من commit ${COMMIT_SHA}."
