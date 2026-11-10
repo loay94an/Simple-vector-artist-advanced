@@ -1,0 +1,40 @@
+name: Generate PWA icons
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "icons/brand-icon.svg"
+      - "manifest.json"
+      - "index.html"
+      - ".github/workflows/generate-pwa-icons.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Install SVG renderer and Arabic fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-bin fonts-noto-core fonts-noto-extra
+      - name: Render matching PNG icons
+        run: |
+          rsvg-convert -w 192 -h 192 icons/brand-icon.svg -o icons/icon-192.png
+          rsvg-convert -w 512 -h 512 icons/brand-icon.svg -o icons/icon-512.png
+      - name: Commit generated icons
+        run: |
+          if git diff --quiet -- icons/icon-192.png icons/icon-512.png; then
+            echo "PWA icons are already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add icons/icon-192.png icons/icon-512.png
+          git commit -m "Generate PWA PNG icons from brand SVG"
+          git push origin main
