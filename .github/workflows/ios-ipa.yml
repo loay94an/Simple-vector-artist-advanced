@@ -73,5 +73,6 @@ jobs:
           path: |
             build/Rasem-Unsigned.ipa
             build/Rasem-Unsigned.xcarchive/**
+            ios/**
           if-no-files-found: error
           retention-days: 14
