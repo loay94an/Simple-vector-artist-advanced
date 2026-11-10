@@ -914,7 +914,8 @@
         const data = window.rasem?.storage?.getDocumentData?.() || window.rasem?.document?.toJSON?.();
         if (!data) throw new Error("لا توجد بيانات رسم لحفظها.");
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const storageModule = await import("./js/storage-export.js");
+        const storageModule = window.rasemStorageExports;
+        if (!storageModule) throw new Error("تعذر تهيئة وحدة الحفظ. أعد تشغيل التطبيق ثم حاول مجدداً.");
         const saved = await storageModule.downloadBlob(blob, `rasem-drawing-${Date.now()}.rasem`);
         if (saved === false) throw new Error("لم يتم حفظ الملف. اختر موقعاً للحفظ وحاول مجدداً.");
         const toast = document.getElementById("toast");
@@ -1174,7 +1175,8 @@
         const data =
           typeof doc.toJSON === "function" ? doc.toJSON() : doc;
 
-        const storageModule = await import("./js/storage-export.js");
+        const storageModule = window.rasemStorageExports;
+        if (!storageModule) throw new Error("تعذر تهيئة وحدة الحفظ. أعد تشغيل التطبيق ثم حاول مجدداً.");
 
         let blob;
         const extension = currentSaveFormat;
