@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - fix/capacitor-save-module-resolution
+      - fix/android-save-style-reference
   workflow_dispatch:
 
 jobs:

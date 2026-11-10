@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DocumentFormat, StorageManager } from "../js/storage-export.js";
+import { DocumentFormat, StorageManager, calculateContentBounds } from "../js/storage-export.js";
 
 function sampleDocument() {
   return {
@@ -52,4 +52,41 @@ test("storage manager reports failure when persistence is unavailable", () => {
   const manager = new StorageManager(sampleDocument(), { storage: null });
   assert.equal(manager.save(), false);
   assert.ok(manager.exportFile() instanceof Blob);
+});
+
+
+test("text export bounds work when a text element has no style object", () => {
+  const bounds = calculateContentBounds({
+    layers: [{
+      id: "layer-text",
+      visible: true,
+      elements: [{
+        id: "text-1",
+        type: "text",
+        text: "مرحبا",
+        geometry: { x: 40, y: 80 }
+      }]
+    }]
+  });
+  assert.ok(Number.isFinite(bounds.x));
+  assert.ok(Number.isFinite(bounds.y));
+  assert.ok(bounds.width > 0);
+  assert.ok(bounds.height > 0);
+});
+
+test("text export bounds respect font size when style is present", () => {
+  const bounds = calculateContentBounds({
+    layers: [{
+      id: "layer-text",
+      visible: true,
+      elements: [{
+        id: "text-2",
+        type: "text",
+        text: "Test",
+        style: { fontSize: 48, size: 48 },
+        geometry: { x: 10, y: 60 }
+      }]
+    }]
+  });
+  assert.ok(bounds.height >= 48);
 });
