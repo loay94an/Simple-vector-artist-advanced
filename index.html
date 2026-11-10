@@ -9,7 +9,7 @@
   <meta property="og:title" content="رسام الخط العربي" />
   <meta property="og:description" content="تطبيق احترافي للرسم المتجهي والخط العربي." />
   <meta property="og:type" content="website" />
-  <link rel="manifest" href="./manifest.json" />
+  <link rel="manifest" href="/Simple-vector-artist-advanced/manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./icons/brand-icon.svg" />
   
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1267,7 +1267,7 @@
       });
     }
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./service-worker.js")
+      navigator.serviceWorker.register("/Simple-vector-artist-advanced/service-worker.js", { scope: "/Simple-vector-artist-advanced/" })
         .then(reg => {
           reg.update();
           console.log("رسام الخط العربي: PWA service worker updated");
