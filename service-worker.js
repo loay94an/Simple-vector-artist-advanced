@@ -1,10 +1,12 @@
 /* رسام الخط العربي — PWA offline shell */
-const CACHE_NAME = "rasem-arabic-calligraphy-pwa-v1";
+const CACHE_NAME = "rasem-arabic-calligraphy-pwa-v2";
 const PRECACHE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./icons/brand-icon.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
   "./css/app.css",
   "./js/app.js",
   "./js/arabic-writing.js",
