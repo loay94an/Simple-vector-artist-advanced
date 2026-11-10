@@ -1,7 +1,10 @@
 name: Build Rasem Android APK
 
 on:
-  # APK builds are manual so web-only recognition changes never create an APK.
+  # Build the requested APK from this focused fix branch; keep other web-only branches APK-free.
+  push:
+    branches:
+      - fix/capacitor-save-module-resolution
   workflow_dispatch:
 
 jobs:
