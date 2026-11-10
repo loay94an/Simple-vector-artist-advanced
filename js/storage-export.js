@@ -818,7 +818,10 @@ export function calculateContentBounds(documentData, padding = 30) {
     const elements = Array.isArray(layer.elements) ? layer.elements : [];
     for (const el of elements) {
       if (el.visible === false) continue;
-      const strokeHalf = (safeNumber(el.style?.size, 2) / 2) + 2;
+      // Normalize style once; text bounds also read fontSize.
+      // Elements without a style object must use safe defaults.
+      const style = isObject(el.style) ? el.style : {};
+      const strokeHalf = (safeNumber(style.size, 2) / 2) + 2;
 
       // 1. Points
       if (Array.isArray(el.points) && el.points.length > 0) {
