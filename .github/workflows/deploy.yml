@@ -35,7 +35,13 @@ jobs:
         run: npm ci || npm install
 
       - name: Build
-        run: npm run build
+        run: |
+          npm run build
+          # Vite only copies files from public/, while the PWA assets live at the repository root.
+          # Publish the manifest, service worker, and matching app icons beside the built index.html.
+          mkdir -p dist/icons
+          cp manifest.json service-worker.js dist/
+          cp icons/brand-icon.svg icons/icon-192.png icons/icon-512.png dist/icons/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
